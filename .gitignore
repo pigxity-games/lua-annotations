@@ -1,2 +1,3 @@
 test/**/generated/
 test/sourcemap.json
+__pycache__
