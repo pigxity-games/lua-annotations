@@ -1,18 +1,19 @@
 local ServerScriptService = game:GetService("ServerScriptService")
 local T = require(ServerScriptService.generated.Types)
-local Network: T.Network
+
+local MessageService
 
 --@service
+--@depends, client:MessageService
 local module = {}
 
---@inject Network
 function module._init(deps: T.GreetServiceDeps)
-	Network = deps.Network
+	MessageService = deps.MessageService
 end
 
---@connect game:Players.PlayerAdded
+--@connect, game:Players.PlayerAdded
 function module.sendGreeting(player: Player)
-	Network.sendClientMessage(player, "Hello, " .. player.Name)
+	MessageService.printMessage('Hello, ' .. player.Name)
 end
 
 return module

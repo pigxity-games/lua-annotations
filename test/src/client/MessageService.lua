@@ -1,7 +1,7 @@
 --@service
 local module = {}
 
---@connect #RemoteEvent, ClientSendMessage
+--@remote, event
 function module.printMessage(message: string)
 	print("Recieved message " .. message)
 end

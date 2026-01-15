@@ -3,7 +3,7 @@ from pathlib import Path
 import json
 from typing import Literal
 
-from dir_scan import scan_directory
+from dir_scan import build
 from init_project import create_config
 
 #argument parsing
@@ -29,6 +29,6 @@ config = json.loads(config_file.read_text())
 
 # main mode
 if mode == 'build':
-    scan_directory(workdir)
+    build(workdir)
 
 #TODO: watch mode
