@@ -17,14 +17,14 @@ args = parser.parse_args()
 mode: Literal['build', 'init', 'watch'] = args.mode
 
 workdir: Path = Path.cwd() / args.workdir
-assert workdir.exists() and workdir.is_dir(), "Specified workdir path is not a directory!"
+assert workdir.exists() and workdir.is_dir(), 'Specified workdir path is not a directory!'
 
 config_file: Path = workdir / args.config
 if mode == 'init':
     create_config(workdir, config_file)
     exit()
 
-assert config_file.exists(), "Config file not found. Run the program in init mode to create one!"
+assert config_file.exists(), 'Config file not found. Run the program in init mode to create one!'
 config = json.loads(config_file.read_text())
 
 # main mode

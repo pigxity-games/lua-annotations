@@ -2,7 +2,7 @@ from itertools import chain
 from pathlib import Path
 import re
 
-from annotation_parser import ANNOTATION_PREFIX, Annotation, AnnotationDef, ExtensionContext
+from annotations import ANNOTATION_PREFIX, Annotation, AnnotationDef, ExtensionContext
 
 FILENAMES = ['*.lua', '*.luau']
 ANNOTATION_REGEX = re.compile('^--@.*', re.MULTILINE)

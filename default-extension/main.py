@@ -1,13 +1,16 @@
-from annotation_parser import AnnotationDef, ArgumentParser, ExtensionContext
+from annotations import AnnotationDef, ExtensionContext
 
-class TestArg(ArgumentParser[str]):
-    def process(self, value: str) -> str:
-        print(value)
-        return value
+def customArg(v: str):
+    return v * 2
 
-methodTest = AnnotationDef('methodTest', scope='method', args=[
-    TestArg()
-])
+moduleTest = AnnotationDef('methodTest',
+    args=[int, str],
+    kwargs={
+        'test': customArg,
+    })
+
+methodTest = AnnotationDef('moduleTest')
 
 def load(ctx: ExtensionContext):
+    ctx.registerAnnotation(moduleTest)
     ctx.registerAnnotation(methodTest)
