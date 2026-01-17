@@ -6,7 +6,7 @@
         "ReplicatedStorage": {
             "$className": "ReplicatedStorage",
             "$path": "src/shared",
-            "include": {
+            "Packages": {
                 "$className": "Folder",
                 "$path": "include"
             }
