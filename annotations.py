@@ -1,37 +1,52 @@
-from typing import Any, Callable, Literal
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Callable, Literal
+
+if TYPE_CHECKING:
+    from dir_scan import BuildProcessCtx
 
 ANNOTATION_PREFIX = '--@'
 ARG_SEP = ', '
 
 type retention = Literal['build', 'init', 'runtime']
-type scope = Literal['module', 'method']
-
-class BuildProcessCtx():
-    def __init__(self):
-        pass
-
-#for extensions to define annotations
+type scope = Literal['module', 'method', 'type']
 type argProcessor = Callable[[str], Any]
+
+@dataclass
+class AnnotationBuildCtx():
+    build_ctx: BuildProcessCtx
+    file: Path
+    line: int
+
+@dataclass
+#for extensions to define annotations
 class AnnotationDef():
-    def __init__(self, name: str, args: list[argProcessor]=[], kwargs: dict[str, argProcessor]={}, retention: retention='init', scope: scope='module'):
-        self.name = name
+    name: str
+    args: list[argProcessor]=[]
+    kwargs: dict[str, argProcessor]={}
+    retention: retention='init'
+    scope: scope='module'
+    mutual_include: list[AnnotationDef]=[]
+    mutual_exclude: list[AnnotationDef]=[]
 
-        self.args = args
-        self.kwargs = kwargs
-        self.retention = retention
-        self.scope = scope
-
-    def on_build(self, ctx: BuildProcessCtx):
+    def on_build(self, ctx: AnnotationBuildCtx):
         ...
+
+    def check_relationships(self, annotations: list[Annotation]):
+        include_checks: list[AnnotationDef] = []
+        for anot in annotations:
+            assert not anot.adef in self.mutual_exclude
+            include_checks.append(anot.adef)
+
+        for anot in self.mutual_include:
+            assert anot in include_checks
 
 #an instance of an annotation found when processing
 class Annotation():
-    def __init__(self, definition: AnnotationDef, text: str):
-        self.adef = definition
-
+    def __init__(self, registry: AnnotationRegistry, text: str):
         parts = text.removeprefix(ANNOTATION_PREFIX).split(ARG_SEP)
-        self.name = parts[0]
 
+        self.adef = registry.get(parts[1])
         self.kwargs_val: dict[str, Any] = {}
         self.args_val: list[Any] = []
         self.parse_args(parts[1:-1])
@@ -49,7 +64,10 @@ class Annotation():
                 self.args_val[i] = proc(arg)
 
 
-class ExtensionContext():
-    registry: list[AnnotationDef] = []
-    def registerAnnotation(self, annotation: AnnotationDef):
-        self.registry.append(annotation)
+class AnnotationRegistry():
+    registry: dict[str, AnnotationDef] = {}
+    def register(self, annotation: AnnotationDef):
+        self.registry[annotation.name] = annotation
+
+    def get(self, name: str):
+        return self.registry[name]

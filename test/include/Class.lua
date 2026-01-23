@@ -1,3 +1,4 @@
+--returns a table type with a .new constructor
 type function createConstructor(T: type)
     assert(T:is('table'))
 
@@ -30,14 +31,14 @@ type function getFields(T: type)
     assert(T:is('table'))
 
     local initFun = T:readproperty(types.singleton('_init'))
-    assert(initFun and initFun:is('function'))
+    assert(initFun and initFun:is('function'), 'init is not a functrion')
     
     local params = initFun:parameters()
     return params.head[1]
 end
 
 local function class<T>(class: T)
-    class.__index = class
+    class.__index = class 
 
     function class.new(...)
         local self = setmetatable({}, class)

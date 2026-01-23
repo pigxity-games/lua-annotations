@@ -1,22 +1,19 @@
---@service
-local module = {
-    --@test
-    testfun3 = function()
-        
-    end
-}
+--@moduleTest
+local module = {}
 
---@test
+--@methodTest
 function module.testfun1()
     
 end
 
---@test
+--@methodTest
 module.testfun2 = function()
     
 end
 
---@test
+--@methodTest
 function module:testfun4()
 
 end
+
+return module
