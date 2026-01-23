@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
@@ -18,16 +18,16 @@ class AnnotationBuildCtx():
     file: Path
     line: int
 
-@dataclass
 #for extensions to define annotations
+@dataclass
 class AnnotationDef():
     name: str
-    args: list[argProcessor]=[]
-    kwargs: dict[str, argProcessor]={}
+    args: list[argProcessor]=field(default_factory=list)
+    kwargs: dict[str, argProcessor]=field(default_factory=dict)
     retention: retention='init'
     scope: scope='module'
-    mutual_include: list[AnnotationDef]=[]
-    mutual_exclude: list[AnnotationDef]=[]
+    mutual_include: list[AnnotationDef]=field(default_factory=list)
+    mutual_exclude: list[AnnotationDef]=field(default_factory=list)
 
     def on_build(self, ctx: AnnotationBuildCtx):
         ...

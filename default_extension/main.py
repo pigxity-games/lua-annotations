@@ -4,8 +4,8 @@ class TestAnnotation(AnnotationDef):
     def on_build(self, ctx: AnnotationBuildCtx):
         print(ctx)
 
-moduleTest = TestAnnotation('methodTest')
-methodTest = TestAnnotation('moduleTest', scope='method')
+moduleTest = TestAnnotation('methodTest', scope='method')
+methodTest = TestAnnotation('moduleTest', scope='module')
 
 def load(ctx: AnnotationRegistry):
     ctx.register(moduleTest)

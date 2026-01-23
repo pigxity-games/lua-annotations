@@ -1,37 +1,35 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import re
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
-from annotations import AnnotationDef, AnnotationRegistry, scope
+from annotations import AnnotationDef, AnnotationRegistry
 from default_extension import main as default_extension
 
 ANNOTATION_PREFIX = '--@'
 ARG_SEP = ', '
 
 #matches module/type name for module/type declarations
-TYPE_LINE_REGEX = re.compile('^type\s+(\w+)')
-MODULE_REGEX = re.compile('^local\s+(\w+)\s*=.*\{')
+TYPE_LINE_REGEX = re.compile(r'^type\s+(\w+)')
+MODULE_REGEX = re.compile(r'^local\s+(\w+)\s*=.*\{')
 
 #matches keys (group 1) and values (group 2) in a dictonary seperated by = or :
-DICT_REGEX = re.compile('(\w+)\s*[:=]\s*(.*?)(?:,\s*|$)')
+DICT_REGEX = re.compile(r'(\w+)\s*[:=]\s*(.*?)(?:,\s*|$)', re.MULTILINE)
 
 #group 1 = module name, group 2 = function name, group 3 = parameters, group 4 = return type
 #use dict_regex for group 2 matches
-FUNCTION_REGEX = re.compile('^\s*(?:function\s+)?(?:(\w+)[.:])?(\w+)\s*(?:=\s*function\s*)?\(\s*([^)]*)\s*\)\s*(?::\s([^\s]+))?')
+FUNCTION_REGEX = re.compile(r'^\s*(?:function\s+)?(?:(\w+)[.:])?(\w+)\s*(?:=\s*function\s*)?\(\s*([^)]*)\s*\)\s*(?::\s([^\s]+))?')
 
 #group 2 if single return, group 1 if table returned (use dict_regex)
-RETURN_REGEX = re.compile('return\s*\{([\s\S]*?)\}\s*$|^return\s(\w*)')
+RETURN_REGEX = re.compile(r'return\s*\{([\s\S]*?)\}\s*$|^return\s(\w*)', re.MULTILINE)
 
 type adornee = LuaModule | LuaMethod
 
 @dataclass
-class TypedValue():
-    type: str
-    name: str
-
-@dataclass
 class LuaMethod():
-    pass
+    name: str
+    module: LuaModule
+    params: dict[str, str] = field(default_factory=dict)
+    return_type: Optional[str] = None
 
 @dataclass
 class LuaModule():
@@ -44,11 +42,7 @@ class Annotation():
     name: str
     args_val: list[Any]
     kwargs_val: dict[str, Any]
-    adornee: Optional[adornee]=None
-
-def set_adornee(anots: list[Annotation], adornee: adornee):
-    for anot in anots:
-        anot.adornee = adornee
+    adornee: adornee = field(init=False)
 
 #assertion functions
 def annotations_scopes_equal(anots: list[AnnotationDef]):
@@ -63,6 +57,10 @@ def annotations_are_mutual(anots: list[AnnotationDef]):
     return True
 
 #parsing
+def set_adornee(anots: list[Annotation], adornee: adornee):
+    for anot in anots:
+        anot.adornee = adornee
+
 def parse_anot_args(adef: AnnotationDef, args: list[str]):
     kwargs_val: dict[str, Any] = {}
     args_val: list[Any] = []
@@ -87,51 +85,147 @@ def parse_annotation(text: str, ctx: AnnotationRegistry):
 
     return Annotation(adef, name, args, kwargs)
 
-def parse_lines(lines: list[str], ctx: AnnotationRegistry):
-    annotations: list[Annotation] = []
-    cur_annotations: list[Annotation] = []
-    
-    for line in lines:
-        #skip empty lines
-        if line == '':
-            continue
-       
-        #comments
-        elif line.startswith('--'):
-            #annotation
-            if line.startswith(ANNOTATION_PREFIX):
-                cur_annotations.append(parse_annotation(line, ctx))
+@dataclass
+class ReturnedValue():
+    default_name: str
+    type: Literal['single', 'dict']
+    single_module: Optional[str] = None
+    dict: Optional[dict[str, str]] = None
 
+    def get_returned_name(self, module: str):
+        if self.type == 'single':
+            if self.single_module == module:
+                return self.default_name
+        elif self.type == 'dict':
+            if self.dict:
+                return self.dict.get(module)
+
+def get_dict_data(text: str):
+    dict = DICT_REGEX.search(text)
+    assert(dict)
+
+    keys: list[str] = dict.group(1)
+    values: list[str] = dict.group(2)
+
+    if len(keys) == len(values):
+        out: dict[str, str] = {}
+        for i, key in enumerate(keys):
+            out[key] = values[i]
+        return out
+  
+def get_returned(text: str, default_name: str):
+    match = RETURN_REGEX.search(text)
+    assert(match)
+
+    single: str = match.group(2)
+
+    if single:
+        return ReturnedValue(default_name, 'single', single_module=single)
+    else:
+        tablestr: str = match.group(1)
+        assert(tablestr)
+        dict_data = get_dict_data(tablestr)
+        return ReturnedValue(default_name, 'dict', dict=dict_data)
+
+def remove_whitespace(t: list[Any]):
+    return [p.strip() for p in t]
+
+def map_param_list(params: list[str]):    
+    out: dict[str, str] = {}
+    for param in params:
+        parts = remove_whitespace(param.split(':'))
+        if len(parts) > 1:
+            out[parts[0]] = parts[1]
         else:
-            #if there are annotations in this block of code, then find adornee
-            if len(cur_annotations) > 0:
-                adefs = [anot.adef for anot in cur_annotations]
-                assert(annotations_scopes_equal(adefs))
-                assert(annotations_are_mutual(adefs))
-                scope = adefs[0].scope
+            out[parts[0]] = 'any'
 
-                #strip comments
-                line = line.split('--')[0]
-                
-                #methods
-                if scope == 'method':
-                    pass
+    return out
 
-                #modul
-                elif scope == 'module':
-                    match = MODULE_REGEX.match(line)
-                    assert(match)
+
+def get_function(text: str, modules: dict[str, LuaModule]):
+    match = FUNCTION_REGEX.search(text)
+    assert(match)
+
+    module_name: str = match.group(1)
+    fun_name: str = match.group(2)
+    raw_params: str = match.group(3)
+    return_type: str = match.group(4) or 'any'
+
+    assert(module_name and fun_name)
+    if not raw_params.strip() == '':
+        params = remove_whitespace(raw_params.split(','))
+        param_dict = map_param_list(params)
+    else:
+        param_dict = {}
+
+    return LuaMethod(fun_name, modules[module_name], param_dict, return_type)
+
+@dataclass
+class FileParser():
+    reg: AnnotationRegistry
+    file_name: str
+    annotations: list[Annotation] = field(default_factory=list)
+    cur_annotations: list[Annotation] = field(default_factory=list)
+    modules: dict[str, LuaModule] = field(default_factory=dict)
+
+    def parse(self, text: str):        
+        returned = get_returned(text, self.file_name)
+        lines = [l.rstrip() for l in text.splitlines()]
+
+        for line in lines:
+            #skip empty lines
+            if line == '':
+                continue
+        
+            #comments
+            elif line.startswith('--'):
+                #annotation
+                if line.startswith(ANNOTATION_PREFIX):
+                    self.cur_annotations.append(parse_annotation(line, self.reg))
+
+            else:
+                #if there are annotations in this block of code, then find adornee
+                if len(self.cur_annotations) > 0:
+                    adefs = [anot.adef for anot in self.cur_annotations]
+                    assert(annotations_scopes_equal(adefs))
+                    assert(annotations_are_mutual(adefs))
+                    scope = adefs[0].scope
+
+                    #strip comments
+                    line = line.split('--')[0]
                     
-                    name = match.group(1)
-                    set_adornee(cur_annotations, LuaModule(name))
+                    #methods
+                    if scope == 'method':
+                        method = get_function(line, self.modules)
+                        set_adornee(self.cur_annotations, method)
 
-                annotations += cur_annotations
-                cur_annotations = []
+                    #module
+                    elif scope == 'module':
+                        match = MODULE_REGEX.search(line)
+                        assert(match)
+                        
+                        name: str = match.group(1)
+                        returned_name = returned.get_returned_name(name)
+                        assert(name and returned_name)
+                
+                        module = LuaModule(name, returned_name)
+                        set_adornee(self.cur_annotations, module)
+                        self.modules[module.name] = module
+
+                    self.annotations += self.cur_annotations
+                    self.cur_annotations = []
 
 #Test
-if __name__ == 'main':
+if __name__ == '__main__':
     ctx = AnnotationRegistry()
     default_extension.load(ctx)
     
-    with open('test/Test.lua', 'r') as f:
-        parse_lines([l.rstrip() for l in f.readlines()], ctx)
+    with open('./test/Test.lua', 'r') as f:
+        parser = FileParser(ctx, 'Test')
+        parser.parse(f.read())
+
+    for module in parser.modules.values():
+        print(module.name, module.returned_name)
+
+    for anot in parser.annotations:
+        print(anot.name, anot.adornee, anot.args_val, anot.kwargs_val)

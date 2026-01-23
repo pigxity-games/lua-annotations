@@ -15,7 +15,7 @@ local module = {
 }
 
 --@methodTest
-function module.testfun1()
+function module.testfun1(t: any, t2: string)
     
 end
 
