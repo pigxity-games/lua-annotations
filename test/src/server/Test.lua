@@ -1,3 +1,11 @@
+type x = 'test' | 'hello'
+
+type y = {
+    x: any,
+    y: string,
+    z: x
+}
+
 --@service
 local module = {
     --@test

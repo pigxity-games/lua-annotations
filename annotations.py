@@ -50,6 +50,6 @@ class Annotation():
 
 
 class ExtensionContext():
-    registry: list[AnnotationDef] = []
+    registry: dict[str, AnnotationDef] = []
     def registerAnnotation(self, annotation: AnnotationDef):
-        self.registry.append(annotation)
+        self.registry[annotation.name] = annotation
