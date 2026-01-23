@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import re
 from typing import Any, Optional
 
-from annotations import AnnotationDef, ExtensionContext, scope
+from annotations import AnnotationDef, AnnotationRegistry, scope
 from default_extension import main as default_extension
 
 ANNOTATION_PREFIX = '--@'
@@ -78,7 +78,7 @@ def parse_anot_args(adef: AnnotationDef, args: list[str]):
 
     return args_val, kwargs_val
 
-def parse_annotation(text: str, ctx: ExtensionContext):
+def parse_annotation(text: str, ctx: AnnotationRegistry):
     parts = text.removeprefix(ANNOTATION_PREFIX).split(ARG_SEP)
     name = parts[0]
 
@@ -87,7 +87,7 @@ def parse_annotation(text: str, ctx: ExtensionContext):
 
     return Annotation(adef, name, args, kwargs)
 
-def parse_lines(lines: list[str], ctx: ExtensionContext):
+def parse_lines(lines: list[str], ctx: AnnotationRegistry):
     annotations: list[Annotation] = []
     cur_annotations: list[Annotation] = []
     
@@ -130,7 +130,7 @@ def parse_lines(lines: list[str], ctx: ExtensionContext):
 
 #Test
 if __name__ == 'main':
-    ctx = ExtensionContext()
+    ctx = AnnotationRegistry()
     default_extension.load(ctx)
     
     with open('test/Test.lua', 'r') as f:
