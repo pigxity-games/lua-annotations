@@ -14,8 +14,13 @@ local module = {
     end
 }
 
+--@moduleTest
+local module2 = {
+
+}
+
 --@methodTest
-function module.testfun1(t: any, t2: string)
+function module.testfun1(t: any, t2: string): number
     
 end
 
@@ -25,8 +30,11 @@ module.testfun2 = function()
 end
 
 --@methodTest
-function module:testfun4()
+function module:testfun4(): string
 
 end
 
-return module
+return {
+    TestModule = module,
+    TestModule2 = module2
+}

@@ -1,48 +1,9 @@
 from dataclasses import dataclass, field
-import re
-from typing import Any, Literal, Optional
+from typing import Any
 
 from annotations import AnnotationDef, AnnotationRegistry
 from default_extension import main as default_extension
-
-ANNOTATION_PREFIX = '--@'
-ARG_SEP = ', '
-
-#matches module/type name for module/type declarations
-TYPE_LINE_REGEX = re.compile(r'^type\s+(\w+)')
-MODULE_REGEX = re.compile(r'^local\s+(\w+)\s*=.*\{')
-
-#matches keys (group 1) and values (group 2) in a dictonary seperated by = or :
-DICT_REGEX = re.compile(r'(\w+)\s*[:=]\s*(.*?)(?:,\s*|$)', re.MULTILINE)
-
-#group 1 = module name, group 2 = function name, group 3 = parameters, group 4 = return type
-#use dict_regex for group 2 matches
-FUNCTION_REGEX = re.compile(r'^\s*(?:function\s+)?(?:(\w+)[.:])?(\w+)\s*(?:=\s*function\s*)?\(\s*([^)]*)\s*\)\s*(?::\s([^\s]+))?')
-
-#group 2 if single return, group 1 if table returned (use dict_regex)
-RETURN_REGEX = re.compile(r'return\s*\{([\s\S]*?)\}\s*$|^return\s(\w*)', re.MULTILINE)
-
-type adornee = LuaModule | LuaMethod
-
-@dataclass
-class LuaMethod():
-    name: str
-    module: LuaModule
-    params: dict[str, str] = field(default_factory=dict)
-    return_type: Optional[str] = None
-
-@dataclass
-class LuaModule():
-    name: str
-    returned_name: str
-
-@dataclass
-class Annotation():
-    adef: AnnotationDef
-    name: str
-    args_val: list[Any]
-    kwargs_val: dict[str, Any]
-    adornee: adornee = field(init=False)
+from parser_schemas import *
 
 #assertion functions
 def annotations_scopes_equal(anots: list[AnnotationDef]):
@@ -85,34 +46,23 @@ def parse_annotation(text: str, ctx: AnnotationRegistry):
 
     return Annotation(adef, name, args, kwargs)
 
-@dataclass
-class ReturnedValue():
-    default_name: str
-    type: Literal['single', 'dict']
-    single_module: Optional[str] = None
-    dict: Optional[dict[str, str]] = None
-
-    def get_returned_name(self, module: str):
-        if self.type == 'single':
-            if self.single_module == module:
-                return self.default_name
-        elif self.type == 'dict':
-            if self.dict:
-                return self.dict.get(module)
-
 def get_dict_data(text: str):
-    dict = DICT_REGEX.search(text)
-    assert(dict)
+    matches = DICT_REGEX.findall(text)
+    assert(len(matches) > 0)
 
-    keys: list[str] = dict.group(1)
-    values: list[str] = dict.group(2)
-
+    keys: list[str] = [m[0] for m in matches]
+    values: list[str] = [m[1] for m in matches]
+        
     if len(keys) == len(values):
         out: dict[str, str] = {}
         for i, key in enumerate(keys):
             out[key] = values[i]
+
         return out
-  
+
+def reverse_dict(d: dict[Any, Any]):
+    return {v: k for k, v in d.items()}
+
 def get_returned(text: str, default_name: str):
     match = RETURN_REGEX.search(text)
     assert(match)
@@ -125,7 +75,8 @@ def get_returned(text: str, default_name: str):
         tablestr: str = match.group(1)
         assert(tablestr)
         dict_data = get_dict_data(tablestr)
-        return ReturnedValue(default_name, 'dict', dict=dict_data)
+        assert(dict_data)
+        return ReturnedValue(default_name, 'dict', dict=reverse_dict(dict_data))
 
 def remove_whitespace(t: list[Any]):
     return [p.strip() for p in t]

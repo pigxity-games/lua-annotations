@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Callable, Literal
 
 if TYPE_CHECKING:
     from dir_scan import BuildProcessCtx
+    from parser_schemas import Annotation
 
 ANNOTATION_PREFIX = '--@'
 ARG_SEP = ', '
@@ -40,29 +41,6 @@ class AnnotationDef():
 
         for anot in self.mutual_include:
             assert anot in include_checks
-
-#an instance of an annotation found when processing
-class Annotation():
-    def __init__(self, registry: AnnotationRegistry, text: str):
-        parts = text.removeprefix(ANNOTATION_PREFIX).split(ARG_SEP)
-
-        self.adef = registry.get(parts[1])
-        self.kwargs_val: dict[str, Any] = {}
-        self.args_val: list[Any] = []
-        self.parse_args(parts[1:-1])
-
-        assert len(self.args_val) == len(self.adef.args), 'missing positional arguments'
-        
-    def parse_args(self, args: list[str]):
-        for i, arg in enumerate(args):
-            if '=' in arg:
-                name, val = arg.split('=')
-                proc = self.adef.kwargs[name]
-                self.kwargs_val[name] = proc(val)
-            else:
-                proc = self.adef.args[i]
-                self.args_val[i] = proc(arg)
-
 
 class AnnotationRegistry():
     registry: dict[str, AnnotationDef] = {}
