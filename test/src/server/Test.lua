@@ -1,5 +1,18 @@
+type x = 'test' | 'hello'
+
+type y = {
+    x: any,
+    y: string,
+    z: x
+}
+
 --@moduleTest
-local module = {}
+local module = {
+    --@test
+    testfun3 = function()
+        
+    end
+}
 
 --@methodTest
 function module.testfun1()
