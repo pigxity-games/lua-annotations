@@ -1,12 +1,12 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Literal
+from typing import TYPE_CHECKING, Any, Callable, Literal, Optional
 
 if TYPE_CHECKING:
     from dir_scan import BuildProcessCtx
-    from parser_schemas import Annotation
+    from parser_schemas import Annotation, Adornee
+    from parser import FileParser
 
-ANNOTATION_PREFIX = '--@'
 ARG_SEP = ', '
 
 type retention = Literal['build', 'init', 'runtime']
@@ -16,6 +16,9 @@ type argProcessor = Callable[[str], Any]
 @dataclass
 class AnnotationBuildCtx():
     build_ctx: BuildProcessCtx
+    annotation: Annotation
+    adornee: Adornee
+    parser: FileParser
     file: Path
     line: int
 
@@ -42,10 +45,18 @@ class AnnotationDef():
         for anot in self.mutual_include:
             assert anot in include_checks
 
+type FileBuildHook = Callable[[AnnotationBuildCtx], None]
+type PostBuildHook =  Callable[[BuildProcessCtx], None]
 class AnnotationRegistry():
     registry: dict[str, AnnotationDef] = {}
-    def register(self, annotation: AnnotationDef):
-        self.registry[annotation.name] = annotation
+    file_build_hooks: list[FileBuildHook]=[]
+    post_build_hooks: list[PostBuildHook]=[]
 
-    def get(self, name: str):
-        return self.registry[name]
+    def registerAnot(self, annotation: AnnotationDef, name: Optional[str]=None):
+        self.registry[name or annotation.name] = annotation
+
+    def onFileProcess(self, hook: FileBuildHook):
+        self.file_build_hooks.append(hook)
+
+    def onPostProcess(self, hook: PostBuildHook):
+        self.post_build_hooks.append(hook)

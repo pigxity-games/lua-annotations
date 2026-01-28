@@ -1,10 +1,13 @@
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 import default_extension.main as default_extension
 
-from annotations import ANNOTATION_PREFIX, Annotation, AnnotationRegistry
-from lua_parser import parse_block
+from annotations import AnnotationRegistry
+from parser_schemas import ANNOTATION_PREFIX, Annotation
+from parser import FileParser
 
+type Environment = Literal['server', 'client', 'shared']
 FILENAMES = ['*.lua', '*.luau']
 
 def check_relations(list: list[Annotation]):
@@ -16,32 +19,26 @@ class BuildProcessCtx():
     reg: AnnotationRegistry
     workdir: Path
 
-    def process_file(self, file: Path):
-        current_anots: list[Annotation] = []
-        
+    def create_file(self, env: Environment, name: str, text: str):
+        pass
+
+    def _process_file(self, file: Path):
         with file.open('r') as f:
-            lines = [l.rstrip() for l in f.readlines()]
-            for i, line in enumerate(lines):
-                if line.startswith(ANNOTATION_PREFIX):
-                    anot = Annotation(self.reg, line)
-                    current_anots.append(anot)
-                elif line == '' or line.startswith('--'):
-                    continue
-                else:
-                    #if there were annotations in this block of code
-                    if len(current_anots) > 0:
-                        block = parse_block(lines[i:-1], anot.adef.scope)
-
-                        check_relations(current_anots)
-                        current_anots = []
-
-        check_relations(module_anots)
+            text = f.read()
+            if ANNOTATION_PREFIX in text:
+                parser = FileParser(self.reg, file.name.split('.')[0])
+                parser.parse(text)
+                for anot in parser.annotations:
+                    print(parser.file_name + ': ' + anot.name)
+                    print(anot.args_val)
+                    print(anot.kwargs_val)
+                return parser
 
     def scan_directory(self):
         for filename in FILENAMES:
             matched_files = self.workdir.rglob(filename)
             for file in matched_files:
-                self.process_file(file)
+                self._process_file(file)
                         
                     
 def build(workdir: Path):

@@ -6,7 +6,7 @@ from annotations import AnnotationDef
 
 
 ANNOTATION_PREFIX = '--@'
-ARG_SEP = ', '
+ARG_SEP = ','
 
 #matches module/type name for module/type declarations
 TYPE_LINE_REGEX = re.compile(r'^type\s+(\w+)')
@@ -22,7 +22,10 @@ FUNCTION_REGEX = re.compile(r'^\s*(?:function\s+)?(?:(\w+)[.:])?(\w+)\s*(?:=\s*f
 #group 2 if single return, group 1 if table returned (use dict_regex)
 RETURN_REGEX = re.compile(r'return\s*\{([\s\S]*?)\}\s*$|^return\s(\w*)', re.MULTILINE)
 
-type adornee = LuaModule | LuaMethod
+#splits annotation arguments while ignoring ones inside brackets
+ANNOTATION_ARG_RE = re.compile(r',\s*(?![^\[]*\])')
+
+type Adornee = LuaModule | LuaMethod
 
 @dataclass
 class LuaMethod():
@@ -42,7 +45,7 @@ class Annotation():
     name: str
     args_val: list[Any]
     kwargs_val: dict[str, Any]
-    adornee: adornee = field(init=False)
+    adornee: Adornee = field(init=False)
 
 
 @dataclass

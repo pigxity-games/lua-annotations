@@ -1,12 +1,21 @@
 from annotations import AnnotationBuildCtx, AnnotationDef, AnnotationRegistry
+from default_extension import lifecycle, manifest, networking
 
-class TestAnnotation(AnnotationDef):
-    def on_build(self, ctx: AnnotationBuildCtx):
-        print(ctx)
+class TestAnot(AnnotationDef):
+    def test(self, ctx: AnnotationBuildCtx):
+        print(ctx.annotation.adornee)
 
-moduleTest = TestAnnotation('methodTest', scope='method')
-methodTest = TestAnnotation('moduleTest', scope='module')
+moduleTest = TestAnot('methodTest', scope='method')
+methodTest = TestAnot('moduleTest', scope='module')
 
 def load(ctx: AnnotationRegistry):
-    ctx.register(moduleTest)
-    ctx.register(methodTest)
+    ctx.registerAnot(moduleTest)
+    ctx.registerAnot(methodTest)
+
+    ctx.registerAnot(lifecycle.service)
+    ctx.registerAnot(lifecycle.indexed)
+    ctx.registerAnot(lifecycle.indexedType)
+    
+    ctx.registerAnot(networking.remote)
+    ctx.onPostProcess(networking.post_process)
+    ctx.onPostProcess(manifest.post_process)

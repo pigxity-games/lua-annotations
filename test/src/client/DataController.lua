@@ -19,3 +19,5 @@ function controller:updateData(data: T.PlayerDataPatch)
     end
     print(self.data)
 end
+
+return controller
