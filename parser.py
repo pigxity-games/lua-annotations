@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from annotations import AnnotationDef, AnnotationRegistry
+from annotations import AnnotationBuildCtx, AnnotationDef, AnnotationRegistry
 from default_extension import main as default_extension
 from parser_schemas import *
 
@@ -42,17 +42,17 @@ class FileParser():
         scope = anots[0].scope
         for anot in anots:
             if not anot.scope == scope:
-                self._error(line, f'all annotations must have scope: `{scope}`')
+                self.error(line, f'all annotations must have scope: `{scope}`')
 
     def _check_anot_relations(self, line: str, anots: list[AnnotationDef]):
         for anot in anots:
             for inc in anot.mutual_exclude:
                 if inc in anots:
-                    self._error(line, f'annotation {anot.name} excludes {inc.name}, but it is present in this code block')
+                    self.error(line, f'annotation {anot.name} excludes {inc.name}, but it is present in this code block')
 
             for inc in anot.mutual_include:
                 if not inc in anots:
-                    self._error(line, f'annotation {anot.name} requires {inc.name}, but it is not present in this code block')
+                    self.error(line, f'annotation {anot.name} requires {inc.name}, but it is not present in this code block')
 
 
     #parsing helpers
@@ -80,12 +80,12 @@ class FileParser():
             args, kwargs = self._parse_anot_args(adef, parts[1:])
             return Annotation(adef, name, args, kwargs)
         else:
-            self._error(text, 'Annotation does not exist')
+            self.error(text, 'Annotation does not exist')
 
     def _get_dict_data(self, text: str):
         matches = DICT_REGEX.findall(text)
         if not len(matches) > 0:
-            self._error('module does not have a ', text)
+            self.error('module does not have a ', text)
 
         keys: list[str] = [m[0] for m in matches]
         values: list[str] = [m[1] for m in matches]
@@ -109,18 +109,18 @@ class FileParser():
         else:
             tablestr: str = match.group(1)
             if not tablestr:
-                self._error(text, 'module export is incorrectly defined')
+                self.error(text, 'module export is incorrectly defined')
 
             dict_data = self._get_dict_data(tablestr)
             if dict_data:
                 return ReturnedValue(default_name, 'dict', dict=reverse_dict(dict_data))
             else:
-                self._error(text, 'module export is not a table')
+                self.error(text, 'module export is not a table')
 
     def _get_function(self, text: str, modules: dict[str, LuaModule]):
         match = FUNCTION_REGEX.search(text)
         if not match:
-            self._error(text, 'function is incorrectly defined')
+            self.error(text, 'function is incorrectly defined')
 
         module_name: str = match.group(1)
         fun_name: str = match.group(2)
@@ -128,7 +128,7 @@ class FileParser():
         return_type: str = match.group(4) or 'any'
 
         if not (module_name or fun_name):
-            self._error(text, 'method is incorrectly defined')
+            self.error(text, 'method is incorrectly defined')
 
         if not raw_params.strip() == '':
             params = remove_whitespace(raw_params.split(','))
@@ -137,12 +137,12 @@ class FileParser():
             param_dict = {}
 
         if not module_name in modules:
-            self._error(module_name, 'cannot use method annotations for an unindexed module.')
+            self.error(module_name, 'cannot use method annotations for an unindexed module.')
         return LuaMethod(fun_name, modules[module_name], param_dict, return_type)
 
 
     #main functions
-    def _error(self, text: str, message: str):
+    def error(self, text: str, message: str):
         raise ParserException(text, message, self.cur_line, self.file_name)
 
     def parse(self, text: str):        
@@ -166,7 +166,7 @@ class FileParser():
                     if anot:
                         self.cur_annotations.append(anot)
                     else:
-                        self._error(line, 'Not an annotation')
+                        self.error(line, 'Not an annotation')
 
             else:
                 #if there are annotations in this block of code, then find adornee
@@ -190,13 +190,13 @@ class FileParser():
                     elif scope == 'module':
                         match = MODULE_REGEX.search(line)
                         if not match:
-                            self._error('code block is not a module', line)
+                            self.error('code block is not a module', line)
                         
                         name: str = match.group(1)
                         returned_name = returned.get_returned_name(name)
 
                         if not (name and returned_name):
-                            self._error(line, 'invalid module definition or it is not returned.')
+                            self.error(line, 'invalid module definition or it is not returned.')
                 
                         module = LuaModule(name, returned_name)
                         set_adornee(self.cur_annotations, module)
@@ -206,6 +206,11 @@ class FileParser():
                     elif scope == 'type':
                         #TODO
                         pass
+
+                    #now run anot on_build
+                    for anot in self.cur_annotations:
+                        if anot.adef.on_build:
+                            anot.adef.on_build(AnnotationBuildCtx(anot, self))
 
                     self.annotations += self.cur_annotations
                     self.cur_annotations = []

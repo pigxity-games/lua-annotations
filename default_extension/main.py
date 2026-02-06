@@ -1,12 +1,11 @@
 from annotations import AnnotationBuildCtx, AnnotationDef, AnnotationRegistry
 from default_extension import lifecycle, manifest, networking
 
-class TestAnot(AnnotationDef):
-    def test(self, ctx: AnnotationBuildCtx):
-        print(ctx.annotation.adornee)
+def test(ctx: AnnotationBuildCtx):
+    print(f'Hello World, {ctx.annotation.name}!')
 
-moduleTest = TestAnot('methodTest', scope='method', args=[str], kwargs={'testKwarg': str})
-methodTest = TestAnot('moduleTest', scope='module')
+moduleTest = AnnotationDef('methodTest', scope='method', args=[str], kwargs={'testKwarg': str}, on_build=test)
+methodTest = AnnotationDef('moduleTest', scope='module', on_build=test)
 
 def load(ctx: AnnotationRegistry):
     ctx.registerAnot(moduleTest)

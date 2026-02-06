@@ -3,8 +3,7 @@ from pathlib import Path
 import json
 from typing import Literal
 
-from dir_scan import build
-from init_project import create_config
+from init_project import create_config, build
 
 #argument parsing
 parser = argparse.ArgumentParser(prog='lua-annotations build-time processor/validator')
@@ -29,6 +28,6 @@ config = json.loads(config_file.read_text())
 
 # main mode
 if mode == 'build':
-    build(workdir)
+    build(workdir, config_file['workspaces'])
 
 #TODO: watch mode

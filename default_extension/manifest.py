@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from dir_scan import BuildProcessCtx
+    from build_process import BuildProcessCtx
 
 client_manifest, server_manifest, shared_manifest = {}, {}, {}
 
