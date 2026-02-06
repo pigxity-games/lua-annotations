@@ -5,7 +5,7 @@ class TestAnot(AnnotationDef):
     def test(self, ctx: AnnotationBuildCtx):
         print(ctx.annotation.adornee)
 
-moduleTest = TestAnot('methodTest', scope='method')
+moduleTest = TestAnot('methodTest', scope='method', args=[str], kwargs={'testKwarg': str})
 methodTest = TestAnot('moduleTest', scope='module')
 
 def load(ctx: AnnotationRegistry):

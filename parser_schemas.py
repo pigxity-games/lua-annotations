@@ -62,3 +62,13 @@ class ReturnedValue():
         elif self.type == 'dict':
             if self.dict:
                 return self.dict.get(module)
+
+@dataclass
+class ParserException(Exception):
+    message: str
+    text: str
+    line_num: int
+    file_name: str
+
+    def __post_init__(self):
+        super().__init__(f'Error on line `{self.line_num}` in file `{self.file_name}.lua` : {self.message}\n{self.text}')

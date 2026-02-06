@@ -76,16 +76,16 @@ class FileParser():
         name = parts[0]
 
         adef = ctx.registry.get(name)
-        if not adef:
+        if adef:
+            args, kwargs = self._parse_anot_args(adef, parts[1:])
+            return Annotation(adef, name, args, kwargs)
+        else:
             self._error(text, 'Annotation does not exist')
-
-        args, kwargs = self._parse_anot_args(adef, parts[1:])
-
-        return Annotation(adef, name, args, kwargs)
 
     def _get_dict_data(self, text: str):
         matches = DICT_REGEX.findall(text)
-        assert len(matches) > 0
+        if not len(matches) > 0:
+            self._error('module does not have a ', text)
 
         keys: list[str] = [m[0] for m in matches]
         values: list[str] = [m[1] for m in matches]
@@ -108,21 +108,28 @@ class FileParser():
             return ReturnedValue(default_name, 'single', single_module=single)
         else:
             tablestr: str = match.group(1)
-            assert tablestr
+            if not tablestr:
+                self._error(text, 'module export is incorrectly defined')
+
             dict_data = self._get_dict_data(tablestr)
-            assert dict_data
-            return ReturnedValue(default_name, 'dict', dict=reverse_dict(dict_data))
+            if dict_data:
+                return ReturnedValue(default_name, 'dict', dict=reverse_dict(dict_data))
+            else:
+                self._error(text, 'module export is not a table')
 
     def _get_function(self, text: str, modules: dict[str, LuaModule]):
         match = FUNCTION_REGEX.search(text)
-        assert match
+        if not match:
+            self._error(text, 'function is incorrectly defined')
 
         module_name: str = match.group(1)
         fun_name: str = match.group(2)
         raw_params: str = match.group(3)
         return_type: str = match.group(4) or 'any'
 
-        assert module_name and fun_name
+        if not (module_name or fun_name):
+            self._error(text, 'method is incorrectly defined')
+
         if not raw_params.strip() == '':
             params = remove_whitespace(raw_params.split(','))
             param_dict = map_param_list(params)
@@ -136,9 +143,7 @@ class FileParser():
 
     #main functions
     def _error(self, text: str, message: str):
-        print(f'Error on line `{self.cur_line}` in file `{self.file_name}.lua` : {message}')
-        print(text)
-        exit()
+        raise ParserException(text, message, self.cur_line, self.file_name)
 
     def parse(self, text: str):        
         returned = self._get_returned(text, self.file_name)
@@ -184,14 +189,14 @@ class FileParser():
                     #module
                     elif scope == 'module':
                         match = MODULE_REGEX.search(line)
-                        assert match
+                        if not match:
+                            self._error('code block is not a module', line)
                         
                         name: str = match.group(1)
                         returned_name = returned.get_returned_name(name)
+
                         if not (name and returned_name):
                             self._error(line, 'invalid module definition or it is not returned.')
-
-                        assert name and returned_name
                 
                         module = LuaModule(name, returned_name)
                         set_adornee(self.cur_annotations, module)

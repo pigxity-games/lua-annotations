@@ -20,16 +20,21 @@ local module2 = {
 }
 
 --@methodTest
+function module2.testfun()
+
+end
+
+--@methodTest, hello, testKwarg=world
 function module.testfun1(t: any, t2: string): number
     
 end
 
---@methodTest
+--@methodTest, testKwarg=world
 module.testfun2 = function()
     
 end
 
---@methodTest
+--@methodTest, hello
 function module:testfun4(): string
 
 end
