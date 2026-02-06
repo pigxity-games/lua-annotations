@@ -5,82 +5,13 @@ from annotations import AnnotationDef, AnnotationRegistry
 from default_extension import main as default_extension
 from parser_schemas import *
 
-#assertion functions
-def annotations_scopes_equal(anots: list[AnnotationDef]):
-    scope = anots[0].scope
-    for anot in anots:
-        if not anot.scope == scope:
-            return False
-    return True
-
-def annotations_are_mutual(anots: list[AnnotationDef]):
-    #TODO
-    return True
-
-#parsing
-def set_adornee(anots: list[Annotation], adornee: Adornee):
-    for anot in anots:
-        anot.adornee = adornee
-
-def parse_anot_args(adef: AnnotationDef, args: list[str]):
-    kwargs_val: dict[str, Any] = {}
-    args_val: list[Any] = []
-
-    for i, arg in enumerate(args):
-        if '=' in arg:
-            name, val = arg.split('=')
-            proc = adef.kwargs[name]
-            kwargs_val[name] = proc(val)
-        else:
-            proc = adef.args[i]
-            args_val.append(proc(arg))
-
-    return args_val, kwargs_val
-
-def parse_annotation(text: str, ctx: AnnotationRegistry):
-    parts = remove_whitespace(ANNOTATION_ARG_RE.split(text.removeprefix(ANNOTATION_PREFIX)))
-    name = parts[0]
-
-    adef = ctx.registry.get(name)
-    if not adef:
-        return
-
-    args, kwargs = parse_anot_args(adef, parts[1:])
-
-    return Annotation(adef, name, args, kwargs)
-
-def get_dict_data(text: str):
-    matches = DICT_REGEX.findall(text)
-    assert len(matches) > 0
-
-    keys: list[str] = [m[0] for m in matches]
-    values: list[str] = [m[1] for m in matches]
-        
-    if len(keys) == len(values):
-        out: dict[str, str] = {}
-        for i, key in enumerate(keys):
-            out[key] = values[i]
-
-        return out
-
+#helper functions
 def reverse_dict(d: dict[Any, Any]):
     return {v: k for k, v in d.items()}
 
-def get_returned(text: str, default_name: str):
-    match = RETURN_REGEX.search(text)
-    if not match:
-        return
-
-    single: str = match.group(2)
-
-    if single:
-        return ReturnedValue(default_name, 'single', single_module=single)
-    else:
-        tablestr: str = match.group(1)
-        assert tablestr
-        dict_data = get_dict_data(tablestr)
-        assert dict_data
-        return ReturnedValue(default_name, 'dict', dict=reverse_dict(dict_data))
+def set_adornee(anots: list[Annotation], adornee: Adornee):
+    for anot in anots:
+        anot.adornee = adornee
 
 def remove_whitespace(t: list[Any]):
     return [p.strip() for p in t]
@@ -96,25 +27,7 @@ def map_param_list(params: list[str]):
 
     return out
 
-
-def get_function(text: str, modules: dict[str, LuaModule]):
-    match = FUNCTION_REGEX.search(text)
-    assert match
-
-    module_name: str = match.group(1)
-    fun_name: str = match.group(2)
-    raw_params: str = match.group(3)
-    return_type: str = match.group(4) or 'any'
-
-    assert module_name and fun_name
-    if not raw_params.strip() == '':
-        params = remove_whitespace(raw_params.split(','))
-        param_dict = map_param_list(params)
-    else:
-        param_dict = {}
-
-    return LuaMethod(fun_name, modules[module_name], param_dict, return_type)
-
+#parsing
 @dataclass
 class FileParser():
     reg: AnnotationRegistry
@@ -122,15 +35,120 @@ class FileParser():
     annotations: list[Annotation] = field(default_factory=list)
     cur_annotations: list[Annotation] = field(default_factory=list)
     modules: dict[str, LuaModule] = field(default_factory=dict)
+    cur_line = 0
+
+    #assertion functions
+    def _check_anot_scopes(self, line: str, anots: list[AnnotationDef]):
+        scope = anots[0].scope
+        for anot in anots:
+            if not anot.scope == scope:
+                self._error(line, f'all annotations must have scope: `{scope}`')
+
+    def _check_anot_relations(self, line: str, anots: list[AnnotationDef]):
+        for anot in anots:
+            for inc in anot.mutual_exclude:
+                if inc in anots:
+                    self._error(line, f'annotation {anot.name} excludes {inc.name}, but it is present in this code block')
+
+            for inc in anot.mutual_include:
+                if not inc in anots:
+                    self._error(line, f'annotation {anot.name} requires {inc.name}, but it is not present in this code block')
+
+
+    #parsing helpers
+    def _parse_anot_args(self, adef: AnnotationDef, args: list[str]):
+        kwargs_val: dict[str, Any] = {}
+        args_val: list[Any] = []
+
+        for i, arg in enumerate(args):
+            if '=' in arg:
+                name, val = arg.split('=')
+                proc = adef.kwargs[name]
+                kwargs_val[name] = proc(val)
+            else:
+                proc = adef.args[i]
+                args_val.append(proc(arg))
+
+        return args_val, kwargs_val
+
+    def _parse_annotation(self, text: str, ctx: AnnotationRegistry):
+        parts = remove_whitespace(ANNOTATION_ARG_RE.split(text.removeprefix(ANNOTATION_PREFIX)))
+        name = parts[0]
+
+        adef = ctx.registry.get(name)
+        if not adef:
+            self._error(text, 'Annotation does not exist')
+
+        args, kwargs = self._parse_anot_args(adef, parts[1:])
+
+        return Annotation(adef, name, args, kwargs)
+
+    def _get_dict_data(self, text: str):
+        matches = DICT_REGEX.findall(text)
+        assert len(matches) > 0
+
+        keys: list[str] = [m[0] for m in matches]
+        values: list[str] = [m[1] for m in matches]
+            
+        if len(keys) == len(values):
+            out: dict[str, str] = {}
+            for i, key in enumerate(keys):
+                out[key] = values[i]
+
+            return out
+
+    def _get_returned(self, text: str, default_name: str):
+        match = RETURN_REGEX.search(text)
+        if not match:
+            return
+
+        single: str = match.group(2)
+
+        if single:
+            return ReturnedValue(default_name, 'single', single_module=single)
+        else:
+            tablestr: str = match.group(1)
+            assert tablestr
+            dict_data = self._get_dict_data(tablestr)
+            assert dict_data
+            return ReturnedValue(default_name, 'dict', dict=reverse_dict(dict_data))
+
+    def _get_function(self, text: str, modules: dict[str, LuaModule]):
+        match = FUNCTION_REGEX.search(text)
+        assert match
+
+        module_name: str = match.group(1)
+        fun_name: str = match.group(2)
+        raw_params: str = match.group(3)
+        return_type: str = match.group(4) or 'any'
+
+        assert module_name and fun_name
+        if not raw_params.strip() == '':
+            params = remove_whitespace(raw_params.split(','))
+            param_dict = map_param_list(params)
+        else:
+            param_dict = {}
+
+        if not module_name in modules:
+            self._error(module_name, 'cannot use method annotations for an unindexed module.')
+        return LuaMethod(fun_name, modules[module_name], param_dict, return_type)
+
+
+    #main functions
+    def _error(self, text: str, message: str):
+        print(f'Error on line `{self.cur_line}` in file `{self.file_name}.lua` : {message}')
+        print(text)
+        exit()
 
     def parse(self, text: str):        
-        returned = get_returned(text, self.file_name)
+        returned = self._get_returned(text, self.file_name)
         if not returned:
             print(f'Skipping file {self.file_name}; doesn\'t return a value')
             return
         lines = [l.rstrip() for l in text.splitlines()]
 
         for line in lines:
+            self.cur_line += 1
             #skip empty lines
             if line == '':
                 continue
@@ -139,18 +157,20 @@ class FileParser():
             elif line.startswith('--'):
                 #annotation
                 if line.startswith(ANNOTATION_PREFIX):
-                    anot = parse_annotation(line, self.reg)
+                    anot = self._parse_annotation(line, self.reg)
                     if anot:
                         self.cur_annotations.append(anot)
                     else:
-                        print(f'Not an annotation: `{line}`')
+                        self._error(line, 'Not an annotation')
 
             else:
                 #if there are annotations in this block of code, then find adornee
                 if len(self.cur_annotations) > 0:
                     adefs = [anot.adef for anot in self.cur_annotations]
-                    assert annotations_scopes_equal(adefs)
-                    assert annotations_are_mutual(adefs)
+
+                    self._check_anot_relations(line, adefs)
+                    self._check_anot_scopes(line, adefs)
+
                     scope = adefs[0].scope
 
                     #strip comments
@@ -158,7 +178,7 @@ class FileParser():
                     
                     #methods
                     if scope == 'method':
-                        method = get_function(line, self.modules)
+                        method = self._get_function(line, self.modules)
                         set_adornee(self.cur_annotations, method)
 
                     #module
@@ -168,6 +188,9 @@ class FileParser():
                         
                         name: str = match.group(1)
                         returned_name = returned.get_returned_name(name)
+                        if not (name and returned_name):
+                            self._error(line, 'invalid module definition or it is not returned.')
+
                         assert name and returned_name
                 
                         module = LuaModule(name, returned_name)
@@ -176,6 +199,7 @@ class FileParser():
 
                     #type
                     elif scope == 'type':
+                        #TODO
                         pass
 
                     self.annotations += self.cur_annotations
