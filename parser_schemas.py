@@ -8,7 +8,7 @@ ANNOTATION_PREFIX = '--@'
 ARG_SEP = ','
 
 #matches module/type name for module/type declarations
-TYPE_LINE_REGEX = re.compile(r'^type\s+(\w+)')
+TYPE_LINE_REGEX = re.compile(r'^(?:export\s+)?type\s+(\w+)')
 MODULE_REGEX = re.compile(r'^local\s+(\w+)\s*=.*\{')
 
 #matches keys (group 1) and values (group 2) in a dictonary seperated by = or :
@@ -24,7 +24,8 @@ RETURN_REGEX = re.compile(r'return\s*\{([\s\S]*?)\}\s*$|^return\s(\w*)', re.MULT
 #splits annotation arguments while ignoring ones inside brackets
 ANNOTATION_ARG_RE = re.compile(r',\s*(?![^\[]*\])')
 
-type Adornee = LuaModule | LuaMethod
+type Adornee = LuaModule | LuaMethod | LuaType
+
 
 @dataclass
 class LuaMethod():
@@ -33,10 +34,17 @@ class LuaMethod():
     params: dict[str, str] = field(default_factory=dict)
     return_type: Optional[str] = None
 
+
 @dataclass
 class LuaModule():
     name: str
     returned_name: str
+
+
+@dataclass
+class LuaType():
+    name: str
+
 
 @dataclass
 class Annotation():
@@ -61,6 +69,7 @@ class ReturnedValue():
         elif self.type == 'dict':
             if self.dict_val:
                 return self.dict_val.get(module)
+
 
 @dataclass
 class ParserException(Exception):

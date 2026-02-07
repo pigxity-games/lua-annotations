@@ -1,5 +1,6 @@
 type x = 'test' | 'hello'
 
+--@typeTest
 type y = {
     x: any,
     y: string,

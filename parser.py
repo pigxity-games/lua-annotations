@@ -39,6 +39,7 @@ class FileParser():
     annotations: list[Annotation] = field(default_factory=list)
     cur_annotations: list[Annotation] = field(default_factory=list)
     modules: dict[str, LuaModule] = field(default_factory=dict)
+    types: dict[str, LuaType] = field(default_factory=dict)
     cur_line = 0
 
     #assertion functions
@@ -156,7 +157,7 @@ class FileParser():
             return
         lines = [l.rstrip() for l in text.splitlines()]
 
-        for line in lines:
+        for i, line in enumerate(lines):
             self.cur_line += 1
             #skip empty lines
             if line == '':
@@ -208,8 +209,17 @@ class FileParser():
 
                     #type
                     elif scope == 'type':
-                        #TODO
-                        pass
+                        match = TYPE_LINE_REGEX.search(line)
+                        if not match:
+                            self.error('code block is not a type definition', line)
+                        
+                        name = match.group(1)
+
+                        #TODO: type contents
+                        lua_type = LuaType(name)
+
+                        set_adornee(self.cur_annotations, lua_type)
+                        self.types[name] = lua_type
 
                     #now run anot on_build
                     for anot in self.cur_annotations:
@@ -225,7 +235,7 @@ if __name__ == '__main__':
     default_extension.load(ctx)
     
     with open('./test/Test.lua', 'r') as f:
-        parser = FileParser(ctx, 'Test', None)
+        parser = FileParser(ctx, 'Test', None)  # pyright: ignore[reportArgumentType]
         parser.parse(f.read())
 
     for module in parser.modules.values():
