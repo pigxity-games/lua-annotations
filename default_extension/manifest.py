@@ -1,11 +1,10 @@
-from typing import TYPE_CHECKING
+from build_process import PostProcessCtx
 
-if TYPE_CHECKING:
-    from build_process import BuildProcessCtx
+#TODO
 
 client_manifest, server_manifest, shared_manifest = {}, {}, {}
 
-def post_process(ctx: 'BuildProcessCtx'):
+def post_process(ctx: PostProcessCtx):
     ctx.create_file('client', 'Manifest.lua', '')
     ctx.create_file('server', 'Manifest.lua', '')
     ctx.create_file('shared', 'Manifest.lua', '')

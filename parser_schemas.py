@@ -4,7 +4,6 @@ from typing import Any, Literal, Optional
 
 from annotations import AnnotationDef
 
-
 ANNOTATION_PREFIX = '--@'
 ARG_SEP = ','
 
@@ -25,12 +24,12 @@ RETURN_REGEX = re.compile(r'return\s*\{([\s\S]*?)\}\s*$|^return\s(\w*)', re.MULT
 #splits annotation arguments while ignoring ones inside brackets
 ANNOTATION_ARG_RE = re.compile(r',\s*(?![^\[]*\])')
 
-type Adornee = "LuaModule" | "LuaMethod"
+type Adornee = LuaModule | LuaMethod
 
 @dataclass
 class LuaMethod():
     name: str
-    module: "LuaModule"
+    module: LuaModule
     params: dict[str, str] = field(default_factory=dict)
     return_type: Optional[str] = None
 

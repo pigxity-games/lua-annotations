@@ -1,10 +1,11 @@
 from pathlib import Path
+from typing import Any, cast
 from annotations import AnnotationRegistry
-from build_process import BuildProcessCtx
+from build_process import BuildCtxList, BuildProcessCtx, Environment, PostProcessCtx
 from parser import default_extension
 
 DEFAULT_CONFIG = Path('./templates/annotations.config.json')
-
+ENVIRONMENTS = ['client', 'server', 'shared']
 
 def create_config(workdir: Path, config_file: Path):
     if not config_file.exists():
@@ -14,18 +15,20 @@ def create_config(workdir: Path, config_file: Path):
         print('Config file already exists. Skipping')
 
 
-def build(workdir: Path, config: dict):
+def build(workdir: Path, config: dict[Any, Any]):
     reg = AnnotationRegistry()
     default_extension.load(reg)
 
-    output_root = workdir / config.get('outDirName', 'Generated')
-    workspaces = config.get('workspaces', [])
+    output_dir_name = config.get('outDirName', 'Generated')
+    workspaces: list[Any] = config.get('workspaces', [])
 
-    build_state = {}
-    build_contexts: list[BuildProcessCtx] = []
+    build_contexts: BuildCtxList = {}
+    build_state: dict[str, Any] = {}
 
     for workspace in workspaces:
-        for env in ['client', 'server', 'shared']:
+        for env in ENVIRONMENTS:
+            env = cast(Environment, env)
+
             path = workspace.get(env)
             if not path:
                 continue
@@ -34,14 +37,17 @@ def build(workdir: Path, config: dict):
             if not env_workdir.exists() or not env_workdir.is_dir():
                 continue
 
-            ctx = BuildProcessCtx(reg, env_workdir, env, output_root, build_state)
+            output_root = env_workdir / Path(output_dir_name)
+            output_root.mkdir(exist_ok=True)
+
+            ctx = BuildProcessCtx(reg, env_workdir, build_state, output_root, env)
             ctx.process_dir()
-            build_contexts.append(ctx)
+            build_contexts[env] = ctx
 
     if not build_contexts:
         return
 
-    # run post-build hooks once with a deterministic shared output context
-    post_ctx = BuildProcessCtx(reg, workdir, 'shared', output_root, build_state)
+    # run post-build hooks
+    ctx = PostProcessCtx(reg, workdir, build_state, build_contexts)
     for hook in reg.post_build_hooks:
-        hook(post_ctx)
+        hook(ctx)

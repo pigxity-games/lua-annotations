@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
@@ -15,31 +15,38 @@ class BuildException(Exception):
     message: str
     file: Path
     workdir: Path
-    env: Environment
 
     def __post_init__(self):
         super().__init__(self.message)
 
-
 @dataclass
-class BuildProcessCtx():
+class ProcessCtx():
     reg: AnnotationRegistry
     workdir: Path
-    env: Environment
-    output_root: Path
-    state: dict[str, Any] = field(default_factory=dict)
-
-    def create_file(self, env: Environment, name: str, text: str):
-        out_dir = self.output_root / env
-        out_dir.mkdir(parents=True, exist_ok=True)
-
-        file = out_dir / name
-        file.parent.mkdir(parents=True, exist_ok=True)
-        file.write_text(text)
-        return file
+    state: dict[str, Any]
 
     def error(self, message: str, file: Path):
-        raise BuildException(message, file, self.workdir, self.env)
+        raise BuildException(message, file, self.workdir)
+
+type BuildCtxList = dict[Environment, BuildProcessCtx]
+
+@dataclass
+class PostProcessCtx(ProcessCtx):
+    build_ctxs: BuildCtxList
+
+    def create_file(self, env: Environment, name: str, text: str):
+        ctx = self.build_ctxs[env]
+
+        file = ctx.output_root / name
+        file.parent.mkdir(exist_ok=True)
+        file.write_text(text)
+        
+        return file
+
+@dataclass
+class BuildProcessCtx(ProcessCtx):
+    output_root: Path
+    env: Environment
 
     def process_file(self, file: Path):
         with file.open('r') as f:

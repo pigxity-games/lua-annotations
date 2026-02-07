@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal, Optional
 
 if TYPE_CHECKING:
-    from build_process import BuildProcessCtx
+    from build_process import BuildProcessCtx, PostProcessCtx
     from parser_schemas import Annotation
     from parser import FileParser
 
@@ -40,7 +40,7 @@ class FileBuildCtx():
     filepath: Path
 
 type FileBuildHook = Callable[[FileBuildCtx], None]
-type PostBuildHook =  Callable[[BuildProcessCtx], None]
+type PostBuildHook =  Callable[[PostProcessCtx], None]
 
 @dataclass
 class AnnotationRegistry():

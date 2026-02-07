@@ -1,6 +1,7 @@
 import json
+from typing import Any
 from annotations import AnnotationBuildCtx, AnnotationDef
-from build_process import BuildProcessCtx
+from build_process import PostProcessCtx
 
 REMOTE_STATE_KEY = 'default_extension.networking.remotes'
 
@@ -13,7 +14,7 @@ remoteInstanceMap = {
 
 def on_build(ctx: AnnotationBuildCtx):
     className = remoteInstanceMap[ctx.annotation.args_val[0]]
-    remotes = ctx.build_ctx.state.setdefault(REMOTE_STATE_KEY, [])
+    remotes: list[Any] = ctx.build_ctx.state.setdefault(REMOTE_STATE_KEY, [])
     remotes.append({'Name': ctx.annotation.adornee.name, 'ClassName': className})
 
 
@@ -25,7 +26,7 @@ remote = AnnotationDef(
 )
 
 
-def post_process(ctx: BuildProcessCtx):
+def post_process(ctx: PostProcessCtx):
     remotes = ctx.state.get(REMOTE_STATE_KEY, [])
     model = {
         'ClassName': 'Folder',
