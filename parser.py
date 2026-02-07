@@ -1,9 +1,12 @@
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from annotations import AnnotationBuildCtx, AnnotationDef, AnnotationRegistry
 from default_extension import main as default_extension
 from parser_schemas import *
+
+if TYPE_CHECKING:
+    from build_process import BuildProcessCtx
 
 #helper functions
 def reverse_dict(d: dict[Any, Any]):
@@ -32,6 +35,7 @@ def map_param_list(params: list[str]):
 class FileParser():
     reg: AnnotationRegistry
     file_name: str
+    build_ctx: 'BuildProcessCtx'
     annotations: list[Annotation] = field(default_factory=list)
     cur_annotations: list[Annotation] = field(default_factory=list)
     modules: dict[str, LuaModule] = field(default_factory=dict)
@@ -210,7 +214,7 @@ class FileParser():
                     #now run anot on_build
                     for anot in self.cur_annotations:
                         if anot.adef.on_build:
-                            anot.adef.on_build(AnnotationBuildCtx(anot, self))
+                            anot.adef.on_build(AnnotationBuildCtx(anot, self, self.build_ctx))
 
                     self.annotations += self.cur_annotations
                     self.cur_annotations = []
@@ -221,7 +225,7 @@ if __name__ == '__main__':
     default_extension.load(ctx)
     
     with open('./test/Test.lua', 'r') as f:
-        parser = FileParser(ctx, 'Test')
+        parser = FileParser(ctx, 'Test', None)
         parser.parse(f.read())
 
     for module in parser.modules.values():

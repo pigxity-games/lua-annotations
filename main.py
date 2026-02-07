@@ -28,6 +28,6 @@ config = json.loads(config_file.read_text())
 
 # main mode
 if mode == 'build':
-    build(workdir, config_file['workspaces'])
+    build(workdir, config)
 
 #TODO: watch mode

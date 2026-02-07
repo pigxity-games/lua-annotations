@@ -17,6 +17,7 @@ type argProcessor = Callable[[str], Any]
 class AnnotationBuildCtx():
     annotation: Annotation
     parser: FileParser
+    build_ctx: 'BuildProcessCtx'
 
 type OnBuild = Callable[[AnnotationBuildCtx], None]
 
@@ -40,10 +41,12 @@ class FileBuildCtx():
 
 type FileBuildHook = Callable[[FileBuildCtx], None]
 type PostBuildHook =  Callable[[BuildProcessCtx], None]
+
+@dataclass
 class AnnotationRegistry():
-    registry: dict[str, AnnotationDef] = {}
-    file_build_hooks: list[FileBuildHook]=[]
-    post_build_hooks: list[PostBuildHook]=[]
+    registry: dict[str, AnnotationDef] = field(default_factory=dict)
+    file_build_hooks: list[FileBuildHook]=field(default_factory=list)
+    post_build_hooks: list[PostBuildHook]=field(default_factory=list)
 
     def registerAnot(self, annotation: AnnotationDef, name: Optional[str]=None):
         self.registry[name or annotation.name] = annotation
