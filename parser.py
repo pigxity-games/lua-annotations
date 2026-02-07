@@ -117,7 +117,7 @@ class FileParser():
 
             dict_data = self._get_dict_data(tablestr)
             if dict_data:
-                return ReturnedValue(default_name, 'dict', dict=reverse_dict(dict_data))
+                return ReturnedValue(default_name, 'dict', dict_val=reverse_dict(dict_data))
             else:
                 self.error(text, 'module export is not a table')
 

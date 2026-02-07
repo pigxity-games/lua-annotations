@@ -25,12 +25,12 @@ RETURN_REGEX = re.compile(r'return\s*\{([\s\S]*?)\}\s*$|^return\s(\w*)', re.MULT
 #splits annotation arguments while ignoring ones inside brackets
 ANNOTATION_ARG_RE = re.compile(r',\s*(?![^\[]*\])')
 
-type Adornee = LuaModule | LuaMethod
+type Adornee = "LuaModule" | "LuaMethod"
 
 @dataclass
 class LuaMethod():
     name: str
-    module: LuaModule
+    module: "LuaModule"
     params: dict[str, str] = field(default_factory=dict)
     return_type: Optional[str] = None
 
@@ -53,15 +53,15 @@ class ReturnedValue():
     default_name: str
     type: Literal['single', 'dict']
     single_module: Optional[str] = None
-    dict: Optional[dict[str, str]] = None
+    dict_val: Optional[dict[str, str]] = None
 
     def get_returned_name(self, module: str):
         if self.type == 'single':
             if self.single_module == module:
                 return self.default_name
         elif self.type == 'dict':
-            if self.dict:
-                return self.dict.get(module)
+            if self.dict_val:
+                return self.dict_val.get(module)
 
 @dataclass
 class ParserException(Exception):

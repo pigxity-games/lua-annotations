@@ -15,8 +15,8 @@ type argProcessor = Callable[[str], Any]
 
 @dataclass
 class AnnotationBuildCtx():
-    annotation: Annotation
-    parser: FileParser
+    annotation: 'Annotation'
+    parser: 'FileParser'
     build_ctx: 'BuildProcessCtx'
 
 type OnBuild = Callable[[AnnotationBuildCtx], None]
@@ -29,14 +29,14 @@ class AnnotationDef():
     kwargs: dict[str, argProcessor]=field(default_factory=dict)
     retention: retention='init'
     scope: scope='module'
-    mutual_include: list[AnnotationDef]=field(default_factory=list)
-    mutual_exclude: list[AnnotationDef]=field(default_factory=list)
+    mutual_include: list['AnnotationDef']=field(default_factory=list)
+    mutual_exclude: list['AnnotationDef']=field(default_factory=list)
     on_build: Optional[OnBuild]=None
 
 @dataclass
 class FileBuildCtx():
-    build_ctx: BuildProcessCtx
-    parser: FileParser
+    build_ctx: 'BuildProcessCtx'
+    parser: 'FileParser'
     filepath: Path
 
 type FileBuildHook = Callable[[FileBuildCtx], None]

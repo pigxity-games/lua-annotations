@@ -5,7 +5,7 @@ if TYPE_CHECKING:
 
 client_manifest, server_manifest, shared_manifest = {}, {}, {}
 
-def post_process(ctx: BuildProcessCtx):
+def post_process(ctx: 'BuildProcessCtx'):
     ctx.create_file('client', 'Manifest.lua', '')
     ctx.create_file('server', 'Manifest.lua', '')
     ctx.create_file('shared', 'Manifest.lua', '')
