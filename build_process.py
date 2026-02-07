@@ -4,7 +4,6 @@ from typing import Any, Literal
 
 from annotations import AnnotationRegistry, FileBuildCtx
 from parser_schemas import ANNOTATION_PREFIX
-from parser import FileParser
 
 type Environment = Literal['server', 'client', 'shared']
 FILENAMES = ['*.lua', '*.luau']
@@ -49,6 +48,8 @@ class BuildProcessCtx(ProcessCtx):
     env: Environment
 
     def process_file(self, file: Path):
+        from parser import FileParser
+
         with file.open('r') as f:
             text = f.read()
             if ANNOTATION_PREFIX in text:
