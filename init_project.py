@@ -1,11 +1,14 @@
 from pathlib import Path
 import shutil
+import time
+from datetime import datetime
 from typing import Any
 from annotations import ENVIRONMENTS, AnnotationRegistry
 from build_process import BuildCtxList, BuildProcessCtx, PostProcessCtx
 from parser import default_extension
 
 DEFAULT_CONFIG = Path('./templates/annotations.config.json')
+WATCH_FILENAMES = ('*.lua', '*.luau')
 
 def create_config(workdir: Path, config_file: Path):
     if not config_file.exists():
@@ -16,6 +19,7 @@ def create_config(workdir: Path, config_file: Path):
 
 
 def build(workdir: Path, config: dict[Any, Any]):
+    init_time = datetime.now()
     reg = AnnotationRegistry()
     default_extension.load(reg)
 
@@ -49,3 +53,61 @@ def build(workdir: Path, config: dict[Any, Any]):
     ctx = PostProcessCtx(reg, workdir, build_state, build_contexts)
     for hook in reg.post_build_hooks:
         hook(ctx)
+
+    delta = datetime.now() - init_time
+    print(f'Built in {delta.total_seconds()}s')
+
+
+#builds a fingerprint of all the last modified times of files
+def _watch_fingerprint(workdir: Path, config_file: Path, config: dict[Any, Any]):
+    output_dir_name = config.get('outDirName', 'Generated')
+
+    #track config file
+    tracked: dict[str, int] = {str(config_file): config_file.stat().st_mtime_ns}
+
+    #track workspaces
+    for workspace in config.get('workspaces', []):
+        for env in ENVIRONMENTS:
+            rel_path = workspace.get(env)
+            if not rel_path:
+                continue
+
+            env_workdir = workdir / Path(rel_path)
+            if not env_workdir.exists() or not env_workdir.is_dir():
+                continue
+
+            for pattern in WATCH_FILENAMES:
+                for file in env_workdir.rglob(pattern):
+                    if output_dir_name in file.parts:
+                        continue
+                    tracked[str(file)] = file.stat().st_mtime_ns
+
+    return tuple(sorted(tracked.items()))
+
+
+def watch(workdir: Path, config_file: Path, poll_interval: float = 1.0):
+    print('Running initial build...')
+    config = read_config(config_file)
+    build(workdir, config)
+
+    last_fingerprint = _watch_fingerprint(workdir, config_file, config)
+    print(f'Watching for changes in {workdir} (interval: {poll_interval}s). Press Ctrl+C to stop.')
+
+    #poll fingerprints every `poll_interval` seconds
+    while True:
+        time.sleep(poll_interval)
+
+        config = read_config(config_file)
+        fingerprint = _watch_fingerprint(workdir, config_file, config)
+
+        if fingerprint != last_fingerprint:
+            print('Change detected, rebuilding...')
+            build(workdir, config)
+            last_fingerprint = fingerprint
+
+
+def read_config(config_file: Path) -> dict[Any, Any]:
+    import json
+
+    assert config_file.exists(), 'Config file not found. Run the program in init mode to create one!'
+    return json.loads(config_file.read_text())
