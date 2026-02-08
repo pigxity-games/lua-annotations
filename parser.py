@@ -67,7 +67,7 @@ class FileParser():
 
         for i, arg in enumerate(args):
             if '=' in arg:
-                name, val = arg.split('=')
+                name, val = [part.strip() for part in arg.split('=', 1)]
                 proc = adef.kwargs[name]
                 kwargs_val[name] = proc(val)
             else:
@@ -90,7 +90,7 @@ class FileParser():
     def _get_dict_data(self, text: str):
         matches = DICT_REGEX.findall(text)
         if not len(matches) > 0:
-            self.error('line is not a dict', text)
+            self.error(text, 'line is not a dict')
 
         keys: list[str] = [m[0] for m in matches]
         values: list[str] = [m[1] for m in matches]
@@ -98,7 +98,7 @@ class FileParser():
         if len(keys) == len(values):
             out: dict[str, str] = {}
             for i, key in enumerate(keys):
-                out[key] = values[i]
+                out[key] = values[i].strip().removesuffix('}').strip()
 
             return out
 
@@ -195,7 +195,7 @@ class FileParser():
                     elif scope == 'module':
                         match = MODULE_REGEX.search(line)
                         if not match:
-                            self.error('code block is not a module', line)
+                            self.error(line, 'code block is not a module')
                         
                         name: str = match.group(1)
                         returned_name = returned.get_returned_name(name)
@@ -219,7 +219,7 @@ class FileParser():
                         #use type regex
                         match = TYPE_REGEX.search(block)
                         if not match:
-                            self.error('code block is not a type definition', line)
+                            self.error(line, 'code block is not a type definition')
 
                         exported = bool(match.group(1))
                         name: str = match.group(2)

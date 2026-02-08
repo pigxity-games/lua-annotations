@@ -37,7 +37,7 @@ class PostProcessCtx(ProcessCtx):
         ctx = self.build_ctxs[env]
 
         file = ctx.output_root / name
-        file.parent.mkdir(exist_ok=True)
+        file.parent.mkdir(parents=True, exist_ok=True)
         file.write_text(text)
         
         return file
