@@ -1,4 +1,5 @@
-type x = 'test' | 'hello'
+--@typeTest
+export type x = 'test' | 'hello'
 
 --@typeTest
 type y = {
@@ -6,6 +7,9 @@ type y = {
     y: string,
     z: x
 }
+
+--@typeTest
+type z = { x: any, y: y, z: x }
 
 --@moduleTest
 local module = {

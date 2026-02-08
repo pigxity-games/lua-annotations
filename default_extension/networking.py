@@ -17,7 +17,7 @@ def remote_on_build(ctx: AnnotationBuildCtx):
 
     className = remoteInstanceMap[ctx.annotation.args_val[0]]
     remotes: list[Any] = ctx.build_ctx.state.setdefault(REMOTE_STATE_KEY, [])
-    remotes.append({'Name': f'{anot.adornee.module.name}_{ctx.annotation.adornee.name}', 'ClassName': className})
+    remotes.append({'Name': f'{anot.adornee.module.returned_name}_{ctx.annotation.adornee.name}', 'ClassName': className})
 
 
 def post_process(ctx: PostProcessCtx):

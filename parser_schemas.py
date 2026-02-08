@@ -8,7 +8,6 @@ ANNOTATION_PREFIX = '--@'
 ARG_SEP = ','
 
 #matches module/type name for module/type declarations
-TYPE_LINE_REGEX = re.compile(r'^(?:export\s+)?type\s+(\w+)')
 MODULE_REGEX = re.compile(r'^local\s+(\w+)\s*=.*\{')
 
 #matches keys (group 1) and values (group 2) in a dictonary seperated by = or :
@@ -20,6 +19,9 @@ FUNCTION_REGEX = re.compile(r'^\s*(?:function\s+)?(?:(\w+)[.:])?(\w+)\s*(?:=\s*f
 
 #group 2 if single return, group 1 if table returned (use dict_regex)
 RETURN_REGEX = re.compile(r'return\s*\{([\s\S]*?)\}\s*$|^return\s(\w*)', re.MULTILINE)
+
+#group 1 exists if exported, group 2 = name, group 3 = contents
+TYPE_REGEX = re.compile(r'^\s*(export\b)?\s*type\s+(\w+)\s*=\s*(\{[\s\S]*?\}|[^\n]+)\s*\s*$', re.MULTILINE)
 
 #splits annotation arguments while ignoring ones inside brackets
 ANNOTATION_ARG_RE = re.compile(r',\s*(?![^\[]*\])')
@@ -44,6 +46,8 @@ class LuaModule():
 @dataclass
 class LuaType():
     name: str
+    data: dict[str, str] | str
+    exported: bool=False
 
 
 @dataclass

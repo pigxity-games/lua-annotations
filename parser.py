@@ -90,7 +90,7 @@ class FileParser():
     def _get_dict_data(self, text: str):
         matches = DICT_REGEX.findall(text)
         if not len(matches) > 0:
-            self.error('module does not have a ', text)
+            self.error('line is not a dict', text)
 
         keys: list[str] = [m[0] for m in matches]
         values: list[str] = [m[1] for m in matches]
@@ -209,14 +209,32 @@ class FileParser():
 
                     #type
                     elif scope == 'type':
-                        match = TYPE_LINE_REGEX.search(line)
+                        #get entire code block
+                        block = ''
+                        for line2 in lines[i:]:
+                            block += line2 + '\n'
+                            if '}' in line2:
+                                break
+
+                        #use type regex
+                        match = TYPE_REGEX.search(block)
                         if not match:
                             self.error('code block is not a type definition', line)
-                        
-                        name = match.group(1)
 
-                        #TODO: type contents
-                        lua_type = LuaType(name)
+                        exported = bool(match.group(1))
+                        name: str = match.group(2)
+                        contents: str = match.group(3)
+
+                        assert name and contents
+
+                        if contents.startswith('{'):
+                            data = self._get_dict_data(contents)
+                        else:
+                            data = contents
+
+                        assert data
+
+                        lua_type = LuaType(name, data, exported)
 
                         set_adornee(self.cur_annotations, lua_type)
                         self.types[name] = lua_type
