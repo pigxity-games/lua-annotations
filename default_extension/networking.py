@@ -1,33 +1,34 @@
 import json
 from typing import Any
-from annotations import AnnotationBuildCtx, AnnotationDef, AnnotationRegistry
+
+from annotations import AnnotationBuildCtx, AnnotationDef, AnnotationRegistry, Extension
 from build_process import PostProcessCtx
 
-REMOTE_STATE_KEY = 'default_extension.networking.remotes'
-
-remoteInstanceMap = {
+REMOTE_INSTANCE_MAP = {
     'function': 'RemoteFunction',
     'event': 'RemoteEvent',
     'unreliable': 'UnreliableRemoteEvent',
 }
 
 
-def remote_on_build(ctx: AnnotationBuildCtx):
-    anot = ctx.annotation
-
-    className = remoteInstanceMap[ctx.annotation.args_val[0]]
-    remotes: list[Any] = ctx.build_ctx.state.setdefault(REMOTE_STATE_KEY, [])
-    remotes.append({'Name': f'{anot.adornee.module.returned_name}_{ctx.annotation.adornee.name}', 'ClassName': className})
+class NetworkingExtension(Extension):
+    def __init__(self):
+        self.remotes: list[Any] = []
 
 
-def post_process(ctx: PostProcessCtx):
-    remotes = ctx.state.get(REMOTE_STATE_KEY, [])
-    model = {'ClassName': 'Folder', 'Children': remotes}
-    ctx.create_file('shared', 'Remotes.model.json', json.dumps(model))
+    def remote_on_build(self, ctx: AnnotationBuildCtx):
+        anot = ctx.annotation
+
+        class_name = REMOTE_INSTANCE_MAP[ctx.annotation.args_val[0]]
+        self.remotes.append({'Name': f'{anot.adornee.module.returned_name}_{ctx.annotation.adornee.name}', 'ClassName': class_name})
 
 
-def load(ctx: AnnotationRegistry):
-    ctx.registerAnot(
-        AnnotationDef('remote', scope='method', args=[str], on_build=remote_on_build)
-    )
-    ctx.onPostProcess(post_process)
+    def on_post_process(self, ctx: PostProcessCtx):
+        model = {'ClassName': 'Folder', 'Children': self.remotes}
+        ctx.create_file('shared', 'Remotes.model.json', json.dumps(model))
+
+
+    def load(self, ctx: AnnotationRegistry):
+        ctx.registerAnot(
+            AnnotationDef('remote', scope='method', args=[str], on_build=self.remote_on_build)
+        )

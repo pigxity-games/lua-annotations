@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 from annotations import AnnotationRegistry, FileBuildCtx
 from parser_schemas import ANNOTATION_PREFIX
@@ -22,7 +22,6 @@ class BuildException(Exception):
 class ProcessCtx():
     reg: AnnotationRegistry
     workdir: Path
-    state: dict[str, Any]
 
     def error(self, message: str, file: Path):
         raise BuildException(message, file, self.workdir)
@@ -53,7 +52,7 @@ class BuildProcessCtx(ProcessCtx):
         with file.open('r') as f:
             text = f.read()
             if ANNOTATION_PREFIX in text:
-                parser = FileParser(self.reg, file.name.split('.')[0], self)
+                parser = FileParser(self.reg, file, self)
                 parser.parse(text)
 
                 #post-file

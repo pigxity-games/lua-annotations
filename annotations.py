@@ -44,6 +44,14 @@ class FileBuildCtx():
 type FileBuildHook = Callable[[FileBuildCtx], None]
 type PostBuildHook =  Callable[[PostProcessCtx], None]
 
+class Extension():
+    def on_post_process(self, ctx: PostProcessCtx):
+        ...
+    def on_file_process(self, ctx: FileBuildCtx):
+        ...
+    def load(self, ctx: AnnotationRegistry):
+        ...
+
 @dataclass
 class AnnotationRegistry():
     registry: dict[str, AnnotationDef] = field(default_factory=dict)
@@ -52,6 +60,11 @@ class AnnotationRegistry():
 
     def registerAnot(self, annotation: AnnotationDef, name: Optional[str]=None):
         self.registry[name or annotation.name] = annotation
+
+    def registerExtension(self, extension: Extension):
+        extension.load(self)
+        self.onPostProcess(extension.on_post_process)
+        self.onFileProcess(extension.on_file_process)
 
     def onFileProcess(self, hook: FileBuildHook):
         self.file_build_hooks.append(hook)

@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from annotations import AnnotationBuildCtx, AnnotationDef, AnnotationRegistry
@@ -34,13 +35,16 @@ def map_param_list(params: list[str]):
 @dataclass
 class FileParser():
     reg: AnnotationRegistry
-    file_name: str
+    file: Path
     build_ctx: 'BuildProcessCtx'
     annotations: list[Annotation] = field(default_factory=list)
     cur_annotations: list[Annotation] = field(default_factory=list)
     modules: dict[str, LuaModule] = field(default_factory=dict)
     types: dict[str, LuaType] = field(default_factory=dict)
     cur_line = 0
+
+    def __post_init__(self):
+        self.file_name = self.file.name.split('.')[0]
 
     #assertion functions
     def _check_anot_scopes(self, line: str, anots: list[AnnotationDef]):
@@ -202,7 +206,7 @@ class FileParser():
 
                         if not (name and returned_name):
                             self.error(line, 'invalid module definition or it is not returned.')
-                
+
                         module = LuaModule(name, returned_name)
                         set_adornee(self.cur_annotations, module)
                         self.modules[module.name] = module
@@ -252,8 +256,9 @@ if __name__ == '__main__':
     ctx = AnnotationRegistry()
     default_extension.load(ctx)
     
-    with open('./test/Test.lua', 'r') as f:
-        parser = FileParser(ctx, 'Test', None)  # pyright: ignore[reportArgumentType]
+    test_file = Path('./test/Test.lua')
+    with test_file.open('r') as f:
+        parser = FileParser(ctx, test_file, None)  # pyright: ignore[reportArgumentType]
         parser.parse(f.read())
 
     for module in parser.modules.values():
