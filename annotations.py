@@ -34,6 +34,7 @@ class AnnotationDef():
     mutual_include: list['AnnotationDef']=field(default_factory=list)
     mutual_exclude: list['AnnotationDef']=field(default_factory=list)
     on_build: Optional[OnBuild]=None
+    extends: list['AnnotationDef']=field(default_factory=list)
 
 @dataclass
 class FileBuildCtx():

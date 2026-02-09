@@ -3,4 +3,4 @@ from arguments import list_arg
 
 
 def load(ctx: AnnotationRegistry):
-    ctx.registerAnot(AnnotationDef('service', kwargs={'depends': list_arg}))
+    ctx.registerAnot(AnnotationDef('service', kwargs={'depends': list_arg}, extends=[ctx.registry['exportType']]))

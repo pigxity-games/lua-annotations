@@ -125,8 +125,8 @@ class _LuaDict:
         return str(value)
 
     def _convert(self):
-        import_lines = self.resolver.get_import_lines()
         body = self._value_to_lua(self.dict, 0)
+        import_lines = self.resolver.get_import_lines()
 
         lines = [HEADER]
         if import_lines:
