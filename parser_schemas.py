@@ -1,8 +1,9 @@
 from dataclasses import dataclass, field
+from pathlib import Path
 import re
 from typing import Any, Literal, Optional
 
-from annotations import AnnotationDef
+from api.annotations import AnnotationDef
 
 ANNOTATION_PREFIX = '--@'
 ARG_SEP = ','
@@ -39,6 +40,7 @@ class LuaMethod():
 
 @dataclass
 class LuaModule():
+    file: Path
     name: str
     returned_name: str
 

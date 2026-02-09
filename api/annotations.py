@@ -29,12 +29,13 @@ class AnnotationDef():
     name: str
     args: list[argProcessor]=field(default_factory=list)
     kwargs: dict[str, argProcessor]=field(default_factory=dict)
-    retention: retention='init'
+    retention: retention='build'
     scope: scope='module'
     mutual_include: list['AnnotationDef']=field(default_factory=list)
     mutual_exclude: list['AnnotationDef']=field(default_factory=list)
     on_build: Optional[OnBuild]=None
     extends: list['AnnotationDef']=field(default_factory=list)
+    
 
 @dataclass
 class FileBuildCtx():

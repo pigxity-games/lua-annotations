@@ -1,4 +1,4 @@
-from annotations import AnnotationRegistry
+from api.annotations import AnnotationRegistry
 from default_extension import lifecycle, test, index, networking
 
 

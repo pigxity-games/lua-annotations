@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from annotations import AnnotationBuildCtx, AnnotationDef, AnnotationRegistry
+from api.annotations import AnnotationBuildCtx, AnnotationDef, AnnotationRegistry
 from default_extension import main as default_extension
 from parser_schemas import *
 
@@ -207,7 +207,7 @@ class FileParser():
                         if not (name and returned_name):
                             self.error(line, 'invalid module definition or it is not returned.')
 
-                        module = LuaModule(name, returned_name)
+                        module = LuaModule(self.file, name, returned_name)
                         set_adornee(self.cur_annotations, module)
                         self.modules[module.name] = module
 

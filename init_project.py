@@ -3,9 +3,11 @@ import shutil
 import time
 from datetime import datetime
 from typing import Any
-from annotations import ENVIRONMENTS, AnnotationRegistry
+from api.annotations import ENVIRONMENTS, AnnotationRegistry
+from api.lua_dict import convert_dict, LuaPath
 from build_process import BuildCtxList, BuildProcessCtx, PostProcessCtx
 from parser import default_extension
+from parser_schemas import LuaModule
 
 DEFAULT_CONFIG = Path('./templates/annotations.config.json')
 WATCH_FILENAMES = ('*.lua', '*.luau')
@@ -55,6 +57,25 @@ def build(workdir: Path, config: dict[Any, Any]):
         ctx = PostProcessCtx(reg, workdir, build_contexts)
         for hook in reg.post_build_hooks:
             hook(ctx)
+
+        #runtime manifest
+        for env in ENVIRONMENTS:
+            build_ctx = ctx.build_ctxs[env]
+
+            #serialize annotations
+            out_manifest: list[Any] = []
+            for anot in build_ctx.runtime_anots:
+                module = anot.adornee
+                assert(isinstance(module, LuaModule))
+
+                out_manifest.append({
+                    'module': LuaPath(module.file),
+                    'module_name': module.returned_name,
+                    'args': anot.args_val,
+                    'kwargs': anot.kwargs_val
+                })
+
+            ctx.create_file(env, 'Manifest.lua', convert_dict(ctx, {'annotatons': out_manifest}))
 
     delta = datetime.now() - init_time
     print(f'Built in {delta.total_seconds()}s')

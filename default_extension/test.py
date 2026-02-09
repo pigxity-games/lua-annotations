@@ -1,4 +1,4 @@
-from annotations import AnnotationBuildCtx, AnnotationDef, AnnotationRegistry
+from api.annotations import AnnotationBuildCtx, AnnotationDef, AnnotationRegistry
 
 
 def test(ctx: AnnotationBuildCtx):

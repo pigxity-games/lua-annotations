@@ -1,6 +1,6 @@
 from typing import Any
 
-from annotations import AnnotationBuildCtx, AnnotationDef, AnnotationRegistry, Extension
+from api.annotations import AnnotationBuildCtx, AnnotationDef, AnnotationRegistry, Extension
 from build_process import PostProcessCtx
 
 REMOTE_INSTANCE_MAP = {

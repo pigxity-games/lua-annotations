@@ -1,6 +1,6 @@
-from annotations import ENVIRONMENTS, AnnotationBuildCtx, AnnotationDef, AnnotationRegistry, Extension
+from api.annotations import ENVIRONMENTS, AnnotationBuildCtx, AnnotationDef, AnnotationRegistry, Extension
+from api.lua_dict import HEADER, LuaPath, LuaPathResolver, convert_dict
 from build_process import Environment, PostProcessCtx
-from lua_dict import HEADER, LuaPath, LuaPathResolver, convert_dict
 from parser_schemas import LuaModule, LuaType
 
 
@@ -41,7 +41,7 @@ class IndexExtension(Extension):
                 + type_lines
                 + ['', 'return nil']
             )
-            ctx.create_file(env, 'Types.lua', '\n'.join(out))
+            ctx.create_file(env, 'Types/Index.lua', '\n'.join(out))
 
 
     def on_build_indexed(self, ctx: AnnotationBuildCtx):
@@ -69,6 +69,7 @@ class IndexExtension(Extension):
 
 
     def load(self, ctx: AnnotationRegistry) -> None:
-        ctx.registerAnot(AnnotationDef('indexed', retention='build', on_build=self.on_build_indexed))
-        ctx.registerAnot(AnnotationDef('exportType', retention='build', on_build=self.on_build_export_type))
-        ctx.registerAnot(AnnotationDef('indexedType', scope='type', retention='build', on_build=self.on_build_indexed_type))
+        ctx.registerAnot(AnnotationDef(name='indexedType', scope='type', on_build=self.on_build_indexed_type))
+        export_type = AnnotationDef('exportType', on_build=self.on_build_export_type)
+        ctx.registerAnot(export_type)
+        ctx.registerAnot(AnnotationDef('indexed', on_build=self.on_build_indexed, extends=[export_type]))
