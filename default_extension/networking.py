@@ -1,4 +1,3 @@
-import json
 from typing import Any
 
 from annotations import AnnotationBuildCtx, AnnotationDef, AnnotationRegistry, Extension
@@ -25,7 +24,7 @@ class NetworkingExtension(Extension):
 
     def on_post_process(self, ctx: PostProcessCtx):
         model = {'ClassName': 'Folder', 'Children': self.remotes}
-        ctx.create_file('shared', 'Remotes.model.json', json.dumps(model))
+        ctx.dump_json('shared', 'Remotes.model.json', model)
 
 
     def load(self, ctx: AnnotationRegistry):

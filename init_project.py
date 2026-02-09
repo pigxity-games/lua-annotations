@@ -40,6 +40,8 @@ def build(workdir: Path, config: dict[Any, Any]):
                 continue
 
             output_root = env_workdir / Path(output_dir_name)
+
+            shutil.rmtree(output_root)
             output_root.mkdir(parents=True, exist_ok=True)
 
             ctx = BuildProcessCtx(reg, env_workdir, output_root, env)
