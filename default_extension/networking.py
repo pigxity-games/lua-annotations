@@ -2,6 +2,7 @@ from typing import Any
 
 from api.annotations import AnnotationBuildCtx, AnnotationDef, AnnotationRegistry, Extension
 from build_process import PostProcessCtx
+from parser_schemas import LuaMethod
 
 REMOTE_INSTANCE_MAP = {
     'function': 'RemoteFunction',
@@ -16,10 +17,11 @@ class NetworkingExtension(Extension):
 
 
     def remote_on_build(self, ctx: AnnotationBuildCtx):
-        anot = ctx.annotation
+        method = ctx.annotation.adornee
+        assert isinstance(method, LuaMethod)
 
         class_name = REMOTE_INSTANCE_MAP[ctx.annotation.args_val[0]]
-        self.remotes.append({'Name': f'{anot.adornee.module.returned_name}_{ctx.annotation.adornee.name}', 'ClassName': class_name})
+        self.remotes.append({'Name': f'{method.module.returned_name}_{method.name}', 'ClassName': class_name})
 
 
     def on_post_process(self, ctx: PostProcessCtx):

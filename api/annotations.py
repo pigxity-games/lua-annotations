@@ -26,6 +26,7 @@ type OnBuild = Callable[[AnnotationBuildCtx], None]
 #for extensions to define annotations
 @dataclass
 class AnnotationDef():
+    """An annotation definition; all Annotation classes are attached to one of these."""
     name: str
     args: list[argProcessor]=field(default_factory=list)
     kwargs: dict[str, argProcessor]=field(default_factory=dict)
@@ -56,6 +57,7 @@ class Extension():
 
 @dataclass
 class AnnotationRegistry():
+    """Provides an API for extensions to register annotations"""
     registry: dict[str, AnnotationDef] = field(default_factory=dict)
     file_build_hooks: list[FileBuildHook]=field(default_factory=list)
     post_build_hooks: list[PostBuildHook]=field(default_factory=list)

@@ -1,10 +1,10 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import json
 from pathlib import Path
 from typing import Any, Literal
 
 from api.annotations import AnnotationRegistry, FileBuildCtx
-from parser_schemas import ANNOTATION_PREFIX, Annotation
+from parser_schemas import ANNOTATION_PREFIX
 
 type Environment = Literal['server', 'client', 'shared']
 FILENAMES = ['*.lua', '*.luau']
@@ -24,6 +24,7 @@ class BuildException(Exception):
 class ProcessCtx():
     reg: AnnotationRegistry
     workdir: Path
+    workspace: Workspace
 
     def error(self, message: str, file: Path):
         raise BuildException(message, file, self.workdir)
@@ -45,7 +46,6 @@ class PostProcessCtx(ProcessCtx):
 class BuildProcessCtx(ProcessCtx):
     output_root: Path
     env: Environment
-    runtime_anots: list[Annotation] = field(default_factory=list)
 
     def create_file(self, name: str, text: str):
         file = self.output_root / name
@@ -63,10 +63,6 @@ class BuildProcessCtx(ProcessCtx):
                 parser = FileParser(self.reg, file, self)
                 parser.parse(text)
 
-                for anot in parser.annotations:
-                    if anot.adef.retention != 'build':
-                        self.runtime_anots.append(anot)
-
                 #post-file
                 for hook in self.reg.file_build_hooks:
                     hook(FileBuildCtx(self, parser, file))
@@ -78,3 +74,15 @@ class BuildProcessCtx(ProcessCtx):
             matched_files = self.workdir.rglob(filename)
             for file in matched_files:
                 self.process_file(file)
+
+
+type Workspace = dict[Environment, Path]
+class Config():
+    def __init__(self, data: dict[Any, Any]):
+        self.out_dir_name = data.get('outDirName', 'Generated')
+
+        #convert each path string to a path object
+        self.workspaces: list[Workspace] = [
+            {env: Path(path) for env, path in wksp.items()}
+            for wksp in data.get('workspaces', [])
+        ]

@@ -2,12 +2,9 @@ from pathlib import Path
 import shutil
 import time
 from datetime import datetime
-from typing import Any
 from api.annotations import ENVIRONMENTS, AnnotationRegistry
-from api.lua_dict import convert_dict, LuaPath
-from build_process import BuildCtxList, BuildProcessCtx, PostProcessCtx
+from build_process import BuildCtxList, BuildProcessCtx, Config, PostProcessCtx
 from parser import default_extension
-from parser_schemas import LuaModule
 
 DEFAULT_CONFIG = Path('./templates/annotations.config.json')
 WATCH_FILENAMES = ('*.lua', '*.luau')
@@ -20,13 +17,10 @@ def create_config(workdir: Path, config_file: Path):
         print('Config file already exists. Skipping')
 
 
-def build(workdir: Path, config: dict[Any, Any]):
+def build(workdir: Path, config: Config):
     init_time = datetime.now()
 
-    output_dir_name = config.get('outDirName', 'Generated')
-    workspaces: list[Any] = config.get('workspaces', [])
-
-    for workspace in workspaces:
+    for workspace in config.workspaces:
         reg = AnnotationRegistry()
         default_extension.load(reg)
 
@@ -41,12 +35,12 @@ def build(workdir: Path, config: dict[Any, Any]):
             if not env_workdir.exists() or not env_workdir.is_dir():
                 continue
 
-            output_root = env_workdir / Path(output_dir_name)
+            output_root = env_workdir / Path(config.out_dir_name)
 
             shutil.rmtree(output_root)
             output_root.mkdir(parents=True, exist_ok=True)
 
-            ctx = BuildProcessCtx(reg, env_workdir, output_root, env)
+            ctx = BuildProcessCtx(reg, env_workdir, workspace, output_root, env)
             ctx.process_dir()
             build_contexts[env] = ctx
 
@@ -54,42 +48,23 @@ def build(workdir: Path, config: dict[Any, Any]):
             return
 
         # run post-build hooks
-        ctx = PostProcessCtx(reg, workdir, build_contexts)
+        ctx = PostProcessCtx(reg, workdir, workspace, build_contexts)
         for hook in reg.post_build_hooks:
             hook(ctx)
-
-        #runtime manifest
-        for env in ENVIRONMENTS:
-            build_ctx = ctx.build_ctxs[env]
-
-            #serialize annotations
-            out_manifest: list[Any] = []
-            for anot in build_ctx.runtime_anots:
-                module = anot.adornee
-                assert(isinstance(module, LuaModule))
-
-                out_manifest.append({
-                    'module': LuaPath(module.file),
-                    'module_name': module.returned_name,
-                    'args': anot.args_val,
-                    'kwargs': anot.kwargs_val
-                })
-
-            ctx.create_file(env, 'Manifest.lua', convert_dict(ctx, {'annotatons': out_manifest}))
 
     delta = datetime.now() - init_time
     print(f'Built in {delta.total_seconds()}s')
 
 
 #builds a fingerprint of all the last modified times of files
-def _watch_fingerprint(workdir: Path, config_file: Path, config: dict[Any, Any]):
-    output_dir_name = config.get('outDirName', 'Generated')
+def _watch_fingerprint(workdir: Path, config_file: Path, config: Config):
+    output_dir_name = config.out_dir_name
 
     #track config file
     tracked: dict[str, int] = {str(config_file): config_file.stat().st_mtime_ns}
 
     #track workspaces
-    for workspace in config.get('workspaces', []):
+    for workspace in config.workspaces:
         for env in ENVIRONMENTS:
             rel_path = workspace.get(env)
             if not rel_path:
@@ -129,8 +104,8 @@ def watch(workdir: Path, config_file: Path, poll_interval: float = 1.0):
             last_fingerprint = fingerprint
 
 
-def read_config(config_file: Path) -> dict[Any, Any]:
+def read_config(config_file: Path):
     import json
 
     assert config_file.exists(), 'Config file not found. Run the program in init mode to create one!'
-    return json.loads(config_file.read_text())
+    return Config(json.loads(config_file.read_text()))

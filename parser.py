@@ -202,12 +202,12 @@ class FileParser():
                             self.error(line, 'code block is not a module')
                         
                         name: str = match.group(1)
-                        returned_name = returned.get_returned_name(name)
+                        returned_name, is_submodule = returned.get_returned_name(name)
 
                         if not (name and returned_name):
                             self.error(line, 'invalid module definition or it is not returned.')
 
-                        module = LuaModule(self.file, name, returned_name)
+                        module = LuaModule(self.file, name, returned_name, is_submodule)
                         set_adornee(self.cur_annotations, module)
                         self.modules[module.name] = module
 

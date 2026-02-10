@@ -21,7 +21,7 @@ class IndexExtension(Extension):
             ctx.create_file(env, 'Index.lua', convert_dict(ctx, self.indexes[env]))
 
             # type index
-            resolver = LuaPathResolver(ctx)
+            resolver = LuaPathResolver(ctx.workspace)
             imports: dict[str, str] = {}
             type_lines: list[str] = []
 
@@ -55,7 +55,7 @@ class IndexExtension(Extension):
         module = ctx.annotation.adornee
         assert isinstance(module, LuaModule)
 
-        path = LuaPath(ctx.parser.file, require=True)
+        path = module.get_path(ctx.parser.file, require=True)
         self.exported_types[_env(ctx)].append((path, module.returned_name))
 
 

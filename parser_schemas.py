@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePath
 import re
 from typing import Any, Literal, Optional
 
@@ -43,6 +43,16 @@ class LuaModule():
     file: Path
     name: str
     returned_name: str
+    submodule: bool=False
+
+    def get_path(self, file: PurePath, relative: bool=False, require: bool=False):
+        """Similar to the LuaPath constructor, but it takes the module's submodule status into account."""
+        from api.lua_dict import LuaPath
+
+        if self.submodule:
+            return LuaPath(file, relative, require, self.returned_name)
+        else:
+            return LuaPath(file, relative, require)
 
 
 @dataclass
@@ -71,10 +81,12 @@ class ReturnedValue():
     def get_returned_name(self, module: str):
         if self.type == 'single':
             if self.single_module == module:
-                return self.default_name
+                return self.default_name, False
         elif self.type == 'dict':
             if self.dict_val:
-                return self.dict_val.get(module)
+                return self.dict_val.get(module), True
+
+        return None, False
 
 
 @dataclass
