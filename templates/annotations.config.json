@@ -2,9 +2,16 @@
     "outDirName": "Generated",
     "workspaces": [
         {
-            "client": "./src/client",
-            "server": "./src/server",
-            "shared": "./src/shared"
+            "client": {"src/client": ":"},
+            "server": {"src/server": ":"},
+            "shared": {"src/shared": ":"}
+        }
+    ],
+    "extensions": [
+        {
+            "py_entry": ["library","default_extension.main"],
+            "lua_shared": "require(:Packages.default_extension):",
+            "lua_server": "require(:Packages.default_extension_server):"
         }
     ]
 }
