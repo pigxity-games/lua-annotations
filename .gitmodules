@@ -1,7 +1,3 @@
 [submodule "test/lua-anot-test"]
   path = test/lua-anot-test
   url = git@github.com:pigxity-games/lua-anot-test.git
-
-[submodule "test/default-extension"]
-  path = test/default-extension
-  url = git@github.com:pigxity-games/lua-anot-default-extension.git

@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from api.annotations import AnnotationBuildCtx, AnnotationDef, AnnotationRegistry
-from default_extension import main as default_extension
+from test import test_ext
 from parser_schemas import *
 
 if TYPE_CHECKING:
@@ -255,7 +255,7 @@ class FileParser():
 #Test
 if __name__ == '__main__':
     ctx = AnnotationRegistry()
-    default_extension.load(ctx)
+    test_ext.load(ctx)
     
     test_file = Path('./test/Test.lua')
     with test_file.open('r') as f:

@@ -10,8 +10,9 @@
     "extensions": [
         {
             "py_entry": ["library","default_extension.main"],
-            "lua_shared": "require(:Packages.default_extension):",
-            "lua_server": "require(:Packages.default_extension_server):"
+            "lua_entry": {
+                "shared": "require(:Packages.default_extension):"
+            }
         }
     ]
 }

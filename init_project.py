@@ -4,7 +4,7 @@ import time
 from datetime import datetime
 from api.annotations import ENVIRONMENTS, AnnotationRegistry
 from build_process import BuildCtxList, BuildProcessCtx, Config, PostProcessCtx
-from parser import default_extension
+from api.lua_dict import convert_dict, LuaPath
 
 DEFAULT_CONFIG = Path('./templates/annotations.config.json')
 WATCH_FILENAMES = ('*.lua', '*.luau')
@@ -22,7 +22,7 @@ def build(workdir: Path, config: Config):
 
     for workspace in config.workspaces:
         reg = AnnotationRegistry()
-        default_extension.load(reg)
+        #TODO: load extensions
 
         build_contexts: BuildCtxList = {}
 
