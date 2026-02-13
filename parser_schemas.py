@@ -1,9 +1,12 @@
 from dataclasses import dataclass, field
 from pathlib import Path, PurePath
 import re
-from typing import Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from api.annotations import AnnotationDef
+
+if TYPE_CHECKING:
+    from api.lua_dict import LuaPathResolver
 
 ANNOTATION_PREFIX = '--@'
 ARG_SEP = ','
@@ -45,6 +48,7 @@ class LuaModule():
     returned_name: str
     submodule: bool=False
 
+
     def get_path(self, file: PurePath, relative: bool=False, require: bool=False):
         """Similar to the LuaPath constructor, but it takes the module's submodule status into account."""
         from api.lua_dict import LuaPath
@@ -53,6 +57,11 @@ class LuaModule():
             return LuaPath(file, relative, require, self.returned_name)
         else:
             return LuaPath(file, relative, require)
+
+
+    def get_expr(self, file: PurePath, resolver: LuaPathResolver, relative: bool=False):
+        path = self.get_path(file, relative, True)
+        return f'local {self.returned_name} = {path.to_lua(resolver)}'
 
 
 @dataclass
