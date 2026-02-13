@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from api.annotations import AnnotationBuildCtx, AnnotationDef, AnnotationRegistry
 from test import test_ext
@@ -10,7 +10,9 @@ if TYPE_CHECKING:
     from build_process import BuildProcessCtx
 
 #helper functions
-def reverse_dict(d: dict[Any, Any]):
+K = TypeVar('K')
+V = TypeVar('V')
+def reverse_dict(d: dict[K, V]) -> dict[V, K]:
     return {v: k for k, v in d.items()}
 
 def set_adornee(anots: list[Annotation], adornee: Adornee):

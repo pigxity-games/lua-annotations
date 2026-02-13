@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import json
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, TypedDict
 
 from api.annotations import AnnotationRegistry, FileBuildCtx
 from parser_schemas import ANNOTATION_PREFIX
@@ -23,11 +23,11 @@ class BuildException(Exception):
 @dataclass
 class ProcessCtx():
     reg: AnnotationRegistry
-    workdir: Path
+    root_dir: Path
     workspace: Workspace
 
     def error(self, message: str, file: Path):
-        raise BuildException(message, file, self.workdir)
+        raise BuildException(message, file, self.root_dir)
 
 type BuildCtxList = dict[Environment, BuildProcessCtx]
 
@@ -44,6 +44,7 @@ class PostProcessCtx(ProcessCtx):
 
 @dataclass
 class BuildProcessCtx(ProcessCtx):
+    workdirs: dict[Path, str]
     output_root: Path
     env: Environment
 
@@ -69,20 +70,29 @@ class BuildProcessCtx(ProcessCtx):
 
                 return parser
 
-    def process_dir(self):
+    def process_dir(self, dir: Path):
         for filename in FILENAMES:
-            matched_files = self.workdir.rglob(filename)
+            matched_files = dir.rglob(filename)
             for file in matched_files:
                 self.process_file(file)
 
 
-type Workspace = dict[Environment, Path]
+type Workspace = dict[Environment, dict[Path, str]]
+
+class Extension(TypedDict):
+    py_entry: tuple[Literal['library', 'path'], str]
+    lua_entry: dict[Environment, str]
+
 class Config():
     def __init__(self, data: dict[Any, Any]):
         self.out_dir_name = data.get('outDirName', 'Generated')
 
+        self.workspaces: list[Workspace] = data.get('workspaces', [])
+
         #convert each path string to a path object
-        self.workspaces: list[Workspace] = [
-            {env: Path(path) for env, path in wksp.items()}
-            for wksp in data.get('workspaces', [])
-        ]
+        for wksp in self.workspaces:
+            for env, paths in wksp.items():
+                wksp[env] = {Path(k): v for k, v in paths.items()}
+
+        #extensions
+        self.extensions: list[Extension] = data.get('extensions', [])
