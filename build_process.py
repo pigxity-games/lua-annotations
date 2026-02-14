@@ -77,6 +77,7 @@ class BuildProcessCtx(ProcessCtx):
                 self.process_file(file)
 
 
+type RawWorkspace = dict[Environment, dict[str, str]]
 type Workspace = dict[Environment, dict[Path, str]]
 
 class Extension(TypedDict):
@@ -87,12 +88,7 @@ class Config():
     def __init__(self, data: dict[Any, Any]):
         self.out_dir_name = data.get('outDirName', 'Generated')
 
-        self.workspaces: list[Workspace] = data.get('workspaces', [])
-
-        #convert each path string to a path object
-        for wksp in self.workspaces:
-            for env, paths in wksp.items():
-                wksp[env] = {Path(k): v for k, v in paths.items()}
+        self.workspaces: list[RawWorkspace] = data.get('workspaces', [])
 
         #extensions
         self.extensions: list[Extension] = data.get('extensions', [])

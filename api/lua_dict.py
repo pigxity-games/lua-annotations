@@ -74,23 +74,27 @@ def _convert_dict(resolver: LuaPathResolver, data: Any, indent: int = 0):
 class LuaPathResolver:
     """Resolves lua paths and stores required imports; one should be created per output file."""
     def __init__(self, workspace: Workspace):
-        self.env_map = workspace
+        self.workspace = workspace
         self.used_imports: set[Environment] = set()
 
-    def normalize(self, path: PurePath) -> tuple[Environment, PurePath]:
+    def _resolve_expr(self, env: Environment, raw_expr: str):
+        return raw_expr.replace(':', ENV_TO_VAR[env] + '.') 
+
+    def normalize(self, path: PurePath) -> tuple[Environment, PurePath, str]:
         # path is relative an env workdir
-        for env, workdir in self.env_map.items():
-            try:
-                relative = path.relative_to(workdir)
-                return env, relative
-            except ValueError:
-                continue
+        for env, path_map in self.workspace.items():
+            for workdir, lua_expr in path_map.items():
+                try:
+                    relative = path.relative_to(workdir)
+                    return env, relative, self._resolve_expr(env, lua_expr)
+                except ValueError:
+                    continue
 
         # path is prefixed with an env name
         parts = [part for part in path.parts if part not in ('', '.', '/')]
-        if parts and parts[0] in self.env_map:
+        if parts and parts[0] in self.workspace:
             env = parts[0]  # type: ignore[assignment]
-            return env, PurePath(*parts[1:])
+            return env, PurePath(*parts[1:]), ENV_TO_VAR[env]
 
         raise ValueError(f'Unknown lua path: {path}')
 
@@ -126,7 +130,7 @@ class LuaPath:
             string = f'require({string})'
         if self.property:
             string += '.' + self.property
-        return string
+        return string.replace('..', '.')
 
     def to_lua_relative(self):
         assert self.relative
@@ -141,11 +145,11 @@ class LuaPath:
             return self.to_lua_relative()
 
         #env path (ReplicatedStorage.Example.Path)
-        env, rel = resolver.normalize(self.path)
+        env, rel, expr_root = resolver.normalize(self.path)
         resolver.mark_used(env)
 
         parts = self._parts_no_ext(rel)
-        expr = '.'.join([ENV_TO_VAR[env], *parts])
+        expr = '.'.join([expr_root, *parts])
         return self._post_process(expr)
 
 

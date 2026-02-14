@@ -5,7 +5,7 @@ import sys
 import time
 from datetime import datetime
 from api.annotations import ENVIRONMENTS, AnnotationRegistry
-from build_process import BuildCtxList, BuildProcessCtx, Config, Extension, PostProcessCtx
+from build_process import BuildCtxList, BuildProcessCtx, Config, Extension, PostProcessCtx, Workspace
 
 DEFAULT_CONFIG = Path('./templates/annotations.config.json')
 WATCH_FILENAMES = ('*.lua', '*.luau')
@@ -24,9 +24,9 @@ def get_root_path(paths: dict[Path, str], env: str):
         raise ValueError(f'environment `{env}` does not have a root path.')
     return root
 
-def iter_rel_paths(path_map: dict[Path, str], workdir: Path):
+def iter_rel_paths(path_map: dict[str, str], workdir: Path):
     for path, lua_expr in path_map.items():
-        p = workdir / path
+        p = workdir / Path(path)
         if not p.is_dir():
             print(f'WARNING: directory {p.as_posix()} does not exist')
             continue
@@ -57,23 +57,36 @@ def import_extension(ext: Extension, workdir: Path):
 def build(workdir: Path, config: Config):
     init_time = datetime.now()
 
-    for workspace in config.workspaces:
+    for raw_workspace in config.workspaces:
+        #process workspace
+        workspace: Workspace = {}
+        for env in ENVIRONMENTS:
+            path_map = raw_workspace.get(env)
+            if not path_map:
+                raise ValueError(f'path for the `{env}` environment is not defined in the config.')
+
+            rel_paths = dict(iter_rel_paths(path_map, workdir))
+            workspace[env] = rel_paths
+
+
+        #load extensions
         reg = AnnotationRegistry()
         
-        #load extensions
         for ext in config.extensions:
             module = import_extension(ext, workdir)
             load_fn = getattr(module, 'load')
-            
-            if callable(load_fn):
-                load_fn(reg)
-            else:
+
+            if not callable(load_fn):
                 raise ValueError(f'module {ext["py_entry"][1]} does not have a `load()` function')
+                
+            load_fn(reg)
 
             #TODO: store lua_entry paths somewhere
 
         print(f'loaded {len(reg.registry)} annotations')
 
+
+        #env processing
         build_contexts: BuildCtxList = {}
 
         for env in ENVIRONMENTS:
@@ -81,31 +94,29 @@ def build(workdir: Path, config: Config):
             if not path_map:
                 raise ValueError(f'path for the `{env}` environment is not defined in the config.')
 
-            #convert each path to be relative to the workdir
-            rel_paths = dict(iter_rel_paths(path_map, workdir))
-        
             #process output root
+            rel_paths = workspace[env]
             root_path = get_root_path(rel_paths, env)
             output_root = root_path / Path(config.out_dir_name)
 
-            shutil.rmtree(output_root)
+            shutil.rmtree(output_root, True)
             output_root.mkdir(parents=True, exist_ok=True)
 
-            #create a ctx
+            #create and use a ctx
             ctx = BuildProcessCtx(reg, root_path, workspace, rel_paths, output_root, env)
             for path in rel_paths:
                 ctx.process_dir(path)
 
             build_contexts[env] = ctx
 
-        if not build_contexts:
-            return
 
         # run post-build hooks
-        ctx = PostProcessCtx(reg, workdir, workspace, build_contexts)
-        for hook in reg.post_build_hooks:
-            hook(ctx)
+        if build_contexts:
+            ctx = PostProcessCtx(reg, workdir, workspace, build_contexts)
+            for hook in reg.post_build_hooks:
+                hook(ctx)
 
+    #logging
     delta = datetime.now() - init_time
     print(f'Built in {delta.total_seconds()}s')
 
@@ -120,19 +131,20 @@ def _watch_fingerprint(workdir: Path, config_file: Path, config: Config):
     #track workspaces
     for workspace in config.workspaces:
         for env in ENVIRONMENTS:
-            rel_path = workspace.get(env)
-            if not rel_path:
+            path_map = workspace.get(env)
+            if not path_map:
                 continue
 
-            env_workdir = workdir / Path(rel_path)
-            if not env_workdir.exists() or not env_workdir.is_dir():
-                continue
+            for rel_path in path_map:
+                env_workdir = workdir / rel_path
+                if not env_workdir.exists() or not env_workdir.is_dir():
+                    continue
 
-            for pattern in WATCH_FILENAMES:
-                for file in env_workdir.rglob(pattern):
-                    if output_dir_name in file.parts:
-                        continue
-                    tracked[str(file)] = file.stat().st_mtime_ns
+                for pattern in WATCH_FILENAMES:
+                    for file in env_workdir.rglob(pattern):
+                        if output_dir_name in file.parts:
+                            continue
+                        tracked[str(file)] = file.stat().st_mtime_ns
 
     return tuple(sorted(tracked.items()))
 

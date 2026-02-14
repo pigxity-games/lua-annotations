@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from api.annotations import AnnotationBuildCtx, AnnotationDef, AnnotationRegistry
-from test import test_ext
+import test_ext
 from parser_schemas import *
 
 if TYPE_CHECKING:
