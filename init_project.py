@@ -1,11 +1,14 @@
+from dataclasses import dataclass
 import importlib
 from pathlib import Path
 import shutil
 import sys
 import time
 from datetime import datetime
+from typing import Literal
 from api.annotations import ENVIRONMENTS, AnnotationRegistry
-from build_process import BuildCtxList, BuildProcessCtx, Config, Extension, PostProcessCtx, Workspace
+from build_process import BuildCtxList, BuildProcessCtx, Config, Environment, Extension, LuaEntry, PostProcessCtx, Workspace
+import lua_extension_anots
 
 DEFAULT_CONFIG = Path('./templates/annotations.config.json')
 WATCH_FILENAMES = ('*.lua', '*.luau')
@@ -54,6 +57,26 @@ def import_extension(ext: Extension, workdir: Path):
         return import_extension_from_path(workdir, entry)
 
 
+def parse_lua_entry(entry: LuaEntry, env: Environment, workdir: Path):
+    type, value = entry[env]
+    raw_path, expr = value
+    assert isinstance(raw_path, str) and isinstance(expr, str)
+
+    if type == 'wally':    
+        package_dir_name = 'Packages' if env == 'shared' else 'ServerPackages'
+        packages = workdir / package_dir_name / '_Index'
+        ext_dir = next(packages.glob(f'*_{raw_path}@*'), None)
+        assert ext_dir
+
+        return ext_dir / raw_path, expr
+
+    elif type == 'path':
+        return workdir / Path(raw_path), expr
+    else:
+        raise ValueError('incorrect lua_entry type in the config file.')
+    
+
+type ExtEnvironment = Literal['server', 'shared']
 def build(workdir: Path, config: Config):
     init_time = datetime.now()
 
@@ -71,17 +94,28 @@ def build(workdir: Path, config: Config):
 
         #load extensions
         reg = AnnotationRegistry()
-        
+
         for ext in config.extensions:
+            ext_reg = AnnotationRegistry()
+            lua_extension_anots.load(ext_reg)
+
+            #py_entry
             module = import_extension(ext, workdir)
             load_fn = getattr(module, 'load')
 
             if not callable(load_fn):
                 raise ValueError(f'module {ext["py_entry"][1]} does not have a `load()` function')
-                
             load_fn(reg)
 
-            #TODO: store lua_entry paths somewhere
+            #process lua_entry, adding paths to workspace
+            lua_entry_paths: dict[ExtEnvironment, Path] = {}
+            for env in ('server', 'shared'):
+                path, expr = parse_lua_entry(ext['lua_entry'], env, workdir)
+                workspace[env][path] = expr
+                lua_entry_paths[env] = path
+
+                #parse lua-entry in seperate BuildProcessCtx
+
 
         print(f'loaded {len(reg.registry)} annotations')
 

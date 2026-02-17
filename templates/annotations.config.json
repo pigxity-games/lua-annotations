@@ -11,7 +11,7 @@
         {
             "py_entry": ["library","default_extension.main"],
             "lua_entry": {
-                "shared": "require(:Packages.default_extension):"
+                "shared": ["wally", ["default_extension", ":Packages"]]
             }
         }
     ]

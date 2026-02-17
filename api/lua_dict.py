@@ -20,7 +20,7 @@ ENV_TO_VAR: dict[Environment, str] = {
 INDENT = ' ' * 4
 
 
-def _convert_dict(resolver: LuaPathResolver, data: Any, indent: int = 0):
+def convert_dict(resolver: LuaPathResolver, data: Any, indent: int = 0, sep: str = ' = '):
     def table_block(entry_lines: list[str], level: int) -> str:
         inner = INDENT * (level + 1)
         outer = INDENT * level
@@ -34,7 +34,7 @@ def _convert_dict(resolver: LuaPathResolver, data: Any, indent: int = 0):
 
         if isinstance(value, dict):
             entries = [
-                f'{key_to_lua(k, level)} = {to_lua(v, level + 1)},'
+                f'{key_to_lua(k, level)}{sep}{to_lua(v, level + 1)},'
                 for k, v in value.items()
             ]
             return table_block(entries, level)
@@ -63,10 +63,10 @@ def _convert_dict(resolver: LuaPathResolver, data: Any, indent: int = 0):
     body = to_lua(data, indent)
     import_lines = resolver.get_import_lines()
 
-    parts = [HEADER]
+    parts: list[str] = []
     if import_lines:
         parts += ['\n'.join(import_lines), '']
-    parts.append(f'return {body}')
+    parts.append(f'{body}')
 
     return '\n'.join(parts) + '\n'
 
@@ -77,16 +77,18 @@ class LuaPathResolver:
         self.workspace = workspace
         self.used_imports: set[Environment] = set()
 
-    def _resolve_expr(self, env: Environment, raw_expr: str):
-        return raw_expr.replace(':', ENV_TO_VAR[env] + '.') 
+    def _resolve_expr(self, env: Environment, raw_expr: str, inline_require: bool = False):
+        map = ENV_TO_IMPORT if inline_require else ENV_TO_VAR
+        #require(:Packages.default_extension): -> require(ServerScriptService.Packages.default_extension).example.path)
+        return raw_expr.replace(':', f'{map[env]}.', 1)
 
-    def normalize(self, path: PurePath) -> tuple[Environment, PurePath, str]:
+    def normalize(self, path: PurePath, inline_require: bool = False) -> tuple[Environment, PurePath, str]:
         # path is relative an env workdir
         for env, path_map in self.workspace.items():
             for workdir, lua_expr in path_map.items():
                 try:
                     relative = path.relative_to(workdir)
-                    return env, relative, self._resolve_expr(env, lua_expr)
+                    return env, relative, self._resolve_expr(env, lua_expr, inline_require)
                 except ValueError:
                     continue
 
@@ -109,9 +111,6 @@ class LuaPathResolver:
                 import_lines.append(f'local {ENV_TO_VAR[env]} = {ENV_TO_IMPORT[env]}')
 
         return import_lines
-
-    def convert_dict(self, data: Any, indent: int = 0):
-        return _convert_dict(self, data, indent)
 
 
 @dataclass
@@ -140,18 +139,25 @@ class LuaPath:
         expr = '.'.join(['script', 'Parent', *parts])
         return self._post_process(expr)
 
-    def to_lua(self, resolver: LuaPathResolver):
+    def to_lua(self, resolver: LuaPathResolver, inline_require: bool = False):
         if self.relative:
             return self.to_lua_relative()
 
         #env path (ReplicatedStorage.Example.Path)
-        env, rel, expr_root = resolver.normalize(self.path)
-        resolver.mark_used(env)
+        env, rel, expr_root = resolver.normalize(self.path, inline_require)
+        if not inline_require:
+            resolver.mark_used(env)
 
         parts = self._parts_no_ext(rel)
         expr = '.'.join([expr_root, *parts])
         return self._post_process(expr)
 
 
-def convert_dict(ctx: ProcessCtx, data: Any, indent: int = 0):
-    return LuaPathResolver(ctx.workspace).convert_dict(data, indent)
+#public api
+def convert_dict_module(ctx: ProcessCtx, data: Any, indent: int = 0):
+    dict_str = convert_dict(LuaPathResolver(ctx.workspace), data, indent)
+    return f'{HEADER}\nreturn {dict_str}'
+
+def convert_dict_type(ctx: ProcessCtx, data: dict[str, Any], type_name: str, indent: int = 0):
+    dict_str = convert_dict(LuaPathResolver(ctx.workspace), data, indent, sep=': ')
+    return f'export type {type_name} = {dict_str}'
