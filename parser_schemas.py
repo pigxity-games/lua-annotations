@@ -1,10 +1,9 @@
 from dataclasses import dataclass, field
-from pathlib import Path, PurePath
+from pathlib import Path
 import re
 from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from api.annotations import AnnotationDef
-from api.lua_dict import LuaPath
 
 if TYPE_CHECKING:
     from api.lua_dict import LuaPathResolver
@@ -41,8 +40,8 @@ class LuaMethod():
     params: dict[str, str] = field(default_factory=dict)
     return_type: Optional[str] = None
 
-    def get_path(self, file: PurePath, relative: bool=False, require: bool=False, sep: str='.'):
-        return self.module.get_path(file, relative, require, sep + self.name)
+    def get_path(self, relative: bool=False, require: bool=False, sep: str='.'):
+        return self.module.get_path(relative, require, sep + self.name)
 
 
 @dataclass
@@ -53,18 +52,18 @@ class LuaModule():
     submodule: bool=False
 
 
-    def get_path(self, file: PurePath, relative: bool=False, require: bool=False, ext: Optional[str]=None):
+    def get_path(self, relative: bool=False, require: bool=False, ext: Optional[str]=None):
         """Similar to the LuaPath constructor, but it takes the module's submodule status into account."""
         from api.lua_dict import LuaPath
 
         if self.submodule:
-            return LuaPath(file, relative, require, self.returned_name, ext)
+            return LuaPath(self.file, relative, require, self.returned_name, ext)
         else:
-            return LuaPath(file, relative, require, ext=ext)
+            return LuaPath(self.file, relative, require, ext=ext)
 
 
-    def get_expr(self, file: PurePath, resolver: LuaPathResolver, relative: bool=False):
-        path = self.get_path(file, relative, True)
+    def get_expr(self, resolver: LuaPathResolver, relative: bool=False):
+        path = self.get_path(relative, True)
         return f'local {self.returned_name} = {path.to_lua(resolver)}'
 
 
@@ -88,7 +87,7 @@ class Annotation():
             'name': self.name,
             'args': self.args_val,
             'kwargs': self.kwargs_val,
-            'module': LuaPath(self.adornee.get_path(parser.file, require=True)) #TODO provide parser instance
+            'adornee': self.adornee.get_path(require=True)
         }
 
 

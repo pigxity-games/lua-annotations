@@ -10,10 +10,10 @@ def on_build(dict: D, ctx: AnnotationBuildCtx):
     adornee = ctx.annotation.adornee
     assert isinstance(adornee, LuaMethod)
 
-    dict[ctx.build_ctx.env].append(adornee.get_path(ctx.parser.file, require=True))
+    dict[ctx.build_ctx.env].append(adornee.get_path(require=True))
 
 
-class ManifestExt(Extension):
+class ManifestExtension(Extension):
     def __init__(self):
         self.post_init_hooks: D = {env: [] for env in ENVIRONMENTS}
         self.anot_init_hooks: D = {env: [] for env in ENVIRONMENTS}
@@ -44,19 +44,19 @@ class ManifestExt(Extension):
 
     def on_post_process(self, ctx: PostProcessCtx):
         for env in ('server', 'client'):
-            with open('./templates/AnotInit.lua') as f:
+            with open('./templates/AnnotationInit.lua') as f:
                 template = f.read()
 
             data = {
                 'init_hooks': self.post_init_hooks[env] + self.post_init_hooks['shared'],
                 'anot_hooks': self.anot_init_hooks[env] + self.anot_init_hooks['shared'],
-                'anots': self.anot_entries[env] + self.anot_init_hooks['shared']
+                'annotations': self.anot_entries[env] + self.anot_init_hooks['shared']
             }
             converted = convert_dict(LuaPathResolver(ctx.workspace), data, prefix = 'local manifest =')
             out = template.replace('--manifest', converted)
 
-            ctx.create_file(env, f'AnotInit.{env}.lua', out)
+            ctx.create_file(env, f'AnnotationInit.{env}.lua', out)
 
 
 def load(ctx: AnnotationRegistry):
-    ctx.registerExtension(ManifestExt())
+    ctx.registerExtension(ManifestExtension())

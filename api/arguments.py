@@ -1,5 +1,6 @@
 #[val1, val2, val3]
-def list_arg(string: str):
+
+def list_arg(string: str) -> list[str]:
     assert string.startswith('[') and string.endswith(']')
     string = string[1:-1]
     if string.strip() == '':

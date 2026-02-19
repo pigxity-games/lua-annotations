@@ -61,11 +61,15 @@ class AnnotationRegistry():
     registry: dict[str, AnnotationDef] = field(default_factory=dict)
     file_build_hooks: list[FileBuildHook]=field(default_factory=list)
     post_build_hooks: list[PostBuildHook]=field(default_factory=list)
+    extensions: dict[str, Extension] = field(default_factory=dict)
 
     def registerAnot(self, annotation: AnnotationDef, name: Optional[str]=None):
         self.registry[name or annotation.name] = annotation
 
     def registerExtension(self, extension: Extension):
+        self.extensions[type(extension).__name__] = extension
+
+        #register ext hooks
         extension.load(self)
         self.onPostProcess(extension.on_post_process)
         self.onFileProcess(extension.on_file_process)

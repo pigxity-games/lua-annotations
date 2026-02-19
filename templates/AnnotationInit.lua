@@ -2,10 +2,10 @@
 
 --manifest
 
-for _, anot in ipairs(manifest.anots) do
+for _, anot in ipairs(manifest.annotations) do
     local fun = manifest.anot_hooks[anot.name]
     if fun then
-        fun(anot)
+        fun(anot, manifest)
     end
 end
 
