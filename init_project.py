@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 import importlib
 from pathlib import Path
 import shutil
@@ -20,12 +19,6 @@ def create_config(workdir: Path, config_file: Path):
     else:
         print('Config file already exists. Skipping')
 
-
-def get_root_path(paths: dict[Path, str], env: str):
-    root = next((p for p, expr in paths.items() if expr == ':'), None)
-    if root is None:
-        raise ValueError(f'environment `{env}` does not have a root path.')
-    return root
 
 def iter_rel_paths(path_map: dict[str, str], workdir: Path):
     for path, lua_expr in path_map.items():
@@ -76,7 +69,6 @@ def parse_lua_entry(entry: LuaEntry, env: Environment, workdir: Path):
         raise ValueError('incorrect lua_entry type in the config file.')
     
 
-type ExtEnvironment = Literal['server', 'shared']
 def build(workdir: Path, config: Config):
     init_time = datetime.now()
 
@@ -94,11 +86,9 @@ def build(workdir: Path, config: Config):
 
         #load extensions
         reg = AnnotationRegistry()
+        lua_extension_anots.load(reg)
 
         for ext in config.extensions:
-            ext_reg = AnnotationRegistry()
-            lua_extension_anots.load(ext_reg)
-
             #py_entry
             module = import_extension(ext, workdir)
             load_fn = getattr(module, 'load')
@@ -108,13 +98,12 @@ def build(workdir: Path, config: Config):
             load_fn(reg)
 
             #process lua_entry, adding paths to workspace
-            lua_entry_paths: dict[ExtEnvironment, Path] = {}
             for env in ('server', 'shared'):
+                if env not in ext['lua_entry']:
+                    continue
+
                 path, expr = parse_lua_entry(ext['lua_entry'], env, workdir)
                 workspace[env][path] = expr
-                lua_entry_paths[env] = path
-
-                #parse lua-entry in seperate BuildProcessCtx
 
 
         print(f'loaded {len(reg.registry)} annotations')
@@ -130,7 +119,7 @@ def build(workdir: Path, config: Config):
 
             #process output root
             rel_paths = workspace[env]
-            root_path = get_root_path(rel_paths, env)
+            root_path = next(iter(rel_paths.keys()))
             output_root = root_path / Path(config.out_dir_name)
 
             shutil.rmtree(output_root, True)

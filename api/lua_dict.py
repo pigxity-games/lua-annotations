@@ -20,7 +20,7 @@ ENV_TO_VAR: dict[Environment, str] = {
 INDENT = ' ' * 4
 
 
-def convert_dict(resolver: LuaPathResolver, data: Any, indent: int = 0, sep: str = ' = '):
+def convert_dict(resolver: LuaPathResolver, data: Any, indent: int = 0, sep: str = ' = ', prefix: str = 'return'):
     def table_block(entry_lines: list[str], level: int) -> str:
         inner = INDENT * (level + 1)
         outer = INDENT * level
@@ -66,7 +66,7 @@ def convert_dict(resolver: LuaPathResolver, data: Any, indent: int = 0, sep: str
     parts: list[str] = []
     if import_lines:
         parts += ['\n'.join(import_lines), '']
-    parts.append(f'{body}')
+    parts.append(f'{prefix} {body}')
 
     return '\n'.join(parts) + '\n'
 
@@ -156,8 +156,8 @@ class LuaPath:
 #public api
 def convert_dict_module(ctx: ProcessCtx, data: Any, indent: int = 0):
     dict_str = convert_dict(LuaPathResolver(ctx.workspace), data, indent)
-    return f'{HEADER}\nreturn {dict_str}'
+    return f'{HEADER}\n{dict_str}'
 
 def convert_dict_type(ctx: ProcessCtx, data: dict[str, Any], type_name: str, indent: int = 0):
-    dict_str = convert_dict(LuaPathResolver(ctx.workspace), data, indent, sep=': ')
-    return f'export type {type_name} = {dict_str}'
+    dict_str = convert_dict(LuaPathResolver(ctx.workspace), data, indent, sep=': ', prefix = f'export type {type_name} = ')
+    return f'{HEADER}\n{dict_str}'
