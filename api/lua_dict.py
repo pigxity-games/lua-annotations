@@ -29,8 +29,12 @@ def convert_dict(resolver: LuaPathResolver, data: Any, indent: int = 0, sep: str
         )
 
     def to_lua(value: Any, level: int):
-        if isinstance(value, LuaPath):
-            return value.to_lua(resolver)
+        if isinstance(value, object):
+            if isinstance(value, LuaPath):
+                return value.to_lua(resolver)
+            
+            if hasattr(value, 'asdict') and callable(value.asdict):
+                return value.asdict()
 
         if isinstance(value, dict):
             entries = [
@@ -120,6 +124,7 @@ class LuaPath:
     relative: bool=False
     require: bool=False
     property: Optional[str]=None
+    ext: Optional[str]=None
 
     def _parts_no_ext(self, p: PurePath):
         return [x for x in p.with_suffix('').parts if x not in ('', '.')]
@@ -129,6 +134,8 @@ class LuaPath:
             string = f'require({string})'
         if self.property:
             string += '.' + self.property
+        if self.ext:
+            string += self.ext
         return string.replace('..', '.')
 
     def to_lua_relative(self):

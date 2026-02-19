@@ -4,6 +4,7 @@ import re
 from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from api.annotations import AnnotationDef
+from api.lua_dict import LuaPath
 
 if TYPE_CHECKING:
     from api.lua_dict import LuaPathResolver
@@ -40,6 +41,9 @@ class LuaMethod():
     params: dict[str, str] = field(default_factory=dict)
     return_type: Optional[str] = None
 
+    def get_path(self, file: PurePath, relative: bool=False, require: bool=False, sep: str='.'):
+        return self.module.get_path(file, relative, require, sep + self.name)
+
 
 @dataclass
 class LuaModule():
@@ -49,14 +53,14 @@ class LuaModule():
     submodule: bool=False
 
 
-    def get_path(self, file: PurePath, relative: bool=False, require: bool=False):
+    def get_path(self, file: PurePath, relative: bool=False, require: bool=False, ext: Optional[str]=None):
         """Similar to the LuaPath constructor, but it takes the module's submodule status into account."""
         from api.lua_dict import LuaPath
 
         if self.submodule:
-            return LuaPath(file, relative, require, self.returned_name)
+            return LuaPath(file, relative, require, self.returned_name, ext)
         else:
-            return LuaPath(file, relative, require)
+            return LuaPath(file, relative, require, ext=ext)
 
 
     def get_expr(self, file: PurePath, resolver: LuaPathResolver, relative: bool=False):
@@ -78,6 +82,14 @@ class Annotation():
     args_val: list[Any]
     kwargs_val: dict[str, Any]
     adornee: Adornee = field(init=False)
+
+    def asdict(self):
+        return {
+            'name': self.name,
+            'args': self.args_val,
+            'kwargs': self.kwargs_val,
+            'module': LuaPath(self.adornee.get_path(parser.file, require=True)) #TODO provide parser instance
+        }
 
 
 @dataclass

@@ -1,26 +1,23 @@
-from api.annotations import ENVIRONMENTS, AnnotationBuildCtx, AnnotationDef, AnnotationRegistry, Extension
+from api.annotations import ENVIRONMENTS, AnnotationBuildCtx, AnnotationDef, AnnotationRegistry, Extension, FileBuildCtx
 from build_process import Environment, PostProcessCtx
-from parser_schemas import LuaMethod
+from parser_schemas import Annotation, LuaMethod
 from api.lua_dict import LuaPath, LuaPathResolver, convert_dict
 
 
-type L = list[tuple[LuaPath, LuaMethod]]
-type D = dict[Environment, L]
+type D = dict[Environment, list[LuaPath]]
 
 def on_build(dict: D, ctx: AnnotationBuildCtx):
     adornee = ctx.annotation.adornee
     assert isinstance(adornee, LuaMethod)
 
-    dict[ctx.build_ctx.env].append((adornee.module.get_path(ctx.parser.file, require=True), adornee))
-
-def process_data(list: L):
-    return [f'{t[0]}.{t[1]}' for t in list]
+    dict[ctx.build_ctx.env].append(adornee.get_path(ctx.parser.file, require=True))
 
 
 class ManifestExt(Extension):
     def __init__(self):
         self.post_init_hooks: D = {env: [] for env in ENVIRONMENTS}
         self.anot_init_hooks: D = {env: [] for env in ENVIRONMENTS}
+        self.anot_entries: dict[Environment, list[Annotation]] = {env: [] for env in ENVIRONMENTS}
 
     def load(self, ctx: AnnotationRegistry):
         ctx.registerAnot(AnnotationDef(
@@ -40,20 +37,25 @@ class ManifestExt(Extension):
             scope='module'
         ))
 
+    def on_file_process(self, ctx: FileBuildCtx):
+        for anot in ctx.parser.annotations:
+            if anot.adef.retention != 'build':
+                self.anot_entries[ctx.build_ctx.env].append(anot)
+
     def on_post_process(self, ctx: PostProcessCtx):
         for env in ('server', 'client'):
             with open('./templates/AnotInit.lua') as f:
                 template = f.read()
 
             data = {
-                'init_hooks': process_data(self.post_init_hooks[env]),
-                'anot_hooks': process_data(self.anot_init_hooks[env])
+                'init_hooks': self.post_init_hooks[env] + self.post_init_hooks['shared'],
+                'anot_hooks': self.anot_init_hooks[env] + self.anot_init_hooks['shared'],
+                'anots': self.anot_entries[env] + self.anot_init_hooks['shared']
             }
             converted = convert_dict(LuaPathResolver(ctx.workspace), data, prefix = 'local manifest =')
-            print(converted)
-            template.replace('--manifest', converted)
-            
-            ctx.create_file(env, f'AnotInit.{env}.lua', template)
+            out = template.replace('--manifest', converted)
+
+            ctx.create_file(env, f'AnotInit.{env}.lua', out)
 
 
 def load(ctx: AnnotationRegistry):
