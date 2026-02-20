@@ -74,8 +74,9 @@ class ExtensionRegistry():
         self.ext_load_order: list[str] = []
 
 
-    def register_extension(self, extension: Extension, deps: list[str] = []):
+    def register_extension(self, extension: Extension, deps: list[str] = [], hook_order: Literal['before', 'after']='after'):
         name = type(extension).__name__
+        extension.hook_order = hook_order
         self.extensions[name] = extension
         self.ext_graph[name] = deps
 
@@ -85,15 +86,38 @@ class ExtensionRegistry():
 
 
     def sort_extensions(self):
-        ts = TopologicalSorter(self.ext_graph)
-        exts = [self.extensions[ext] for ext in ts.static_order()]
+        ext_layers = [[self.extensions[ext] for ext in layer] for layer in topo_layers(self.ext_graph)]
+        load_exts = [x for y in ext_layers for x in y]
+        hook_exts = [x for y in shift_exts(ext_layers) for x in y]
 
-        #register annotations
-        for ext in exts:
+        for ext in load_exts:
             ext.load(self)
 
         return SortedRegistry(
-            [ext.on_file_process for ext in exts],
-            [ext.on_post_process for ext in exts],
+            [ext.on_file_process for ext in hook_exts],
+            [ext.on_post_process for ext in hook_exts],
             self.anot_registry
         )
+
+def shift_exts(layers: list[list[Extension]], flag: str='before'):
+    befores = []
+    for layer in layers:
+        befores += [e for e in layer if e.hook_order == flag]
+        layer[:] = [e for e in layer if e.hook_order != flag]
+
+    if befores:
+        layers[0][:0] = befores
+
+    return layers
+
+def topo_layers(graph: dict[str, list[str]]):
+    ts = TopologicalSorter(graph)
+    ts.prepare()
+
+    layers: list[list[str]] = []
+    while ts.is_active():
+        ready = list(ts.get_ready())
+        ready.sort()
+        layers.append(list(ready))
+        ts.done(*ready)
+    return layers

@@ -9,26 +9,32 @@ class ManifestExtension(Extension):
     def __init__(self):
         self.manifest: dict[Environment, dict[Any, Any]] = {env: {} for env in ENVIRONMENTS}
         for env in ENVIRONMENTS:
-            self.manifest[env]['anot_hooks'] = []
+            self.manifest[env]['anot_hooks'] = {}
             self.manifest[env]['init_hooks'] = []
             self.manifest[env]['annotations'] = []
 
-    def on_build(self, key: str, ctx: AnnotationBuildCtx):
+    def on_build_post_init(self, ctx: AnnotationBuildCtx):
         adornee = ctx.annotation.adornee
         assert isinstance(adornee, LuaMethod)
 
-        self.manifest[ctx.build_ctx.env][key].append(adornee.get_path(require=True))
+        self.manifest[ctx.build_ctx.env]['init_hooks'].append(adornee.get_path(require=True))
+
+    def on_build_annotation_init(self, ctx: AnnotationBuildCtx):
+        adornee = ctx.annotation.adornee
+        assert isinstance(adornee, LuaMethod)
+
+        self.manifest[ctx.build_ctx.env]['anot_hooks'][ctx.annotation.name] = adornee.get_path(require=True)
 
     def load(self, ctx: ExtensionRegistry):
         ctx.register_anot(AnnotationDef(
             'onPostInit',
             scope='method',
-            on_build= lambda ctx: self.on_build('init_hooks', ctx) 
+            on_build=self.on_build_post_init 
         ))
         ctx.register_anot(AnnotationDef(
             name='annotationInit',
             scope='method',
-            on_build= lambda ctx: self.on_build('anot_hooks', ctx)
+            on_build=self.on_build_annotation_init
         ))
 
         #annotation to literally just mark a module to be parsed.
@@ -47,7 +53,13 @@ class ManifestExtension(Extension):
             with open('./templates/AnnotationInit.lua') as f:
                 template = f.read()
 
-            data = self.manifest[env] | self.manifest['shared']
+            for key in ('annotations', 'anot_hooks', 'init_hooks'):
+                if isinstance(self.manifest[env][key], dict):
+                    self.manifest[env][key] |= self.manifest['shared'][key]
+                else:
+                    self.manifest[env][key] += self.manifest['shared'][key]
+            data =  self.manifest[env]
+
             converted = convert_dict(LuaPathResolver(ctx.workspace), data, prefix = 'local manifest =')
             out = template.replace('--manifest', converted)
 
