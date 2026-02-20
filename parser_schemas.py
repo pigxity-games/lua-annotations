@@ -4,6 +4,7 @@ import re
 from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from api.annotations import AnnotationDef
+from exceptions import ParseError
 
 if TYPE_CHECKING:
     from api.lua_dict import LuaPathResolver
@@ -110,7 +111,8 @@ class ReturnedValue():
 
 
 @dataclass
-class ParserException(Exception):
+class LuaParserError(ParseError):
+    """Raised for invalid text when parsing lua files"""
     message: str
     text: str
     line_num: int

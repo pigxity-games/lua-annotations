@@ -154,7 +154,7 @@ class FileParser():
 
     #main functions
     def error(self, text: str, message: str):
-        raise ParserException(text, message, self.cur_line, self.file_name)
+        raise LuaParserError(message, text, self.cur_line, self.file_name)
 
     def parse(self, text: str):        
         returned = self._get_returned(text, self.file_name)
@@ -231,14 +231,16 @@ class FileParser():
                         name: str = match.group(2)
                         contents: str = match.group(3)
 
-                        assert name and contents
+                        if not (name and contents):
+                            self.error(line, 'type definition is missing name or contents')
 
                         if contents.startswith('{'):
                             data = self._get_dict_data(contents)
                         else:
                             data = contents
 
-                        assert data
+                        if not data:
+                            self.error(line, 'type definition is missing type data')
 
                         lua_type = LuaType(name, data, exported)
 
