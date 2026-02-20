@@ -4,7 +4,7 @@ import shutil
 import sys
 import time
 from datetime import datetime
-from api.annotations import ENVIRONMENTS, AnnotationRegistry
+from api.annotations import ENVIRONMENTS, ExtensionRegistry
 from build_process import BuildCtxList, BuildProcessCtx, Config, Environment, Extension, LuaEntry, PostProcessCtx, Workspace
 import lua_extension_anots
 from exceptions import BuildError, ConfigError
@@ -93,7 +93,7 @@ def build(workdir: Path, config: Config):
 
 
         #load extensions
-        reg = AnnotationRegistry()
+        reg = ExtensionRegistry()
         lua_extension_anots.load(reg)
 
         for ext in config.extensions:
@@ -114,7 +114,8 @@ def build(workdir: Path, config: Config):
                 workspace[env][path] = expr
 
 
-        print(f'loaded {len(reg.registry)} annotations')
+        reg = reg.sort_extensions()
+        print(f'loaded {len(reg.anot_registry)} annotations')
 
 
         #env processing

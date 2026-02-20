@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from graphlib import TopologicalSorter
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal, Optional
 
@@ -52,30 +53,47 @@ class Extension():
         ...
     def on_file_process(self, ctx: FileBuildCtx):
         ...
-    def load(self, ctx: AnnotationRegistry):
+    def load(self, ctx: ExtensionRegistry):
         ...
 
+
 @dataclass
-class AnnotationRegistry():
-    """Provides an API for extensions to register annotations"""
-    registry: dict[str, AnnotationDef] = field(default_factory=dict)
-    file_build_hooks: list[FileBuildHook]=field(default_factory=list)
-    post_build_hooks: list[PostBuildHook]=field(default_factory=list)
-    extensions: dict[str, Extension] = field(default_factory=dict)
+class SortedRegistry():
+    """Topologically sorted file_build_hooks and post_build_hooks"""
+    file_build_hooks: list[FileBuildHook]
+    post_build_hooks: list[PostBuildHook]
+    anot_registry: dict[str, AnnotationDef]
 
-    def registerAnot(self, annotation: AnnotationDef, name: Optional[str]=None):
-        self.registry[name or annotation.name] = annotation
+class ExtensionRegistry():
+    """Provides an API to register and get extensions"""
 
-    def registerExtension(self, extension: Extension):
-        self.extensions[type(extension).__name__] = extension
+    def __init__(self):
+        self.anot_registry: dict[str, AnnotationDef] = {}
+        self.extensions: dict[str, Extension] = {}
+        self.ext_graph: dict[str, list[str]] = {}
+        self.ext_load_order: list[str] = []
 
-        #register ext hooks
-        extension.load(self)
-        self.onPostProcess(extension.on_post_process)
-        self.onFileProcess(extension.on_file_process)
 
-    def onFileProcess(self, hook: FileBuildHook):
-        self.file_build_hooks.append(hook)
+    def register_extension(self, extension: Extension, deps: list[str] = []):
+        name = type(extension).__name__
+        self.extensions[name] = extension
+        self.ext_graph[name] = deps
 
-    def onPostProcess(self, hook: PostBuildHook):
-        self.post_build_hooks.append(hook)
+    
+    def register_anot(self, anot: AnnotationDef):
+        self.anot_registry[anot.name] = anot
+
+
+    def sort_extensions(self):
+        ts = TopologicalSorter(self.ext_graph)
+        exts = [self.extensions[ext] for ext in ts.static_order()]
+
+        #register annotations
+        for ext in exts:
+            ext.load(self)
+
+        return SortedRegistry(
+            [ext.on_file_process for ext in exts],
+            [ext.on_post_process for ext in exts],
+            self.anot_registry
+        )

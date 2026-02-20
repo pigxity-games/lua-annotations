@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar
 
-from api.annotations import AnnotationBuildCtx, AnnotationDef, AnnotationRegistry
+from api.annotations import AnnotationBuildCtx, AnnotationDef, ExtensionRegistry, SortedRegistry
 import test_ext
 from parser_schemas import *
 
@@ -36,7 +36,7 @@ def map_param_list(params: list[str]):
 #parsing
 @dataclass
 class FileParser():
-    reg: AnnotationRegistry
+    reg: SortedRegistry
     file: Path
     build_ctx: 'BuildProcessCtx'
     annotations: list[Annotation] = field(default_factory=list)
@@ -82,11 +82,11 @@ class FileParser():
 
         return args_val, kwargs_val
 
-    def _parse_annotation(self, text: str, ctx: AnnotationRegistry):
+    def _parse_annotation(self, text: str, ctx: ExtensionRegistry):
         parts = remove_whitespace(ANNOTATION_ARG_RE.split(text.removeprefix(ANNOTATION_PREFIX)))
         name = parts[0]
 
-        adef = ctx.registry.get(name)
+        adef = ctx.anot_registry.get(name)
         if adef:
             args, kwargs = self._parse_anot_args(adef, parts[1:])
             return Annotation(adef, name, args, kwargs)
@@ -258,8 +258,9 @@ class FileParser():
 
 #Test
 if __name__ == '__main__':
-    ctx = AnnotationRegistry()
+    ctx = ExtensionRegistry()
     test_ext.load(ctx)
+    ctx = ctx.sort_extensions()
     
     test_file = Path('./test/Test.lua')
     with test_file.open('r') as f:

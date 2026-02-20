@@ -1,12 +1,12 @@
-from api.annotations import AnnotationBuildCtx, AnnotationDef, AnnotationRegistry
+from api.annotations import AnnotationBuildCtx, AnnotationDef, ExtensionRegistry
 
 
 def test(ctx: AnnotationBuildCtx):
     print(f'Hello World, {ctx.annotation.name}!')
 
 
-def load(ctx: AnnotationRegistry):
-    ctx.registerAnot(
+def load(ctx: ExtensionRegistry):
+    ctx.register_anot(
         AnnotationDef(
             'methodTest',
             scope='method',
@@ -15,5 +15,5 @@ def load(ctx: AnnotationRegistry):
             on_build=test,
         )
     )
-    ctx.registerAnot(AnnotationDef('moduleTest', scope='module', on_build=test))
-    ctx.registerAnot(AnnotationDef('typeTest', scope='type', on_build=test))
+    ctx.register_anot(AnnotationDef('moduleTest', scope='module', on_build=test))
+    ctx.register_anot(AnnotationDef('typeTest', scope='type', on_build=test))

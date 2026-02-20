@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from typing import Any, Literal, TypedDict
 
-from api.annotations import AnnotationRegistry, FileBuildCtx
+from api.annotations import FileBuildCtx, SortedRegistry
 from parser_schemas import ANNOTATION_PREFIX
 
 type Environment = Literal['server', 'client', 'shared']
@@ -22,7 +22,7 @@ class BuildException(Exception):
 
 @dataclass
 class ProcessCtx():
-    reg: AnnotationRegistry
+    reg: SortedRegistry
     root_dir: Path
     workspace: Workspace
 
