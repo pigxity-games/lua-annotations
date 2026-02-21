@@ -41,8 +41,9 @@ class LuaMethod():
     params: dict[str, str] = field(default_factory=dict)
     return_type: Optional[str] = None
 
-    def get_path(self, relative: bool=False, require: bool=False, sep: str='.'):
-        return self.module.get_path(relative, require, sep + self.name)
+
+    def get_path(self, relative: bool=False, require: bool=False):
+        return self.module.get_path(relative, require, [self.name])
 
 
 @dataclass
@@ -53,14 +54,14 @@ class LuaModule():
     submodule: bool=False
 
 
-    def get_path(self, relative: bool=False, require: bool=False, ext: Optional[str]=None):
+    def get_path(self, relative: bool=False, require: bool=False, properties: list[str]=[]):
         """Similar to the LuaPath constructor, but it takes the module's submodule status into account."""
         from api.lua_dict import LuaPath
 
         if self.submodule:
-            return LuaPath(self.file, relative, require, self.returned_name, ext)
+            return LuaPath(self.file, relative, require, [self.returned_name] + properties)
         else:
-            return LuaPath(self.file, relative, require, ext=ext)
+            return LuaPath(self.file, relative, require, properties)
 
 
     def get_expr(self, resolver: LuaPathResolver, relative: bool=False):
