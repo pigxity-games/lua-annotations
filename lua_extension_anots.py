@@ -17,13 +17,13 @@ class ManifestExtension(Extension):
         adornee = ctx.annotation.adornee
         assert isinstance(adornee, LuaMethod)
 
-        self.manifest[ctx.build_ctx.env]['init_hooks'].append(adornee.get_path())
+        self.manifest[ctx.build_ctx.env]['init_hooks'].append(adornee.get_path(require=True))
 
     def on_build_annotation_init(self, ctx: AnnotationBuildCtx):
         adornee = ctx.annotation.adornee
         assert isinstance(adornee, LuaMethod)
 
-        self.manifest[ctx.build_ctx.env]['anot_hooks'][ctx.annotation.name] = adornee.get_path()
+        self.manifest[ctx.build_ctx.env]['anot_hooks'][ctx.annotation.name] = adornee.get_path(require=True)
 
     def load(self, ctx: ExtensionRegistry):
         ctx.register_anot(AnnotationDef(

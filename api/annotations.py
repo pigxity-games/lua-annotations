@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 ARG_SEP = ', '
 
 type retention = Literal['build', 'init', 'runtime']
-type scope = Literal['module', 'method', 'type']
+type scope = Literal['module', 'method', 'type', 'returned_value']
 type argProcessor = Callable[[str], Any]
 
 @dataclass

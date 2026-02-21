@@ -44,10 +44,7 @@ def convert_dict(resolver: LuaPathResolver, data: Any, indent: int = 0, sep: str
                 return value.string
 
             if isinstance(value, LuaPath):
-                v = value.to_lua(resolver)
-                if isinstance(v, (dict, list)):
-                    return to_lua(v, level)
-                return v
+                return value.to_lua(resolver)
             
             if hasattr(value, 'asdict') and callable(value.asdict):
                 return process_dict(value.asdict(), level)
@@ -143,23 +140,25 @@ class LuaPath:
     relative: bool=False
     require: bool=False
     properties: list[str]=field(default_factory=list)
+    function: bool=False
 
     def _parts_no_ext(self, p: PurePath):
         return [x for x in p.with_suffix('').parts if x not in ('', '.')]
 
     def _post_process(self, string: str):
-        if self.require:
+        if self.require or len(self.properties) > 0:
             string = f'require({string})'
         
-        if len(self.properties) > 0:
-            if self.require == False:
-                #if require is false, return a dict representation of the path
-                return {'module': LuaExpr(string), 'exports': self.properties}
+        for prop in self.properties:
+            string += '.' + prop
 
-            for prop in self.properties:
-                string += '.' + prop
+        string = string.replace('..', '.')
+
+        if self.function or (len(self.properties) > 0 and not self.require):
+            #if require is false, wrap the require path in a function
+            return f'function() return {string} end'
         
-        return string.replace('..', '.')
+        return string
 
     def to_lua_relative(self):
         assert self.relative

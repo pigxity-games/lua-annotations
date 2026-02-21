@@ -116,7 +116,7 @@ class FileParser():
         single: str = match.group(2)
 
         if single:
-            return ReturnedValue(default_name, 'single', single_module=single)
+            return ReturnDefinition(default_name, 'single', single_module=single)
         else:
             tablestr: str = match.group(1)
             if not tablestr:
@@ -124,9 +124,23 @@ class FileParser():
 
             dict_data = self._get_dict_data(tablestr)
             if dict_data:
-                return ReturnedValue(default_name, 'dict', dict_val=reverse_dict(dict_data))
+                return ReturnDefinition(default_name, 'dict', dict_val=reverse_dict(dict_data))
             else:
                 self.error(text, 'module export is not a table')
+
+    def _get_returned_value(self, text: str, returned: ReturnDefinition):
+        match = VARIABLE_REGEX.search(text)
+        if not match:
+            self.error(text, 'code block is not a variable declaration')
+
+        name: str = match.group(1)
+        returned_name, is_submodule = returned.get_returned_name(name)
+
+        if not (name and returned_name):
+            self.error(text, 'invalid returned value definition or it is not exported.')
+
+        return ReturnedValue(self.file, name, returned_name, is_submodule)
+
 
     def _get_function(self, text: str, modules: dict[str, LuaModule]):
         match = FUNCTION_REGEX.search(text)
@@ -212,6 +226,13 @@ class FileParser():
                         module = LuaModule(self.file, name, returned_name, is_submodule)
                         set_adornee(self.cur_annotations, module)
                         self.modules[module.name] = module
+
+
+                    #returned value
+                    elif scope == 'returned_value':
+                        returned_value = self._get_returned_value(line, returned)
+                        set_adornee(self.cur_annotations, returned_value)
+
 
                     #type
                     elif scope == 'type':
