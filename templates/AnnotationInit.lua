@@ -4,6 +4,8 @@
 
 
 --lifecycle
+local t0 = os.clock()
+
 for _, fun in ipairs(manifest.init_hooks) do
     fun(manifest)
 end
@@ -18,3 +20,5 @@ end
 for _, fun in ipairs(manifest.post_init_hooks) do
     fun(manifest)
 end
+
+print("Started services in " .. (os.clock() - t0))

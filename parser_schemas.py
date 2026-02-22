@@ -92,14 +92,21 @@ class Annotation():
     args_val: list[Any]
     kwargs_val: dict[str, Any]
     adornee: Adornee = field(init=False)
+    export_data: dict[Any, Any] = field(default_factory=dict)
+
+    def get_module(self):
+        if isinstance(self.adornee, LuaMethod):
+            return self.adornee.module
+        else:
+            return self.adornee
 
     def asdict(self):
         return {
             'name': self.name,
             'args': self.args_val,
             'kwargs': self.kwargs_val,
-            'adornee': self.adornee.get_path(require=True)
-        }
+            'getAdornee': self.adornee.get_path(require=True, function=True),
+        } | self.export_data 
 
 
 @dataclass

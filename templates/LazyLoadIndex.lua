@@ -1,3 +1,5 @@
+--TODO: implement this format for generated Index.lua files
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 type Exports = {
