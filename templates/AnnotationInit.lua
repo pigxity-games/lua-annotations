@@ -4,6 +4,10 @@
 
 
 --lifecycle
+for _, fun in ipairs(manifest.init_hooks) do
+    fun(manifest)
+end
+
 for _, anot in ipairs(manifest.annotations) do
     local fun = manifest.anot_hooks[anot.name]
     if fun then
@@ -11,6 +15,6 @@ for _, anot in ipairs(manifest.annotations) do
     end
 end
 
-for _, fun in ipairs(manifest.init_hooks) do
+for _, fun in ipairs(manifest.post_init_hooks) do
     fun(manifest)
 end

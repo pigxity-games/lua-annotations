@@ -11,13 +11,14 @@ class ManifestExtension(Extension):
         for env in ENVIRONMENTS:
             self.manifest[env]['anot_hooks'] = {}
             self.manifest[env]['init_hooks'] = []
+            self.manifest[env]['post_init_hooks'] = []
             self.manifest[env]['annotations'] = []
 
-    def on_build_post_init(self, ctx: AnnotationBuildCtx):
+    def on_build_post_init(self, ctx: AnnotationBuildCtx, key: str):
         adornee = ctx.annotation.adornee
         assert isinstance(adornee, LuaMethod)
 
-        self.manifest[ctx.build_ctx.env]['init_hooks'].append(adornee.get_path(require=True))
+        self.manifest[ctx.build_ctx.env][key].append(adornee.get_path(require=True))
 
     def on_build_annotation_init(self, ctx: AnnotationBuildCtx):
         adornee = ctx.annotation.adornee
@@ -27,9 +28,14 @@ class ManifestExtension(Extension):
 
     def load(self, ctx: ExtensionRegistry):
         ctx.register_anot(AnnotationDef(
+            name='onInit',
+            scope='method',
+            on_build=lambda ctx: self.on_build_post_init(ctx, 'init_hooks')
+        ))
+        ctx.register_anot(AnnotationDef(
             'onPostInit',
             scope='method',
-            on_build=self.on_build_post_init 
+            on_build=lambda ctx: self.on_build_post_init(ctx, 'post_init_hooks')
         ))
         ctx.register_anot(AnnotationDef(
             name='annotationInit',
@@ -53,7 +59,7 @@ class ManifestExtension(Extension):
             with open('./templates/AnnotationInit.lua') as f:
                 template = f.read()
 
-            for key in ('annotations', 'anot_hooks', 'init_hooks'):
+            for key in ('annotations', 'anot_hooks', 'init_hooks', 'post_init_hooks'):
                 if isinstance(self.manifest[env][key], dict):
                     self.manifest[env][key] |= self.manifest['shared'][key]
                 else:
