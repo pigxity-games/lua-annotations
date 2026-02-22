@@ -1,11 +1,13 @@
 import argparse
 from pathlib import Path
+import sys
 from typing import Literal
 
+from exceptions import LuaAnnotationsError
 from init_project import build, create_config, read_config, watch
 
 
-def main() -> None:
+def main():
     parser = argparse.ArgumentParser(prog='lua-annotations build-time processor/validator')
     parser.add_argument('mode', help='mode of the program', choices=['build', 'init', 'watch'])
     parser.add_argument(
@@ -26,7 +28,8 @@ def main() -> None:
     mode: Literal['build', 'init', 'watch'] = args.mode
 
     workdir: Path = Path.cwd() / args.workdir
-    assert workdir.exists() and workdir.is_dir(), 'Specified workdir path is not a directory!'
+    if not workdir.exists() or not workdir.is_dir():
+        raise LuaAnnotationsError(f'Invalid workdir: {workdir}. Provide a valid project directory.')
 
     config_file: Path = workdir / args.config
 
@@ -41,10 +44,14 @@ def main() -> None:
         return
 
     #watch mode
-    try:
-        watch(workdir, config_file, poll_interval=args.watch_interval)
-    except KeyboardInterrupt:
-        print('\nStopped watching.')
+    watch(workdir, config_file, poll_interval=args.watch_interval)
+
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print('\nStopped watching.')
+    except LuaAnnotationsError as exc:
+        print(f'Error: {exc}')
+        sys.exit(1)

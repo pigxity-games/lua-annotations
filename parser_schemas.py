@@ -1,9 +1,13 @@
 from dataclasses import dataclass, field
-from pathlib import Path, PurePath
+from pathlib import Path
 import re
-from typing import Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from api.annotations import AnnotationDef
+from exceptions import ParseError
+
+if TYPE_CHECKING:
+    from api.lua_dict import LuaPathResolver
 
 ANNOTATION_PREFIX = '--@'
 ARG_SEP = ','
@@ -27,7 +31,10 @@ TYPE_REGEX = re.compile(r'^\s*(export\b)?\s*type\s+(\w+)\s*=\s*(\{[\s\S]*?\}|[^\
 #splits annotation arguments while ignoring ones inside brackets
 ANNOTATION_ARG_RE = re.compile(r',\s*(?![^\[]*\])')
 
-type Adornee = LuaModule | LuaMethod | LuaType
+#mathes variable definitions (including functions) with group 1 being the name.
+VARIABLE_REGEX = re.compile(r'^\s*(?:local\s+)?(?:function\s+)?(\w+)\s*(?:<[^>]+>)?\s*(?:\(|=(?!=))')
+
+type Adornee = ReturnedValue | LuaModule | LuaMethod | LuaType
 
 
 @dataclass
@@ -38,21 +45,37 @@ class LuaMethod():
     return_type: Optional[str] = None
 
 
+    def get_path(self, relative: bool=False, require: bool=False, function: bool=False):
+        return self.module.get_path(relative, require, [self.name], function)
+
+
 @dataclass
-class LuaModule():
+class ReturnedValue():
     file: Path
     name: str
     returned_name: str
     submodule: bool=False
 
-    def get_path(self, file: PurePath, relative: bool=False, require: bool=False):
+
+    def get_path(self, relative: bool=False, require: bool=False, properties: list[str]=[], function: bool=False):
         """Similar to the LuaPath constructor, but it takes the module's submodule status into account."""
         from api.lua_dict import LuaPath
 
         if self.submodule:
-            return LuaPath(file, relative, require, self.returned_name)
+            return LuaPath(self.file, relative, require, [self.returned_name] + properties, function)
         else:
-            return LuaPath(file, relative, require)
+            return LuaPath(self.file, relative, require, properties, function)
+
+
+    def get_expr(self, resolver: LuaPathResolver, relative: bool=False):
+        path = self.get_path(relative, True)
+        return f'local {self.returned_name} = {path.to_lua(resolver)}'
+
+
+@dataclass
+class LuaModule(ReturnedValue):
+    """For distinguishing between modules (tables) and basic values"""
+    pass
 
 
 @dataclass
@@ -69,10 +92,25 @@ class Annotation():
     args_val: list[Any]
     kwargs_val: dict[str, Any]
     adornee: Adornee = field(init=False)
+    export_data: dict[Any, Any] = field(default_factory=dict)
+
+    def get_module(self):
+        if isinstance(self.adornee, LuaMethod):
+            return self.adornee.module
+        else:
+            return self.adornee
+
+    def asdict(self):
+        return {
+            'name': self.name,
+            'args': self.args_val,
+            'kwargs': self.kwargs_val,
+            'getAdornee': self.adornee.get_path(require=True, function=True),
+        } | self.export_data 
 
 
 @dataclass
-class ReturnedValue():
+class ReturnDefinition():
     default_name: str
     type: Literal['single', 'dict']
     single_module: Optional[str] = None
@@ -90,7 +128,8 @@ class ReturnedValue():
 
 
 @dataclass
-class ParserException(Exception):
+class LuaParserError(ParseError):
+    """Raised for invalid text when parsing lua files"""
     message: str
     text: str
     line_num: int

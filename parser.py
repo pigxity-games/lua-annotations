@@ -1,16 +1,18 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
-from api.annotations import AnnotationBuildCtx, AnnotationDef, AnnotationRegistry
-from default_extension import main as default_extension
+from api.annotations import AnnotationBuildCtx, AnnotationDef, ExtensionRegistry, SortedRegistry
+import test_ext
 from parser_schemas import *
 
 if TYPE_CHECKING:
     from build_process import BuildProcessCtx
 
 #helper functions
-def reverse_dict(d: dict[Any, Any]):
+K = TypeVar('K')
+V = TypeVar('V')
+def reverse_dict(d: dict[K, V]) -> dict[V, K]:
     return {v: k for k, v in d.items()}
 
 def set_adornee(anots: list[Annotation], adornee: Adornee):
@@ -34,7 +36,7 @@ def map_param_list(params: list[str]):
 #parsing
 @dataclass
 class FileParser():
-    reg: AnnotationRegistry
+    reg: SortedRegistry
     file: Path
     build_ctx: 'BuildProcessCtx'
     annotations: list[Annotation] = field(default_factory=list)
@@ -80,11 +82,11 @@ class FileParser():
 
         return args_val, kwargs_val
 
-    def _parse_annotation(self, text: str, ctx: AnnotationRegistry):
+    def _parse_annotation(self, text: str, ctx: ExtensionRegistry):
         parts = remove_whitespace(ANNOTATION_ARG_RE.split(text.removeprefix(ANNOTATION_PREFIX)))
         name = parts[0]
 
-        adef = ctx.registry.get(name)
+        adef = ctx.anot_registry.get(name)
         if adef:
             args, kwargs = self._parse_anot_args(adef, parts[1:])
             return Annotation(adef, name, args, kwargs)
@@ -114,7 +116,7 @@ class FileParser():
         single: str = match.group(2)
 
         if single:
-            return ReturnedValue(default_name, 'single', single_module=single)
+            return ReturnDefinition(default_name, 'single', single_module=single)
         else:
             tablestr: str = match.group(1)
             if not tablestr:
@@ -122,9 +124,23 @@ class FileParser():
 
             dict_data = self._get_dict_data(tablestr)
             if dict_data:
-                return ReturnedValue(default_name, 'dict', dict_val=reverse_dict(dict_data))
+                return ReturnDefinition(default_name, 'dict', dict_val=reverse_dict(dict_data))
             else:
                 self.error(text, 'module export is not a table')
+
+    def _get_returned_value(self, text: str, returned: ReturnDefinition):
+        match = VARIABLE_REGEX.search(text)
+        if not match:
+            self.error(text, 'code block is not a variable declaration')
+
+        name: str = match.group(1)
+        returned_name, is_submodule = returned.get_returned_name(name)
+
+        if not (name and returned_name):
+            self.error(text, 'invalid returned value definition or it is not exported.')
+
+        return ReturnedValue(self.file, name, returned_name, is_submodule)
+
 
     def _get_function(self, text: str, modules: dict[str, LuaModule]):
         match = FUNCTION_REGEX.search(text)
@@ -152,7 +168,7 @@ class FileParser():
 
     #main functions
     def error(self, text: str, message: str):
-        raise ParserException(text, message, self.cur_line, self.file_name)
+        raise LuaParserError(message, text, self.cur_line, self.file_name)
 
     def parse(self, text: str):        
         returned = self._get_returned(text, self.file_name)
@@ -211,6 +227,13 @@ class FileParser():
                         set_adornee(self.cur_annotations, module)
                         self.modules[module.name] = module
 
+
+                    #returned value
+                    elif scope == 'returned_value':
+                        returned_value = self._get_returned_value(line, returned)
+                        set_adornee(self.cur_annotations, returned_value)
+
+
                     #type
                     elif scope == 'type':
                         #get entire code block
@@ -229,14 +252,16 @@ class FileParser():
                         name: str = match.group(2)
                         contents: str = match.group(3)
 
-                        assert name and contents
+                        if not (name and contents):
+                            self.error(line, 'type definition is missing name or contents')
 
                         if contents.startswith('{'):
                             data = self._get_dict_data(contents)
                         else:
                             data = contents
 
-                        assert data
+                        if not data:
+                            self.error(line, 'type definition is missing type data')
 
                         lua_type = LuaType(name, data, exported)
 
@@ -254,8 +279,9 @@ class FileParser():
 
 #Test
 if __name__ == '__main__':
-    ctx = AnnotationRegistry()
-    default_extension.load(ctx)
+    ctx = ExtensionRegistry()
+    test_ext.load(ctx)
+    ctx = ctx.sort_extensions()
     
     test_file = Path('./test/Test.lua')
     with test_file.open('r') as f:
