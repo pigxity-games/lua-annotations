@@ -1,0 +1,25 @@
+site_name: lua-annotations
+site_url: https://pigxity.github.io
+theme:
+  icon:
+    logo: material/at
+  features:
+    - content.code.copy
+    - navigation.instant
+    - navigation.expand
+    - navigation.path
+    - navigation.indexes
+  name: material
+  font:
+    text: Noto Sans
+    code: Source Code Pro
+  palette:
+    scheme: slate
+    primary: black
+    accent: deep purple
+repo_url: https://github.com/pigxity-games/lua-annotations-python
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  
