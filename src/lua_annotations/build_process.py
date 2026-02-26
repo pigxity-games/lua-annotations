@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import json
 from pathlib import Path
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal
 
 from api.annotations import FileBuildCtx, SortedRegistry
 from exceptions import BuildError
