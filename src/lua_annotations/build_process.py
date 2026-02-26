@@ -81,12 +81,7 @@ class BuildProcessCtx(ProcessCtx):
 type RawWorkspace = dict[Environment, dict[str, str]]
 type Workspace = dict[Environment, dict[Path, str]]
 
-type LuaEntry = dict[Environment, tuple[str, Any]]
-type PyEntry = tuple[Literal['library', 'path'], str]
-
-class Extension(TypedDict):
-    py_entry: PyEntry
-    lua_entry: LuaEntry
+type Extension = tuple[Literal['library', 'path'], str]
 
 class Config():
     def __init__(self, data: dict[Any, Any]):

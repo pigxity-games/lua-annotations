@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from api.annotations import AnnotationBuildCtx, AnnotationDef, ExtensionRegistry, SortedRegistry
-import test_ext
 from parser_schemas import *
 
 if TYPE_CHECKING:
@@ -276,20 +275,3 @@ class FileParser():
 
                     self.annotations += self.cur_annotations
                     self.cur_annotations = []
-
-#Test
-if __name__ == '__main__':
-    ctx = ExtensionRegistry()
-    test_ext.load(ctx)
-    ctx = ctx.sort_extensions()
-    
-    test_file = Path('./test/Test.lua')
-    with test_file.open('r') as f:
-        parser = FileParser(ctx, test_file, None)  # pyright: ignore[reportArgumentType]
-        parser.parse(f.read())
-
-    for module in parser.modules.values():
-        print(module.name, module.returned_name)
-
-    for anot in parser.annotations:
-        print(anot.name, anot.adornee, anot.args_val, anot.kwargs_val)

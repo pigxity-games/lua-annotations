@@ -4,10 +4,10 @@ from api.annotations import ENVIRONMENTS, AnnotationBuildCtx, AnnotationDef, Ext
 from api.arguments import default_list
 from build_process import Environment, PostProcessCtx
 from exceptions import BuildError
-from parser_schemas import Annotation, LuaMethod
+from parser_schemas import Annotation
 
 if TYPE_CHECKING:
-    from lua_extension_anots import ManifestExtension
+    from default import ManifestExtension
 
 
 def filter_deps(deps: list[str]):

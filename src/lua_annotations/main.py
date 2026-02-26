@@ -8,7 +8,7 @@ from init_project import build, create_config, read_config, watch
 
 
 def main():
-    parser = argparse.ArgumentParser(prog='lua-annotations build-time processor/validator')
+    parser = argparse.ArgumentParser(prog='lua-anot')
     parser.add_argument('mode', help='mode of the program', choices=['build', 'init', 'watch'])
     parser.add_argument(
         'workdir',

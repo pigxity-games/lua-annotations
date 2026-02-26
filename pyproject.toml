@@ -12,7 +12,7 @@ license = "Apache-2.0"
 authors = [{name="pigxity"}]
 
 [project.scripts]
-lua-anot = "main:main"
+lua-anot = "lua_annotations.main:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

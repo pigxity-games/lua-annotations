@@ -6,7 +6,7 @@ from parser_schemas import LuaType, ReturnedValue
 
 def _env(ctx: AnnotationBuildCtx):
     return ctx.build_ctx.env
-    def _name(ctx: AnnotationBuildCtx):
+def _name(ctx: AnnotationBuildCtx):
     return ctx.annotation.kwargs_val.get('name')
 
 

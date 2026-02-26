@@ -5,8 +5,8 @@ import sys
 import time
 from datetime import datetime
 from api.annotations import ENVIRONMENTS, ExtensionRegistry
-from build_process import BuildCtxList, BuildProcessCtx, Config, Environment, Extension, LuaEntry, PostProcessCtx, Workspace
-import lua_extension_anots
+from build_process import BuildCtxList, BuildProcessCtx, Config, Environment, Extension, PostProcessCtx, Workspace
+import extensions.default
 from exceptions import BuildError, ConfigError
 
 DEFAULT_CONFIG = Path('./templates/annotations.config.json')
@@ -20,12 +20,17 @@ def create_config(workdir: Path, config_file: Path):
         print('Config file already exists. Skipping')
 
 
-def iter_rel_paths(path_map: dict[str, str], workdir: Path):
+def iter_rel_paths(path_map: dict[str, str], workdir: Path, env: Environment):
     for path, lua_expr in path_map.items():
-        p = workdir / Path(path)
+        if '@' in path:
+            p, lua_expr = process_tags(path, lua_expr, env, workdir)
+        else:
+            p = workdir / Path(path)
+
         if not p.is_dir():
             print(f'WARNING: directory {p.as_posix()} does not exist')
             continue
+
         yield p, lua_expr
 
 
@@ -42,7 +47,7 @@ def import_extension_from_path(workdir: Path, entry: str):
 
 
 def import_extension(ext: Extension, workdir: Path):
-    entry_type, entry = ext['py_entry']
+    entry_type, entry = ext
 
     try:
         if entry_type == 'library':
@@ -54,28 +59,22 @@ def import_extension(ext: Extension, workdir: Path):
         ) from exc
 
 
-def parse_lua_entry(entry: LuaEntry, env: Environment, workdir: Path):
-    type, value = entry[env]
-    raw_path, expr = value
-    if not isinstance(raw_path, str) or not isinstance(expr, str):
-        raise ConfigError(f'invalid lua_entry for {env}: expected path and expr strings')
+def process_tags(raw: str, raw_expr: str, env: Environment, workdir: Path):
+    name, data = raw.split('@')
 
-    if type == 'wally':    
+    if name == 'wally':
         package_dir_name = 'Packages' if env == 'shared' else 'ServerPackages'
         packages = workdir / package_dir_name / '_Index'
-        ext_dir = next(packages.glob(f'*_{raw_path}@*'), None)
+        ext_dir = next(packages.glob(f'*_{data}@*'), None)
         if not ext_dir:
             raise ConfigError(
-                f'wally package {raw_path} not found under {packages.as_posix()}'
+                f'wally package {data} not found under {packages.as_posix()}'
             )
 
-        return ext_dir / raw_path, expr
+        return ext_dir / data, f'require({raw_expr}.{data})' 
 
-    elif type == 'path':
-        return workdir / Path(raw_path), expr
-    else:
-        raise ConfigError('incorrect lua_entry type in the config file.')
-    
+    raise ConfigError(f'invalid path tag: {raw}')
+
 
 def build(workdir: Path, config: Config):
     init_time = datetime.now()
@@ -88,13 +87,13 @@ def build(workdir: Path, config: Config):
             if not path_map:
                 raise ConfigError(f'path for the `{env}` environment is not defined in the config.')
 
-            rel_paths = dict(iter_rel_paths(path_map, workdir))
+            rel_paths = dict(iter_rel_paths(path_map, workdir, env))
             workspace[env] = rel_paths
 
 
         #load extensions
         reg = ExtensionRegistry()
-        lua_extension_anots.load(reg)
+        extensions.default.load(reg)
 
         for ext in config.extensions:
             #py_entry
@@ -102,16 +101,8 @@ def build(workdir: Path, config: Config):
             load_fn = getattr(module, 'load')
 
             if not callable(load_fn):
-                raise BuildError(f'module {ext["py_entry"][1]} does not have a `load()` function')
+                raise BuildError(f'module {ext[1]} does not have a `load()` function')
             load_fn(reg)
-
-            #process lua_entry, adding paths to workspace
-            for env in ('server', 'shared'):
-                if env not in ext['lua_entry']:
-                    continue
-
-                path, expr = parse_lua_entry(ext['lua_entry'], env, workdir)
-                workspace[env][path] = expr
 
 
         reg = reg.sort_extensions()
