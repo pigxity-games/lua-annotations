@@ -43,7 +43,7 @@ class MyExtension(Extension):
         print('Build finished!')
 
     def load(ctx: ExtensionRegistry):
-        ctx.register_anot(AnnotationDef('moduleTest', scope='module', on_build=test_anot)
+        ctx.register_anot(AnnotationDef('moduleTest', scope='module', on_build=self.on_build_test_anot)
 
 
 def load(ctx: ExtensionRegistry):
