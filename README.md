@@ -39,11 +39,11 @@ class MyExtension(Extension):
         print(f'Hello World, {ctx.annotation.name}!')
 
     #Runs after all files have been processed
-    def post_process(ctx: PostProcessCtx):
+    def on_post_process(ctx: PostProcessCtx):
         print('Build finished!')
 
     def load(ctx: ExtensionRegistry):
-        ctx.register_anot(AnnotationDef('moduleTest', scope='module', on_build=test_anot)
+        ctx.register_anot(AnnotationDef('moduleTest', scope='module', on_build=self.on_build_test_anot)
 
 
 def load(ctx: ExtensionRegistry):
