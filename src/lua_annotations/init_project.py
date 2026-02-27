@@ -4,17 +4,18 @@ import shutil
 import sys
 import time
 from datetime import datetime
-from api.annotations import ENVIRONMENTS, ExtensionRegistry
-from build_process import BuildCtxList, BuildProcessCtx, Config, Environment, Extension, PostProcessCtx, Workspace
-import extensions.default
-from exceptions import BuildError, ConfigError
 
-DEFAULT_CONFIG = Path('./templates/annotations.config.json')
+from .api.annotations import ENVIRONMENTS, ExtensionRegistry
+from .build_process import BuildCtxList, BuildProcessCtx, Config, Environment, Extension, PostProcessCtx, Workspace, get_template
+from .exceptions import BuildError, ConfigError
+from .extensions import default as default_ext
+
 WATCH_FILENAMES = ('*.lua', '*.luau')
 
 def create_config(workdir: Path, config_file: Path):
     if not config_file.exists():
-        shutil.copyfile(DEFAULT_CONFIG, config_file)
+        default_config = get_template('annotations.config.json')
+        config_file.write_text(default_config)
         print('Created a default config file')
     else:
         print('Config file already exists. Skipping')
@@ -49,14 +50,9 @@ def import_extension_from_path(workdir: Path, entry: str):
 def import_extension(ext: Extension, workdir: Path):
     entry_type, entry = ext
 
-    try:
-        if entry_type == 'library':
-            return importlib.import_module(entry)
-        return import_extension_from_path(workdir, entry)
-    except ModuleNotFoundError as exc:
-        raise BuildError(
-            f'failed to import extension module {entry}.'
-        ) from exc
+    if entry_type == 'library':
+        return importlib.import_module("lua_annotations.extensions.game_framework.main")
+    return import_extension_from_path(workdir, entry)
 
 
 def process_tags(raw: str, raw_expr: str, env: Environment, workdir: Path):
@@ -93,7 +89,7 @@ def build(workdir: Path, config: Config):
 
         #load extensions
         reg = ExtensionRegistry()
-        extensions.default.load(reg)
+        default_ext.load(reg)
 
         for ext in config.extensions:
             #py_entry

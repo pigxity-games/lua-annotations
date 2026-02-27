@@ -1,7 +1,7 @@
-from api.annotations import ENVIRONMENTS, AnnotationBuildCtx, AnnotationDef, Extension, ExtensionRegistry
-from api.lua_dict import HEADER, LuaPath, LuaPathResolver, convert_dict_module
-from build_process import Environment, PostProcessCtx
-from parser_schemas import LuaType, ReturnedValue
+from lua_annotations.api.annotations import ENVIRONMENTS, AnnotationBuildCtx, AnnotationDef, Extension, ExtensionRegistry
+from lua_annotations.api.lua_dict import HEADER, LuaPath, LuaPathResolver, convert_dict_module
+from lua_annotations.build_process import Environment, PostProcessCtx
+from lua_annotations.parser_schemas import LuaType, ReturnedValue
 
 
 def _env(ctx: AnnotationBuildCtx):

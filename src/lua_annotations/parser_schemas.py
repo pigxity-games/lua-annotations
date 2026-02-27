@@ -3,11 +3,11 @@ from pathlib import Path
 import re
 from typing import TYPE_CHECKING, Any, Literal, Optional
 
-from api.annotations import AnnotationDef
-from exceptions import ParseError
+from .api.annotations import AnnotationDef
+from .exceptions import ParseError
 
 if TYPE_CHECKING:
-    from api.lua_dict import LuaPathResolver
+    from .api.lua_dict import LuaPathResolver
 
 ANNOTATION_PREFIX = '--@'
 ARG_SEP = ','
@@ -59,7 +59,7 @@ class ReturnedValue():
 
     def get_path(self, relative: bool=False, require: bool=False, properties: list[str]=[], function: bool=False):
         """Similar to the LuaPath constructor, but it takes the module's submodule status into account."""
-        from api.lua_dict import LuaPath
+        from .api.lua_dict import LuaPath
 
         if self.submodule:
             return LuaPath(self.file, relative, require, [self.returned_name] + properties, function)

@@ -16,4 +16,10 @@ lua-anot = "lua_annotations.main:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-py-modules = ["main"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["lua_annotations*"]
+
+[tool.setuptools.package-data]
+lua_annotations = ["templates/**"]

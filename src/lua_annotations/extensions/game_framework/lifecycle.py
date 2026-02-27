@@ -1,13 +1,14 @@
 from graphlib import CycleError, TopologicalSorter
 from typing import TYPE_CHECKING
-from api.annotations import ENVIRONMENTS, AnnotationBuildCtx, AnnotationDef, ExtensionRegistry, Extension, scope
-from api.arguments import default_list
-from build_process import Environment, PostProcessCtx
-from exceptions import BuildError
-from parser_schemas import Annotation
+
+from lua_annotations.api.annotations import ENVIRONMENTS, AnnotationBuildCtx, AnnotationDef, ExtensionRegistry, Extension, scope
+from lua_annotations.api.arguments import default_list
+from lua_annotations.build_process import Environment, PostProcessCtx
+from lua_annotations.exceptions import BuildError
+from lua_annotations.parser_schemas import Annotation
 
 if TYPE_CHECKING:
-    from default import ManifestExtension
+    from lua_annotations.extensions.default import ManifestExtension
 
 
 def filter_deps(deps: list[str]):

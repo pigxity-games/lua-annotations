@@ -1,4 +1,4 @@
-from api.annotations import ExtensionRegistry
+from lua_annotations.api.annotations import ExtensionRegistry
 from . import lifecycle, index, networking
 
 

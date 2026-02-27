@@ -1,8 +1,9 @@
 from typing import Any
-from api.annotations import ENVIRONMENTS, AnnotationBuildCtx, AnnotationDef, ExtensionRegistry, Extension, FileBuildCtx
-from build_process import Environment, PostProcessCtx
-from parser_schemas import LuaMethod
-from api.lua_dict import LuaPathResolver, convert_dict
+
+from lua_annotations.api.annotations import ENVIRONMENTS, AnnotationBuildCtx, AnnotationDef, ExtensionRegistry, Extension, FileBuildCtx
+from lua_annotations.build_process import Environment, PostProcessCtx, get_template
+from lua_annotations.parser_schemas import LuaMethod
+from lua_annotations.api.lua_dict import LuaPathResolver, convert_dict
 
 
 class ManifestExtension(Extension):
@@ -56,8 +57,7 @@ class ManifestExtension(Extension):
 
     def on_post_process(self, ctx: PostProcessCtx):
         for env in ('server', 'client'):
-            with open('./templates/AnnotationInit.lua') as f:
-                template = f.read()
+            template = get_template('AnnotationInit.lua')
 
             for key in ('annotations', 'anot_hooks', 'init_hooks', 'post_init_hooks'):
                 if isinstance(self.manifest[env][key], dict):

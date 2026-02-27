@@ -1,8 +1,8 @@
 from typing import Any
 
-from api.annotations import AnnotationBuildCtx, AnnotationDef, ExtensionRegistry, Extension
-from build_process import PostProcessCtx
-from parser_schemas import Annotation, LuaMethod
+from lua_annotations.api.annotations import AnnotationBuildCtx, AnnotationDef, ExtensionRegistry, Extension
+from lua_annotations.build_process import PostProcessCtx
+from lua_annotations.parser_schemas import Annotation, LuaMethod
 
 REMOTE_INSTANCE_MAP = {
     'function': 'RemoteFunction',

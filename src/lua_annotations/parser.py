@@ -2,8 +2,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar
 
-from api.annotations import AnnotationBuildCtx, AnnotationDef, ExtensionRegistry, SortedRegistry
-from parser_schemas import *
+from .api.annotations import AnnotationBuildCtx, AnnotationDef, ExtensionRegistry, SortedRegistry
+from .parser_schemas import *
 
 if TYPE_CHECKING:
     from build_process import BuildProcessCtx
