@@ -3,3 +3,4 @@ test/sourcemap.json
 __pycache__
 **.egg-info
 build/
+pyenv/

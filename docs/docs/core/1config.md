@@ -3,7 +3,7 @@ This is a rundown of the initial config file.
 
 ```json title="annotations.config.json"
 {
-    "outDirName": "Generated",
+    "out_dir": "Generated",
     "workspaces": [
         {
             "client": {"src/client": ":"},
@@ -12,11 +12,17 @@ This is a rundown of the initial config file.
         }
     ],
     "extensions": [
-        ["package", "my_extension.main"],
-    ]
+        {
+            "kind": "package",
+            "value": "my_extension.main",
+        },
+    ],
+    "flags": {
+        ...
+    }
 }
 ```
-## `outDirName`
+## `out_dir`
 The name of the directory of where generated files would be placed. Relative to the root of each environment per workspace
 
 Don't forget to add this directory to your `.gitignore`!
@@ -37,7 +43,7 @@ Each workspace must contain an environment map, that is a dictionary with the `c
 ### Path tags
 Instead of a literal filesystem path and lua expression, you may use a tag to resolve paths automatically.
 
-Currently, the only tag is `wally`, which resolves a path based on a package name (`my-package`, in this example). The value must be the package directory at lua runtime (such as `:Packages`)
+`wally`: resolves a path based on a package name (`my-package`, in this example). The value must be the package directory at lua runtime (such as `:Packages`)
 ```json title="annotations.config.json"
 "workspaces": [
 	"shared": {..., "wally@my-package": ":Packages"}
@@ -45,4 +51,10 @@ Currently, the only tag is `wally`, which resolves a path based on a package nam
 ```
 
 ## `extensions`
-A list of python package names to be imported and processed by the CLI tool. These should contain a `load()` function at the root module which utilizes the `Extension` API. Each value in the list must be a tuple of a literal string (`package` or `path`), and a value, being the package name or filepath respectively.
+A list of python package names to be imported and processed by the CLI tool. These should contain a `load()` function at the root module which utilizes the `Extension` API. `kind` must either be `package` or `path`, where `value` should be the package name or filepath, respectively.
+
+## `flags`
+A list of boolean flags which can modify behavior of the tool or of extensions:
+
+game_framework:
+* `game_framework.service_typegen`: whether to generate type files for services (True)
