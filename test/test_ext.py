@@ -1,4 +1,4 @@
-from api.annotations import AnnotationBuildCtx, AnnotationDef, ExtensionRegistry
+from lua_annotations.api.annotations import AnnotationBuildCtx, AnnotationDef, ExtensionRegistry
 
 
 def test(ctx: AnnotationBuildCtx):

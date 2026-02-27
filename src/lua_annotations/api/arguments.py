@@ -1,4 +1,4 @@
-from exceptions import ParseError
+from lua_annotations.exceptions import ParseError
 
 #[val1, val2, val3]
 def list_arg(string: str) -> list[str]:

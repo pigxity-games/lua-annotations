@@ -3,12 +3,12 @@ from pathlib import Path
 import sys
 from typing import Literal
 
-from exceptions import LuaAnnotationsError
-from init_project import build, create_config, read_config, watch
+from .exceptions import LuaAnnotationsError
+from .init_project import build, create_config, read_config, watch
 
 
 def main():
-    parser = argparse.ArgumentParser(prog='lua-annotations build-time processor/validator')
+    parser = argparse.ArgumentParser(prog='lua-anot')
     parser.add_argument('mode', help='mode of the program', choices=['build', 'init', 'watch'])
     parser.add_argument(
         'workdir',
@@ -45,6 +45,8 @@ def main():
 
     #watch mode
     watch(workdir, config_file, poll_interval=args.watch_interval)
+
+    return 0
 
 
 if __name__ == '__main__':

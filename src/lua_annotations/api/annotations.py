@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Any, Callable, Literal, Optional
 ENVIRONMENTS = ('client', 'server', 'shared')
 
 if TYPE_CHECKING:
-    from build_process import BuildProcessCtx, PostProcessCtx
-    from parser_schemas import Annotation
+    from lua_annotations.build_process import BuildProcessCtx, PostProcessCtx
+    from lua_annotations.parser_schemas import Annotation
     from parser import FileParser
 
 ARG_SEP = ', '

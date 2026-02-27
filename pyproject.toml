@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lua-annotations"
+version = "0.1.0"
+description = "lua-annotations build-time processor/validator"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "Apache-2.0"
+authors = [{name="pigxity"}]
+
+[project.scripts]
+lua-anot = "lua_annotations.main:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["lua_annotations*"]
+
+[tool.setuptools.package-data]
+lua_annotations = ["templates/**"]

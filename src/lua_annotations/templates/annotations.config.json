@@ -1,0 +1,13 @@
+{
+    "outDirName": "Generated",
+    "workspaces": [
+        {
+            "client": {"src/client": ":"},
+            "server": {"src/server": ":"},
+            "shared": {"src/shared": ":", "wally@game-framework-shared": ":Packages"}
+        }
+    ],
+    "extensions": [
+        ["library", "lua-annotations.extensions.game_framework.main"]
+    ]
+}
