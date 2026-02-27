@@ -56,5 +56,6 @@ A list of python package names to be imported and processed by the CLI tool. The
 ## `flags`
 A list of boolean flags which can modify behavior of the tool or of extensions:
 
-game_framework:
+**game_framework:**
+
 * `game_framework.service_typegen`: whether to generate type files for services (True)
