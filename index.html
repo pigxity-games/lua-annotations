@@ -862,12 +862,18 @@ You may either install it using a git submodule or a Wally package.</p>
 </code></pre></div></p>
 <h3 id="framework-extension_1">Framework Extension</h3>
 <p>Symlink the <code>lua/game_framework</code> directory in the repo to your project</p>
-<p>=== "bash"
-    <div class="highlight"><pre><span></span><code>ln<span class="w"> </span>-s<span class="w"> </span>./lua/game_framework<span class="w"> </span>/your/project/game_framework
-</code></pre></div></p>
-<p>=== "powershell (requires admin/devmode)"
-    <div class="highlight"><pre><span></span><code><span class="nb">New-Item</span> <span class="n">-ItemType</span> <span class="n">SymbolicLink</span> <span class="n">-Path</span> <span class="s2">&quot;.\lua\game_framework&quot;</span> <span class="n">-Target</span> <span class="s2">&quot;\your\project\game_framework&quot;</span> 
-</code></pre></div></p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">bash</label><label for="__tabbed_1_2">powershell (requires admin/devmode)</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code>ln<span class="w"> </span>-s<span class="w"> </span>./lua/game_framework<span class="w"> </span>/your/project/game_framework
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="nb">New-Item</span> <span class="n">-ItemType</span> <span class="n">SymbolicLink</span> <span class="n">-Path</span> <span class="s2">&quot;.\lua\game_framework&quot;</span> <span class="n">-Target</span> <span class="s2">&quot;\your\project\game_framework&quot;</span> 
+</code></pre></div>
+</div>
+</div>
+</div>
 <p>Add the directory to your <code>annotations.config.json</code> and your rojo <code>.project.json</code></p>
 
 
