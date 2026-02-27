@@ -12,7 +12,7 @@
       
       
       
-        <link rel="next" href="core/1config/">
+        <link rel="next" href="core/0usage/">
       
       
         
@@ -288,6 +288,18 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#using-a-package-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using a package manager
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Using a package manager">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#build-tool" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -297,8 +309,8 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#framework-extension" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -306,6 +318,39 @@
       
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#from-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From source
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="From source">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#framework-extension_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Framework Extension
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -325,6 +370,8 @@
   
     
     
+      
+        
       
         
       
@@ -371,6 +418,34 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="core/0usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -585,14 +660,14 @@
   
   
     <li class="md-nav__item">
-      <a href="game%20framework/4annotations/" class="md-nav__link">
+      <a href="game%20framework/4indexes/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Other annotations
+    Indexes
   
 
     
@@ -640,6 +715,18 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#using-a-package-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using a package manager
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Using a package manager">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#build-tool" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -649,8 +736,8 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#framework-extension" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -658,6 +745,39 @@
       
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#from-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From source
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="From source">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#framework-extension_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Framework Extension
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -693,9 +813,10 @@
 <p>lua-annotations has two installation steps - one for the core python CLI tool (<code>lua-annotations</code>), allowing you to create custom annitations, and optionally, <code>default-framework</code>, which provides a set of annotations that use the build tool's API to create a Roblox game framework.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>This guide assumes that you already have a Rojo project set up. If not, you may follow the tool's <a href="https://rojo.space/docs">official documentation.</a></p>
+<p>This guide assumes that you already have a Rojo project set up and you are familiar with the tool. If not, you may follow the tool's <a href="https://rojo.space/docs">official documentation.</a></p>
 </div>
-<h2 id="build-tool">Build Tool</h2>
+<h2 id="using-a-package-manager">Using a package manager</h2>
+<h3 id="build-tool">Build Tool</h3>
 <p>Install the python tool
 <div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>lua-annotations
 </code></pre></div>
@@ -717,18 +838,37 @@ If you wish to add a Wally package to be processed, you may add it like this:
 <span class="p">]</span>
 </code></pre></div></p>
 <hr />
-<h2 id="framework-extension">Framework Extension</h2>
+<h3 id="framework-extension">Framework Extension</h3>
 <p>This provides a Roblox game framework you could optionally use. It is automatically installed with the python package but not automatically imported - add it as an extension to your config.</p>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>
 <p>You may follow these steps to install any other third-party python extension or even create your own! (more info in the lua-annotations API guide)</p>
 </div>
 <p><div class="highlight"><span class="filename">annotations.config.json</span><pre><span></span><code><span class="nt">&quot;extensions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">    </span><span class="p">[</span><span class="s2">&quot;library&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;lua-annotations.extensions.game_framework.main&quot;</span><span class="p">],</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;library&quot;</span><span class="p">,</span><span class="w"> </span>
+<span class="w">        </span><span class="nt">&quot;expr&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;lua-annotations.extensions.game_framework.main&quot;</span>
+<span class="w">    </span><span class="p">}</span>
 <span class="p">]</span>
 </code></pre></div>
 You would also need to install the lua runtime extension. This would need to be installed inside your project directory and added to your <code>annotations.config.json</code> and rojo <code>.project.json</code> files.
 You may either install it using a git submodule or a Wally package.</p>
+<h2 id="from-source">From source</h2>
+<p>Clone the git repository:
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/pigxity-games/lua-annotations
+</code></pre></div></p>
+<p>Install via pip:
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>./lua-annotations
+</code></pre></div></p>
+<h3 id="framework-extension_1">Framework Extension</h3>
+<p>Symlink the <code>lua/game_framework</code> directory in the repo to your project</p>
+<p>=== "bash"
+    <div class="highlight"><pre><span></span><code>ln<span class="w"> </span>-s<span class="w"> </span>./lua/game_framework<span class="w"> </span>/your/project/game_framework
+</code></pre></div></p>
+<p>=== "powershell (requires admin/devmode)"
+    <div class="highlight"><pre><span></span><code><span class="nb">New-Item</span> <span class="n">-ItemType</span> <span class="n">SymbolicLink</span> <span class="n">-Path</span> <span class="s2">&quot;.\lua\game_framework&quot;</span> <span class="n">-Target</span> <span class="s2">&quot;\your\project\game_framework&quot;</span> 
+</code></pre></div></p>
+<p>Add the directory to your <code>annotations.config.json</code> and your rojo <code>.project.json</code></p>
 
 
 

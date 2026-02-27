@@ -14,7 +14,7 @@
         <link rel="prev" href="../2components/">
       
       
-        <link rel="next" href="../4annotations/">
+        <link rel="next" href="../4indexes/">
       
       
         
@@ -263,6 +263,8 @@
       
         
       
+        
+      
     
     
     
@@ -304,6 +306,34 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../core/0usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -528,14 +558,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../4annotations/" class="md-nav__link">
+      <a href="../4indexes/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Other annotations
+    Indexes
   
 
     
@@ -643,6 +673,43 @@
 
 
 <h1 id="networking">Networking</h1>
+<p>Networking is made easy! It is largely done through the <code>@remote</code> annotation. This creates a remote event/function at build-time and injects it into services at runtime.</p>
+<p>To define a remote:
+<div class="highlight"><span class="filename">client/MessageController.lua</span><pre><span></span><code><span class="c1">--@service</span>
+<span class="kd">local</span><span class="w"> </span><span class="nv">controller</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{}</span>
+
+<span class="c1">--@remote, event</span>
+<span class="kr">function</span><span class="w"> </span><span class="nc">controller</span><span class="p">.</span><span class="nf">printMessage</span><span class="p">(</span><span class="nv">message</span><span class="p">:</span><span class="w"> </span><span class="py">string</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Recieved message &quot;</span><span class="w"> </span><span class="o">..</span><span class="w"> </span><span class="nv">message</span><span class="p">)</span>
+<span class="kr">end</span>
+
+<span class="kr">return</span><span class="w"> </span><span class="nv">controller</span>
+</code></pre></div></p>
+<p>The <code>@remote</code> annotation takes one argument, that being a literal <code>event</code>, <code>function</code>, or <code>unreliable</code> string, which corresponds to the underlying Roblox instance to use.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Methods with the <code>@remote</code> annotation must be defined with the <code>.</code> syntax, not with the self-passing <code>:</code> syntax.</p>
+</div>
+<p>On the server side, we can import remote services by prefixing them with <code>:client</code>.</p>
+<div class="highlight"><span class="filename">server/GreetService.lua</span><pre><span></span><code><span class="kd">local</span><span class="w"> </span><span class="nv">Players</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">game</span><span class="p">:</span><span class="nf">GetService</span><span class="p">(</span><span class="s2">&quot;Players&quot;</span><span class="p">)</span>
+
+<span class="c1">--@service, depends=[client:MessageController]</span>
+<span class="kd">local</span><span class="w"> </span><span class="nv">service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{}</span>
+
+<span class="kr">function</span><span class="w"> </span><span class="nc">module</span><span class="p">:</span><span class="nf">_init</span><span class="p">(</span><span class="nv">deps</span><span class="p">)</span>
+<span class="w">    </span><span class="nv">self</span><span class="p">.</span><span class="py">deps</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">deps</span>
+
+<span class="w">    </span><span class="nv">task</span><span class="p">.</span><span class="nf">spawn</span><span class="p">(</span><span class="kr">function</span><span class="p">()</span>
+<span class="w">        </span><span class="kr">while</span><span class="w"> </span><span class="nv">task</span><span class="p">.</span><span class="nf">wait</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="kr">do</span>
+<span class="w">            </span><span class="kr">for</span><span class="w"> </span><span class="nv">_</span><span class="p">,</span><span class="w"> </span><span class="nv">player</span><span class="w"> </span><span class="kr">in</span><span class="w"> </span><span class="nb">ipairs</span><span class="p">(</span><span class="nv">Players</span><span class="p">:</span><span class="nf">GetPlayers</span><span class="p">())</span><span class="w"> </span><span class="kr">do</span>
+<span class="w">                </span><span class="nv">self</span><span class="p">.</span><span class="py">deps</span><span class="p">.</span><span class="py">client</span><span class="p">.</span><span class="py">MessageController</span><span class="p">.</span><span class="nf">printMessage</span><span class="p">(</span><span class="nv">player</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;Hello, &#39;</span><span class="w"> </span><span class="o">..</span><span class="w"> </span><span class="nv">player</span><span class="p">.</span><span class="py">Name</span><span class="p">)</span>
+<span class="w">            </span><span class="kr">end</span>
+<span class="w">        </span><span class="kr">end</span>
+<span class="w">    </span><span class="kr">end</span><span class="p">)</span>
+<span class="kr">end</span>
+
+<span class="kr">return</span><span class="w"> </span><span class="nv">service</span>
+</code></pre></div>
 
 
 

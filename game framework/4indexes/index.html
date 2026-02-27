@@ -8,7 +8,7 @@
       
       
       
-        <link rel="canonical" href="https://pigxity.github.io/game%20framework/4annotations/">
+        <link rel="canonical" href="https://pigxity.github.io/game%20framework/4indexes/">
       
       
         <link rel="prev" href="../3networking/">
@@ -23,7 +23,7 @@
     
     
       
-        <title>Other annotations - lua-annotations</title>
+        <title>Indexes - lua-annotations</title>
       
     
     
@@ -72,7 +72,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#other-annotations" class="md-skip">
+        <a href="#indexes" class="md-skip">
           Skip to content
         </a>
       
@@ -108,7 +108,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Other annotations
+              Indexes
             
           </span>
         </div>
@@ -261,6 +261,8 @@
       
         
       
+        
+      
     
     
     
@@ -302,6 +304,34 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../core/0usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -525,6 +555,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indexes
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -532,7 +580,7 @@
   <span class="md-ellipsis">
     
   
-    Other annotations
+    Indexes
   
 
     
@@ -541,6 +589,36 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#indexedtype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IndexedType
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -573,6 +651,25 @@
   
     
   
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#indexedtype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IndexedType
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
   
 </nav>
                   </div>
@@ -640,7 +737,34 @@
   
 
 
-<h1 id="other-annotations">Other annotations</h1>
+<h1 id="indexes">Indexes</h1>
+<p>This is the framework's solution to reducing manual requires for utility modules. As paths change, it may get annoying to constantly update requires for every module that uses it. </p>
+<p>Thus, it is recommended to use the <code>@indexed</code> annotation for any modules utility modules, classes, etc. This places modules inside of a "index" module which returns a list of these modules.</p>
+<p>For example, say we have a simple utility module:
+<div class="highlight"><span class="filename">MyUtils.lua</span><pre><span></span><code><span class="c1">--@indexed</span>
+<span class="kd">local</span><span class="w"> </span><span class="nv">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{}</span>
+
+<span class="kr">function</span><span class="w"> </span><span class="nc">module</span><span class="p">.</span><span class="nf">printHello</span><span class="p">()</span>
+<span class="w">    </span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Hello World!&quot;</span><span class="p">)</span>
+<span class="kr">end</span>
+
+<span class="kr">return</span><span class="w"> </span><span class="nv">module</span>
+</code></pre></div></p>
+<p>We can then import it from anywhere else:
+<div class="highlight"><pre><span></span><code><span class="kd">local</span><span class="w"> </span><span class="nv">ReplicatedStorage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">game</span><span class="p">:</span><span class="nf">GetService</span><span class="p">(</span><span class="s2">&quot;ReplicatedStorage&quot;</span><span class="p">)</span>
+<span class="kd">local</span><span class="w"> </span><span class="nv">Index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">require</span><span class="p">(</span><span class="nv">ReplicatedStorage</span><span class="p">.</span><span class="py">Generated</span><span class="p">.</span><span class="py">Index</span><span class="p">)</span>
+<span class="kd">local</span><span class="w"> </span><span class="nv">MyUtils</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Index</span><span class="p">.</span><span class="py">MyUtils</span>
+
+<span class="nv">MyUtils</span><span class="p">.</span><span class="nf">printHello</span><span class="p">()</span>
+</code></pre></div></p>
+<p>The annotation also accepts an argument, which places the indexed module in a nested table which is inside of the index.</p>
+<p>For example, you define an indexed module with <code>@indexed, Utils</code>. You can then import it as follows:
+<div class="highlight"><pre><span></span><code><span class="kd">local</span><span class="w"> </span><span class="nv">MyUtils</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Index</span><span class="p">.</span><span class="py">Utils</span><span class="p">.</span><span class="py">MyUtils</span>
+<span class="nv">MyUtils</span><span class="p">.</span><span class="nf">printHello</span><span class="p">()</span>
+</code></pre></div></p>
+<h2 id="indexedtype">IndexedType</h2>
+<p><code>@indexedType</code> follows a similar concept, except with a type scope.
+This places any annotated types inside of <code>Generated/Types/Index.lua</code>.</p>
 
 
 

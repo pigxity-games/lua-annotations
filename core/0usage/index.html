@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://pigxity.github.io/core/1config/">
+        <link rel="canonical" href="https://pigxity.github.io/core/0usage/">
       
       
-        <link rel="prev" href="../0usage/">
+        <link rel="prev" href="../..">
       
       
-        <link rel="next" href="../2api/">
+        <link rel="next" href="../1config/">
       
       
         
@@ -25,7 +25,7 @@
     
     
       
-        <title>Config format - lua-annotations</title>
+        <title>CLI Usage - lua-annotations</title>
       
     
     
@@ -74,7 +74,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#config-format" class="md-skip">
+        <a href="#cli-usage" class="md-skip">
           Skip to content
         </a>
       
@@ -110,7 +110,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Config format
+              CLI Usage
             
           </span>
         </div>
@@ -311,34 +311,6 @@
                 
   
   
-  
-  
-    <li class="md-nav__item">
-      <a href="../0usage/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    CLI Usage
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
     
   
   
@@ -358,7 +330,7 @@
   <span class="md-ellipsis">
     
   
-    Config format
+    CLI Usage
   
 
     
@@ -376,7 +348,7 @@
   <span class="md-ellipsis">
     
   
-    Config format
+    CLI Usage
   
 
     
@@ -402,10 +374,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#out_dir" class="md-nav__link">
+  <a href="#modes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        out_dir
+        Modes
       
     </span>
   </a>
@@ -413,49 +385,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#workspaces" class="md-nav__link">
+  <a href="#args" class="md-nav__link">
     <span class="md-ellipsis">
       
-        workspaces
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="workspaces">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#path-tags" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Path tags
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#extensions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        extensions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#flags" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        flags
+        Args
       
     </span>
   </a>
@@ -466,6 +399,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../1config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -711,10 +672,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#out_dir" class="md-nav__link">
+  <a href="#modes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        out_dir
+        Modes
       
     </span>
   </a>
@@ -722,49 +683,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#workspaces" class="md-nav__link">
+  <a href="#args" class="md-nav__link">
     <span class="md-ellipsis">
       
-        workspaces
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="workspaces">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#path-tags" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Path tags
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#extensions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        extensions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#flags" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        flags
+        Args
       
     </span>
   </a>
@@ -814,7 +736,7 @@
     
     
       <li class="md-path__item">
-        <a href="../0usage/" class="md-path__link">
+        <a href="./" class="md-path__link">
           
   <span class="md-ellipsis">
     Core
@@ -839,54 +761,21 @@
   
 
 
-<h1 id="config-format">Config format</h1>
-<p>This is a rundown of the initial config file.</p>
-<div class="highlight"><span class="filename">annotations.config.json</span><pre><span></span><code><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;out_dir&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Generated&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;workspaces&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">        </span><span class="p">{</span>
-<span class="w">            </span><span class="nt">&quot;client&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;src/client&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;:&quot;</span><span class="p">},</span>
-<span class="w">            </span><span class="nt">&quot;server&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;src/server&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;:&quot;</span><span class="p">},</span>
-<span class="w">            </span><span class="nt">&quot;shared&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;src/shared&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;:&quot;</span><span class="p">}</span>
-<span class="w">        </span><span class="p">}</span>
-<span class="w">    </span><span class="p">],</span>
-<span class="w">    </span><span class="nt">&quot;extensions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">        </span><span class="p">{</span>
-<span class="w">            </span><span class="nt">&quot;kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;package&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;my_extension.main&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="p">},</span>
-<span class="w">    </span><span class="p">],</span>
-<span class="w">    </span><span class="nt">&quot;flags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="err">...</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="p">}</span>
-</code></pre></div>
-<h2 id="out_dir"><code>out_dir</code></h2>
-<p>The name of the directory of where generated files would be placed. Relative to the root of each environment per workspace</p>
-<p>Don't forget to add this directory to your <code>.gitignore</code>!
-<div class="highlight"><span class="filename">.gitignore</span><pre><span></span><code>**Generated/
+<h1 id="cli-usage">CLI Usage</h1>
+<p>The CLI tool can be ran with the following command:
+<div class="highlight"><pre><span></span><code>lua-anot<span class="w"> </span><span class="o">{</span>mode<span class="o">}</span><span class="w"> </span><span class="o">{</span>args<span class="o">}</span><span class="w"> </span><span class="o">{</span>workdir:<span class="w"> </span><span class="nv">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>.<span class="o">}</span>
 </code></pre></div></p>
-<h2 id="workspaces"><code>workspaces</code></h2>
-<p>These represent individual lua projects which are processed in parallel. Multiple workspaces are especially useful for multi-place Roblox games.</p>
-<p>Each workspace must contain an environment map, that is a dictionary with the <code>client</code>, <code>server</code>, and <code>shared</code> keys. Each environment value should contain a map of filesystem paths (relative to the config directory) to lua expressions that represent the path at runtime (where <code>:</code> is replaced with the environement root.)</p>
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p>Each environment can contain multiple processed paths, but the first one is the root. (where the <code>Generated</code> directory is created)</p>
-<p>Other paths are good for having packages be processed, for example.</p>
-</div>
-<h3 id="path-tags">Path tags</h3>
-<p>Instead of a literal filesystem path and lua expression, you may use a tag to resolve paths automatically.</p>
-<p><code>wally</code>: resolves a path based on a package name (<code>my-package</code>, in this example). The value must be the package directory at lua runtime (such as <code>:Packages</code>)
-<div class="highlight"><span class="filename">annotations.config.json</span><pre><span></span><code><span class="nt">&quot;workspaces&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">    </span><span class="nt">&quot;shared&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;wally@my-package&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;:Packages&quot;</span><span class="p">}</span>
-<span class="p">]</span>
-</code></pre></div></p>
-<h2 id="extensions"><code>extensions</code></h2>
-<p>A list of python package names to be imported and processed by the CLI tool. These should contain a <code>load()</code> function at the root module which utilizes the <code>Extension</code> API. <code>kind</code> must either be <code>package</code> or <code>path</code>, where <code>value</code> should be the package name or filepath, respectively.</p>
-<h2 id="flags"><code>flags</code></h2>
-<p>A list of boolean flags which can modify behavior of the tool or of extensions:</p>
-<p>game_framework:
-* <code>game_framework.service_typegen</code>: whether to generate type files for services (True)</p>
+<h2 id="modes">Modes</h2>
+<ul>
+<li><code>build</code>: builds the project under <code>workdir</code>.</li>
+<li><code>watch</code>: watches for changes under <code>workdir</code>; if it detects any, the project is rebuilt.</li>
+<li><code>init</code>: creates a default <code>annotations.config.json</code> file inside the <code>workdir</code>.</li>
+</ul>
+<h2 id="args">Args</h2>
+<ul>
+<li><code>-c</code>/<code>--config</code>: path to the config file to use (default = 'annotations.config.json')</li>
+<li><code>--watch-interval</code>: polling interval (in seconds) for watch mode.</li>
+</ul>
 
 
 
