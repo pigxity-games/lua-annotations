@@ -12,13 +12,15 @@ This is a rundown of the initial config file.
         }
     ],
     "extensions": [
-        {
-            "kind": "package",
-            "value": "my_extension.main",
-        },
+        ["package", "my_extension.main"]
     ],
     "flags": {
-        ...
+        "core": {
+            ...
+        },
+        "game_framework": {
+            ...
+        }
     }
 }
 ```
@@ -51,11 +53,11 @@ Instead of a literal filesystem path and lua expression, you may use a tag to re
 ```
 
 ## `extensions`
-A list of python package names to be imported and processed by the CLI tool. These should contain a `load()` function at the root module which utilizes the `Extension` API. `kind` must either be `package` or `path`, where `value` should be the package name or filepath, respectively.
+A list of python package names to be imported and processed by the CLI tool. These should contain a `load()` function at the root module which utilizes the `Extension` API. The first value must either be `package` or `path`, while the second should be the package name or filepath, respective to the first.
 
 ## `flags`
 A list of boolean flags which can modify behavior of the tool or of extensions:
 
 **game_framework:**
 
-* `game_framework.service_typegen`: whether to generate type files for services (True)
+* `service_typegen`: whether to generate type files for services. If enabled, the program downloads and uses a modified luau-lsp binary to generate types. (False)

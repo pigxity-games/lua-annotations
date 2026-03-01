@@ -38,19 +38,24 @@ Utilizing this would decouple your game features and thus allow for modular code
 Let's create a new service that utilizes the `greet()` method of the above `GreetService`.
 
 ```lua title="src/server/PlayerService.lua"
---@service, depends=[GreetService]
 local Players = game:GetService("Players")
-local ST = require(game:GetService("ServerScriptService").Generated.Types.GreetService) --if you care about type checking
+local ServerScriptService = game:GetService("ServerScriptService")
 
+--if `service_typegen` is enabled:
+local DT = require(ServerScriptService.Generated.ServiceTypes)
+
+
+--@service, depends=[GreetService]
 local service = {}
 
-function service:_init(deps: ST.Deps)
+function service:_init(deps: DT.PlayerServiceDeps)
     self.deps = deps
 
     Players.PlayerAdded:Connect(function(player)
         self.deps.GreetService:greet(player.Name)
     end)
 end
+
 
 return service
 ```
