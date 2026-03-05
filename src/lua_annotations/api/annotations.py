@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, replace
 from graphlib import TopologicalSorter
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal, Optional
@@ -24,6 +24,13 @@ class AnnotationBuildCtx():
 
 type OnBuild = Callable[[AnnotationBuildCtx], None]
 
+def merge(parent: Any, value: Any):
+    if isinstance(parent, dict):
+        return parent | value
+    if isinstance(parent, (list, tuple)):
+        return parent + value
+    return value
+
 #for extensions to define annotations
 @dataclass
 class AnnotationDef():
@@ -36,8 +43,16 @@ class AnnotationDef():
     mutual_include: list['AnnotationDef']=field(default_factory=list)
     mutual_exclude: list['AnnotationDef']=field(default_factory=list)
     on_build: Optional[OnBuild]=None
-    extends: list['AnnotationDef']=field(default_factory=list)
-    
+    extends: Optional[AnnotationDef]=None
+
+    def extend(self, other: AnnotationDef):
+        updates = {}
+        for f in fields(type(self)):
+            updates[f.name] = merge(getattr(self, f.name), getattr(other, f.name))
+        
+        other.extends = self
+        return replace(other, **updates)
+
 
 @dataclass
 class FileBuildCtx():

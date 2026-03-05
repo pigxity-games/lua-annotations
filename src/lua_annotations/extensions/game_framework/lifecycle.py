@@ -24,9 +24,14 @@ def proc_deps(deps: list[str]):
             out['services'].append(dep)
     return out
 
+def get_topo_graph(services: list[Annotation], key: str) -> dict[str, list[str]]:
+    return {svc.adornee.returned_name: filter_deps(svc.kwargs_val.get(key, {})) for svc in services}
+
+type AnotDict = dict[Environment, list[Annotation]]
 class LifecycleExtension(Extension):
     def __init__(self):
-        self.services: dict[Environment, list[Annotation]] = {env: [] for env in ENVIRONMENTS}
+        self.services: AnotDict = {env: [] for env in ENVIRONMENTS}
+        self.dependencies: AnotDict = {env: [] for env in ENVIRONMENTS}
 
     def add_service(self, ctx: AnnotationBuildCtx):
         self.services[ctx.build_ctx.env].append(ctx.annotation)
@@ -43,18 +48,24 @@ class LifecycleExtension(Extension):
             }
                 | ({'tags': svc.args_val[0]} if svc.name == 'component' else {})
             )
-            for svc in services}
+            for svc in services if svc.name != 'dependency'}
 
-            sorter = TopologicalSorter({svc.adornee.returned_name: filter_deps(svc.kwargs_val.get('depends', {})) for svc in services})
+            load_after_graph = get_topo_graph(services, 'load_after')
+            runtime_load_exclude = tuple(load_after_graph.keys())
+
+            sorter = TopologicalSorter(get_topo_graph(services, 'depends') | load_after_graph)
             
             try:
-                self.manifestExt.manifest[env]['load_order'] = list(sorter.static_order())
+                self.manifestExt.manifest[env]['load_order'] = list([s for s in sorter.static_order() if s not in runtime_load_exclude])
             except CycleError as e:
                 raise BuildError(f"Cycle detected for service graph: {e.args}") from e
 
     def load(self, ctx: ExtensionRegistry):
         self.manifestExt: ManifestExtension = ctx.extensions['ManifestExtension']
 
-        ctx.register_anot(AnnotationDef('service', retention='build', kwargs={'depends': default_list}, on_build=self.add_service))
+        dependency = AnnotationDef('dependency', retention='build', kwargs={'load_after': default_list}, on_build=self.add_service)
+        ctx.register_anot(dependency)
+
+        ctx.register_anot(dependency.extend(AnnotationDef('service', kwargs={'depends': default_list})))
         ctx.register_anot(AnnotationDef('component', retention='build', args=[default_list], kwargs={'depends': default_list}, on_build=self.add_service))
         ctx.register_anot(AnnotationDef('bindTag', retention='init', args=[default_list], scope='method'))

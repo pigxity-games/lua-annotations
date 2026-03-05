@@ -6,7 +6,8 @@ import time
 from datetime import datetime
 
 from .api.annotations import ENVIRONMENTS, ExtensionRegistry
-from .build_process import BuildCtxList, BuildProcessCtx, Config, Environment, Extension, PostProcessCtx, Workspace, get_template
+from .build_process import BuildCtxList, BuildProcessCtx, Environment, PostProcessCtx, Workspace, get_template
+from .config import Config, ExtensionConfig, read_config
 from .exceptions import BuildError, ConfigError
 from .extensions import default as default_ext
 
@@ -47,12 +48,10 @@ def import_extension_from_path(workdir: Path, entry: str):
     return importlib.import_module(mod_name)
 
 
-def import_extension(ext: Extension, workdir: Path):
-    entry_type, entry = ext
-
-    if entry_type == 'library':
+def import_extension(ext: ExtensionConfig, workdir: Path):
+    if ext.kind == 'library':
         return importlib.import_module("lua_annotations.extensions.game_framework.main")
-    return import_extension_from_path(workdir, entry)
+    return import_extension_from_path(workdir, ext.expr)
 
 
 def process_tags(raw: str, raw_expr: str, env: Environment, workdir: Path):
@@ -75,15 +74,16 @@ def process_tags(raw: str, raw_expr: str, env: Environment, workdir: Path):
 def build(workdir: Path, config: Config):
     init_time = datetime.now()
 
-    for raw_workspace in config.workspaces:
+    for workspace_cfg in config.workspaces:
         #process workspace
         workspace: Workspace = {}
         for env in ENVIRONMENTS:
-            path_map = raw_workspace.get(env)
-            if not path_map:
-                raise ConfigError(f'path for the `{env}` environment is not defined in the config.')
-
+            path_map = workspace_cfg.get(env)
             rel_paths = dict(iter_rel_paths(path_map, workdir, env))
+            if not rel_paths:
+                raise ConfigError(
+                    f'no valid directories were found for `{env}` in this workspace.'
+                )
             workspace[env] = rel_paths
 
 
@@ -97,7 +97,7 @@ def build(workdir: Path, config: Config):
             load_fn = getattr(module, 'load')
 
             if not callable(load_fn):
-                raise BuildError(f'module {ext[1]} does not have a `load()` function')
+                raise BuildError(f'module {ext.expr} does not have a `load()` function')
             load_fn(reg)
 
 
@@ -109,10 +109,6 @@ def build(workdir: Path, config: Config):
         build_contexts: BuildCtxList = {}
 
         for env in ENVIRONMENTS:
-            path_map = workspace.get(env)
-            if not path_map:
-                raise ConfigError(f'path for the `{env}` environment is not defined in the config.')
-
             #process output root
             rel_paths = workspace[env]
             root_path = next(iter(rel_paths.keys()))
@@ -151,14 +147,7 @@ def _watch_fingerprint(workdir: Path, config_file: Path, config: Config):
     for workspace in config.workspaces:
         for env in ENVIRONMENTS:
             path_map = workspace.get(env)
-            if not path_map:
-                continue
-
-            for rel_path in path_map:
-                env_workdir = workdir / rel_path
-                if not env_workdir.exists() or not env_workdir.is_dir():
-                    continue
-
+            for env_workdir, _ in iter_rel_paths(path_map, workdir, env):
                 for pattern in WATCH_FILENAMES:
                     for file in env_workdir.rglob(pattern):
                         if output_dir_name in file.parts:
@@ -187,11 +176,3 @@ def watch(workdir: Path, config_file: Path, poll_interval: float = 1.0):
             print('Change detected, rebuilding...')
             build(workdir, config)
             last_fingerprint = fingerprint
-
-
-def read_config(config_file: Path):
-    import json
-
-    if not config_file.exists():
-        raise ConfigError('Config file not found. Run the program in init mode to create one!')
-    return Config(json.loads(config_file.read_text()))

@@ -269,9 +269,11 @@ class FileParser():
 
                     #now run anot on_build
                     for anot in self.cur_annotations:
-                        for adef in [anot.adef] + anot.adef.extends:
-                            if adef.on_build:
-                                adef.on_build(AnnotationBuildCtx(anot, self, self.build_ctx))
+                        adef = anot.adef
+                        for on_build in (adef.on_build, adef.extends.on_build if adef.extends else None):
+                            if not on_build:
+                                continue
+                            on_build(AnnotationBuildCtx(anot, self, self.build_ctx))
 
                     self.annotations += self.cur_annotations
                     self.cur_annotations = []

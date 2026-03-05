@@ -1,5 +1,5 @@
 {
-    "outDirName": "Generated",
+    "out_dir": "Generated",
     "workspaces": [
         {
             "client": {"src/client": ":"},

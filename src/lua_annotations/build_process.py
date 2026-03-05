@@ -84,16 +84,4 @@ class BuildProcessCtx(ProcessCtx):
                 self.process_file(file)
 
 
-type RawWorkspace = dict[Environment, dict[str, str]]
 type Workspace = dict[Environment, dict[Path, str]]
-
-type Extension = tuple[Literal['library', 'path'], str]
-
-class Config():
-    def __init__(self, data: dict[Any, Any]):
-        self.out_dir_name = data.get('outDirName', 'Generated')
-
-        self.workspaces: list[RawWorkspace] = data.get('workspaces', [])
-
-        #extensions
-        self.extensions: list[Extension] = data.get('extensions', [])
