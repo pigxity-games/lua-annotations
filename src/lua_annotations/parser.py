@@ -8,20 +8,25 @@ from .parser_schemas import *
 if TYPE_CHECKING:
     from .build_process import BuildProcessCtx
 
-#helper functions
+# helper functions
 K = TypeVar('K')
 V = TypeVar('V')
+
+
 def reverse_dict(d: dict[K, V]) -> dict[V, K]:
     return {v: k for k, v in d.items()}
+
 
 def set_adornee(anots: list[Annotation], adornee: Adornee):
     for anot in anots:
         anot.adornee = adornee
 
+
 def remove_whitespace(t: list[Any]):
     return [p.strip() for p in t]
 
-def map_param_list(params: list[str]):    
+
+def map_param_list(params: list[str]):
     out: dict[str, str] = {}
     for param in params:
         parts = remove_whitespace(param.split(':'))
@@ -32,9 +37,10 @@ def map_param_list(params: list[str]):
 
     return out
 
-#parsing
+
+# parsing
 @dataclass
-class FileParser():
+class FileParser:
     reg: SortedRegistry
     file: Path
     build_ctx: 'BuildProcessCtx'
@@ -47,7 +53,7 @@ class FileParser():
     def __post_init__(self):
         self.file_name = self.file.name.split('.')[0]
 
-    #assertion functions
+    # assertion functions
     def _check_anot_scopes(self, line: str, anots: list[AnnotationDef]):
         scope = anots[0].scope
         for anot in anots:
@@ -58,14 +64,19 @@ class FileParser():
         for anot in anots:
             for inc in anot.mutual_exclude:
                 if inc in anots:
-                    self.error(line, f'annotation {anot.name} excludes {inc.name}, but it is present in this code block')
+                    self.error(
+                        line,
+                        f'annotation {anot.name} excludes {inc.name}, but it is present in this code block',
+                    )
 
             for inc in anot.mutual_include:
                 if not inc in anots:
-                    self.error(line, f'annotation {anot.name} requires {inc.name}, but it is not present in this code block')
+                    self.error(
+                        line,
+                        f'annotation {anot.name} requires {inc.name}, but it is not present in this code block',
+                    )
 
-
-    #parsing helpers
+    # parsing helpers
     def _parse_anot_args(self, adef: AnnotationDef, args: list[str]):
         kwargs_val: dict[str, Any] = {}
         args_val: list[Any] = []
@@ -99,7 +110,7 @@ class FileParser():
 
         keys: list[str] = [m[0] for m in matches]
         values: list[str] = [m[1] for m in matches]
-            
+
         if len(keys) == len(values):
             out: dict[str, str] = {}
             for i, key in enumerate(keys):
@@ -140,7 +151,6 @@ class FileParser():
 
         return ReturnedValue(self.file, name, returned_name, is_submodule)
 
-
     def _get_function(self, text: str, modules: dict[str, LuaModule]):
         match = FUNCTION_REGEX.search(text)
         if not match:
@@ -165,12 +175,11 @@ class FileParser():
             self.error(module_name, 'cannot use method annotations for an unindexed module.')
         return LuaMethod(fun_name, modules[module_name], param_dict, return_type)
 
-
-    #main functions
+    # main functions
     def error(self, text: str, message: str):
         raise LuaParserError(message, text, self.cur_line, self.file_name)
 
-    def parse(self, text: str):        
+    def parse(self, text: str):
         returned = self._get_returned(text, self.file_name)
         if not returned:
             print(f'Skipping file {self.file_name}; doesn\'t return a value')
@@ -179,13 +188,13 @@ class FileParser():
 
         for i, line in enumerate(lines):
             self.cur_line += 1
-            #skip empty lines
+            # skip empty lines
             if line == '':
                 continue
-        
-            #comments
+
+            # comments
             elif line.startswith('--'):
-                #annotation
+                # annotation
                 if line.startswith(ANNOTATION_PREFIX):
                     anot = self._parse_annotation(line, self.reg)
                     if anot:
@@ -194,7 +203,7 @@ class FileParser():
                         self.error(line, 'Not an annotation')
 
             else:
-                #if there are annotations in this block of code, then find adornee
+                # if there are annotations in this block of code, then find adornee
                 if len(self.cur_annotations) > 0:
                     adefs = [anot.adef for anot in self.cur_annotations]
 
@@ -203,20 +212,20 @@ class FileParser():
 
                     scope = adefs[0].scope
 
-                    #strip comments
+                    # strip comments
                     line = line.split('--')[0]
-                    
-                    #methods
+
+                    # methods
                     if scope == 'method':
                         method = self._get_function(line, self.modules)
                         set_adornee(self.cur_annotations, method)
 
-                    #module
+                    # module
                     elif scope == 'module':
                         match = MODULE_REGEX.search(line)
                         if not match:
                             self.error(line, 'code block is not a module')
-                        
+
                         name: str = match.group(1)
                         returned_name, is_submodule = returned.get_returned_name(name)
 
@@ -227,23 +236,21 @@ class FileParser():
                         set_adornee(self.cur_annotations, module)
                         self.modules[module.name] = module
 
-
-                    #returned value
+                    # returned value
                     elif scope == 'returned_value':
                         returned_value = self._get_returned_value(line, returned)
                         set_adornee(self.cur_annotations, returned_value)
 
-
-                    #type
+                    # type
                     elif scope == 'type':
-                        #get entire code block
+                        # get entire code block
                         block = ''
                         for line2 in lines[i:]:
                             block += line2 + '\n'
                             if '}' in line2:
                                 break
 
-                        #use type regex
+                        # use type regex
                         match = TYPE_REGEX.search(block)
                         if not match:
                             self.error(line, 'code block is not a type definition')
@@ -268,10 +275,13 @@ class FileParser():
                         set_adornee(self.cur_annotations, lua_type)
                         self.types[name] = lua_type
 
-                    #now run anot on_build
+                    # now run anot on_build
                     for anot in self.cur_annotations:
                         adef = anot.adef
-                        for on_build in (adef.on_build, adef.extends.on_build if adef.extends else None):
+                        for on_build in (
+                            adef.on_build,
+                            adef.extends.on_build if adef.extends else None,
+                        ):
                             if not on_build:
                                 continue
                             on_build(AnnotationBuildCtx(anot, self, self.build_ctx))

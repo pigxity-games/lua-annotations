@@ -29,9 +29,7 @@ def test_luapath_resolves_workspace_paths_and_tracks_imports(tmp_path: Path):
 
     path = LuaPath(tmp_path / "server" / "Services" / "Data.lua", require=True)
     assert path.to_lua(resolver) == "require(ServerScriptService.ServerRoot.Services.Data)"
-    assert resolver.get_import_lines() == [
-        'local ServerScriptService = game:GetService("ServerScriptService")'
-    ]
+    assert resolver.get_import_lines() == ['local ServerScriptService = game:GetService("ServerScriptService")']
 
 
 def test_luapath_resolves_env_prefixed_paths(tmp_path: Path):
@@ -39,9 +37,7 @@ def test_luapath_resolves_env_prefixed_paths(tmp_path: Path):
     path = LuaPath(PurePath("shared/Util/Math.lua"), require=True)
 
     assert path.to_lua(resolver) == "require(ReplicatedStorage.Util.Math)"
-    assert resolver.get_import_lines() == [
-        'local ReplicatedStorage = game:GetService("ReplicatedStorage")'
-    ]
+    assert resolver.get_import_lines() == ['local ReplicatedStorage = game:GetService("ReplicatedStorage")']
 
 
 def test_luapath_relative_and_function_wrapping_behavior():
@@ -59,10 +55,7 @@ def test_luapath_inline_require_uses_service_expr_without_imports(tmp_path: Path
     resolver = LuaPathResolver(make_workspace(tmp_path))
     path = LuaPath(tmp_path / "server" / "Pkg" / "Remote.lua", require=True)
 
-    assert (
-        path.to_lua(resolver, inline_require=True)
-        == 'require(game:GetService("ServerScriptService").ServerRoot.Pkg.Remote)'
-    )
+    assert path.to_lua(resolver, inline_require=True) == 'require(game:GetService("ServerScriptService").ServerRoot.Pkg.Remote)'
     assert resolver.get_import_lines() == []
 
 
@@ -130,8 +123,6 @@ def test_convert_dict_module_and_type_include_generated_header(tmp_path: Path):
     assert "count = 1" in module_out
 
     type_out = convert_dict_type(ctx, {"id": "number"}, "MyType")
-    assert type_out.startswith(
-        "-- Generated using lua-anot; do not edit manually.\nexport type MyType =  {\n"
-    )
+    assert type_out.startswith("-- Generated using lua-anot; do not edit manually.\nexport type MyType =  {\n")
     # current behavior keeps lua type values as quoted strings
     assert 'id: "number"' in type_out

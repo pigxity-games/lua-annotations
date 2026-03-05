@@ -1,21 +1,33 @@
-from lua_annotations.api.annotations import ENVIRONMENTS, AnnotationBuildCtx, AnnotationDef, Extension, ExtensionRegistry
-from lua_annotations.api.lua_dict import HEADER, LuaPath, LuaPathResolver, convert_dict_module
+from lua_annotations.api.annotations import (
+    ENVIRONMENTS,
+    AnnotationBuildCtx,
+    AnnotationDef,
+    Extension,
+    ExtensionRegistry,
+)
+from lua_annotations.api.lua_dict import (
+    HEADER,
+    LuaPath,
+    LuaPathResolver,
+    convert_dict_module,
+)
 from lua_annotations.build_process import Environment, PostProcessCtx
 from lua_annotations.parser_schemas import LuaType, ReturnedValue
 
 
 def _env(ctx: AnnotationBuildCtx) -> Environment:
     return ctx.build_ctx.env
+
+
 def _name(ctx: AnnotationBuildCtx) -> str | None:
     return ctx.annotation.kwargs_val.get('name')
 
 
 class IndexExtension(Extension):
     def __init__(self) -> None:
-        self.indexes: dict[Environment, dict[str, LuaPath] | LuaPath]                 = {env: {} for env in ENVIRONMENTS}
-        self.exported_types: dict[Environment, list[tuple[LuaPath, str]]]       = {env: [] for env in ENVIRONMENTS}
-        self.indexed_types: dict[Environment, list[tuple[LuaPath, str, str]]]   = {env: [] for env in ENVIRONMENTS}
-
+        self.indexes: dict[Environment, dict[str, LuaPath] | LuaPath] = {env: {} for env in ENVIRONMENTS}
+        self.exported_types: dict[Environment, list[tuple[LuaPath, str]]] = {env: [] for env in ENVIRONMENTS}
+        self.indexed_types: dict[Environment, list[tuple[LuaPath, str, str]]] = {env: [] for env in ENVIRONMENTS}
 
     def on_post_process(self, ctx: PostProcessCtx):
         for env in ENVIRONMENTS:
@@ -35,16 +47,8 @@ class IndexExtension(Extension):
                 type_lines.append(f'export type {type_name} = {module_name}.{type_name}')
 
             # build final file
-            out = (
-                [HEADER]
-                + resolver.get_import_lines()
-                + ['']
-                + list(imports.values())
-                + type_lines
-                + ['', 'return nil']
-            )
+            out = [HEADER] + resolver.get_import_lines() + [''] + list(imports.values()) + type_lines + ['', 'return nil']
             ctx.create_file(env, 'Types/Index.lua', '\n'.join(out))
-
 
     def on_build_indexed(self, ctx: AnnotationBuildCtx):
         module = ctx.annotation.adornee
@@ -62,13 +66,11 @@ class IndexExtension(Extension):
         else:
             indexed[key] = value  # pyright: ignore[reportIndexIssue]
 
-
     def on_build_export_type(self, ctx: AnnotationBuildCtx):
         module = ctx.annotation.adornee
         assert isinstance(module, ReturnedValue)
 
         self.exported_types[_env(ctx)].append((module.get_path(require=True), _name(ctx) or module.returned_name))
-
 
     def on_build_indexed_type(self, ctx: AnnotationBuildCtx):
         lua_type = ctx.annotation.adornee
@@ -78,8 +80,29 @@ class IndexExtension(Extension):
         path = LuaPath(ctx.parser.file, require=True)
         self.indexed_types[_env(ctx)].append((path, _name(ctx) or lua_type.name, ctx.parser.file_name))
 
-
     def load(self, ctx: ExtensionRegistry) -> None:
-        ctx.register_anot(AnnotationDef('indexedType', scope='type',           kwargs={'name': str}, on_build=self.on_build_indexed_type))
-        ctx.register_anot(AnnotationDef('exportType',  scope='returned_value', kwargs={'name': str}, on_build=self.on_build_export_type))
-        ctx.register_anot(AnnotationDef('indexed',     scope='returned_value', kwargs={'name': str}, args=[str], on_build=self.on_build_indexed))
+        ctx.register_anot(
+            AnnotationDef(
+                'indexedType',
+                scope='type',
+                kwargs={'name': str},
+                on_build=self.on_build_indexed_type,
+            )
+        )
+        ctx.register_anot(
+            AnnotationDef(
+                'exportType',
+                scope='returned_value',
+                kwargs={'name': str},
+                on_build=self.on_build_export_type,
+            )
+        )
+        ctx.register_anot(
+            AnnotationDef(
+                'indexed',
+                scope='returned_value',
+                kwargs={'name': str},
+                args=[str],
+                on_build=self.on_build_indexed,
+            )
+        )

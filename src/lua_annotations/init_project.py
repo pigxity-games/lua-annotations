@@ -6,12 +6,20 @@ import time
 from datetime import datetime
 
 from .api.annotations import ENVIRONMENTS, ExtensionRegistry
-from .build_process import BuildCtxList, BuildProcessCtx, Environment, PostProcessCtx, Workspace, get_template
+from .build_process import (
+    BuildCtxList,
+    BuildProcessCtx,
+    Environment,
+    PostProcessCtx,
+    Workspace,
+    get_template,
+)
 from .config import Config, ExtensionConfig, read_config
 from .exceptions import BuildError, ConfigError
 from .extensions import default as default_ext
 
 WATCH_FILENAMES = ('*.lua', '*.luau')
+
 
 def create_config(workdir: Path, config_file: Path):
     if not config_file.exists():
@@ -62,11 +70,9 @@ def process_tags(raw: str, raw_expr: str, env: Environment, workdir: Path):
         packages = workdir / package_dir_name / '_Index'
         ext_dir = next(packages.glob(f'*_{data}@*'), None)
         if not ext_dir:
-            raise ConfigError(
-                f'wally package {data} not found under {packages.as_posix()}'
-            )
+            raise ConfigError(f'wally package {data} not found under {packages.as_posix()}')
 
-        return ext_dir / data, f'require({raw_expr}.{data})' 
+        return ext_dir / data, f'require({raw_expr}.{data})'
 
     raise ConfigError(f'invalid path tag: {raw}')
 
@@ -75,24 +81,21 @@ def build(workdir: Path, config: Config):
     init_time = datetime.now()
 
     for workspace_cfg in config.workspaces:
-        #process workspace
+        # process workspace
         workspace: Workspace = {}
         for env in ENVIRONMENTS:
             path_map = workspace_cfg.get(env)
             rel_paths = dict(iter_rel_paths(path_map, workdir, env))
             if not rel_paths:
-                raise ConfigError(
-                    f'no valid directories were found for `{env}` in this workspace.'
-                )
+                raise ConfigError(f'no valid directories were found for `{env}` in this workspace.')
             workspace[env] = rel_paths
 
-
-        #load extensions
+        # load extensions
         reg = ExtensionRegistry()
         default_ext.load(reg)
 
         for ext in config.extensions:
-            #py_entry
+            # py_entry
             module = import_extension(ext, workdir)
             load_fn = getattr(module, 'load')
 
@@ -100,16 +103,14 @@ def build(workdir: Path, config: Config):
                 raise BuildError(f'module {ext.expr} does not have a `load()` function')
             load_fn(reg)
 
-
         reg = reg.sort_extensions()
         print(f'loaded {len(reg.anot_registry)} annotations')
 
-
-        #env processing
+        # env processing
         build_contexts: BuildCtxList = {}
 
         for env in ENVIRONMENTS:
-            #process output root
+            # process output root
             rel_paths = workspace[env]
             root_path = next(iter(rel_paths.keys()))
             output_root = root_path / Path(config.out_dir_name)
@@ -117,13 +118,12 @@ def build(workdir: Path, config: Config):
             shutil.rmtree(output_root, True)
             output_root.mkdir(parents=True, exist_ok=True)
 
-            #create and use a ctx
+            # create and use a ctx
             ctx = BuildProcessCtx(reg, root_path, workspace, rel_paths, output_root, env)
             for path in rel_paths:
                 ctx.process_dir(path)
 
             build_contexts[env] = ctx
-
 
         # run post-build hooks
         if build_contexts:
@@ -131,19 +131,19 @@ def build(workdir: Path, config: Config):
             for hook in reg.post_build_hooks:
                 hook(ctx)
 
-    #logging
+    # logging
     delta = datetime.now() - init_time
     print(f'Built in {delta.total_seconds()}s')
 
 
-#builds a fingerprint of all the last modified times of files
+# builds a fingerprint of all the last modified times of files
 def _watch_fingerprint(workdir: Path, config_file: Path, config: Config):
     output_dir_name = config.out_dir_name
 
-    #track config file
+    # track config file
     tracked: dict[str, int] = {str(config_file): config_file.stat().st_mtime_ns}
 
-    #track workspaces
+    # track workspaces
     for workspace in config.workspaces:
         for env in ENVIRONMENTS:
             path_map = workspace.get(env)
@@ -165,7 +165,7 @@ def watch(workdir: Path, config_file: Path, poll_interval: float = 1.0):
     last_fingerprint = _watch_fingerprint(workdir, config_file, config)
     print(f'Watching for changes in {workdir} (interval: {poll_interval}s). Press Ctrl+C to stop.')
 
-    #poll fingerprints every `poll_interval` seconds
+    # poll fingerprints every `poll_interval` seconds
     while True:
         time.sleep(poll_interval)
 

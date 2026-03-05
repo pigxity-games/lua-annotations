@@ -111,10 +111,7 @@ return {
         "shared": {},
     }
     resolver = LuaPathResolver(workspace)
-    assert (
-        module.get_expr(resolver)
-        == "local ExportedMod = require(ServerScriptService.Project.Submodule).ExportedMod"
-    )
+    assert module.get_expr(resolver) == "local ExportedMod = require(ServerScriptService.Project.Submodule).ExportedMod"
 
 
 def test_parser_builds_luatype_exported_and_unexported_states(tmp_path: Path):

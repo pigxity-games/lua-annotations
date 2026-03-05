@@ -1,6 +1,13 @@
 from typing import Any
 
-from lua_annotations.api.annotations import ENVIRONMENTS, AnnotationBuildCtx, AnnotationDef, ExtensionRegistry, Extension, FileBuildCtx
+from lua_annotations.api.annotations import (
+    ENVIRONMENTS,
+    AnnotationBuildCtx,
+    AnnotationDef,
+    ExtensionRegistry,
+    Extension,
+    FileBuildCtx,
+)
 from lua_annotations.build_process import Environment, PostProcessCtx, get_template
 from lua_annotations.parser_schemas import LuaMethod
 from lua_annotations.api.lua_dict import LuaPathResolver, convert_dict
@@ -28,27 +35,30 @@ class ManifestExtension(Extension):
         self.manifest[ctx.build_ctx.env]['anot_hooks'][ctx.annotation.adornee.name] = adornee.get_path(require=True)
 
     def load(self, ctx: ExtensionRegistry):
-        ctx.register_anot(AnnotationDef(
-            name='onInit',
-            scope='method',
-            on_build=lambda ctx: self.on_build_post_init(ctx, 'init_hooks')
-        ))
-        ctx.register_anot(AnnotationDef(
-            'onPostInit',
-            scope='method',
-            on_build=lambda ctx: self.on_build_post_init(ctx, 'post_init_hooks')
-        ))
-        ctx.register_anot(AnnotationDef(
-            name='annotationInit',
-            scope='method',
-            on_build=self.on_build_annotation_init
-        ))
+        ctx.register_anot(
+            AnnotationDef(
+                name='onInit',
+                scope='method',
+                on_build=lambda ctx: self.on_build_post_init(ctx, 'init_hooks'),
+            )
+        )
+        ctx.register_anot(
+            AnnotationDef(
+                'onPostInit',
+                scope='method',
+                on_build=lambda ctx: self.on_build_post_init(ctx, 'post_init_hooks'),
+            )
+        )
+        ctx.register_anot(
+            AnnotationDef(
+                name='annotationInit',
+                scope='method',
+                on_build=self.on_build_annotation_init,
+            )
+        )
 
-        #annotation to literally just mark a module to be parsed.
-        ctx.register_anot(AnnotationDef(
-            name='module',
-            scope='module'
-        ))
+        # annotation to literally just mark a module to be parsed.
+        ctx.register_anot(AnnotationDef(name='module', scope='module'))
 
     def on_file_process(self, ctx: FileBuildCtx):
         for anot in ctx.parser.annotations:
@@ -64,9 +74,9 @@ class ManifestExtension(Extension):
                     self.manifest[env][key] |= self.manifest['shared'][key]
                 else:
                     self.manifest[env][key] += self.manifest['shared'][key]
-            data =  self.manifest[env]
+            data = self.manifest[env]
 
-            converted = convert_dict(LuaPathResolver(ctx.workspace), data, prefix = 'local manifest =')
+            converted = convert_dict(LuaPathResolver(ctx.workspace), data, prefix='local manifest =')
             out = template.replace('--manifest', converted)
 
             ctx.create_file(env, f'AnnotationInit.{env}.lua', out)

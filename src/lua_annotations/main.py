@@ -16,7 +16,12 @@ def main():
         default='',
         help='working directory for the program; this should be your rojo project root',
     )
-    parser.add_argument('-c', '--config', default='annotations.config.json', help='filename of the config file to use')
+    parser.add_argument(
+        '-c',
+        '--config',
+        default='annotations.config.json',
+        help='filename of the config file to use',
+    )
     parser.add_argument(
         '--watch-interval',
         type=float,
@@ -33,17 +38,17 @@ def main():
 
     config_file: Path = workdir / args.config
 
-    #init mode
+    # init mode
     if mode == 'init':
         create_config(workdir, config_file)
         return
 
-    #main mode
+    # main mode
     if mode == 'build':
         build(workdir, read_config(config_file))
         return
 
-    #watch mode
+    # watch mode
     watch(workdir, config_file, poll_interval=args.watch_interval)
 
     return 0

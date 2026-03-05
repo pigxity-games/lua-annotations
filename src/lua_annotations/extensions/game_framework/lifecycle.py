@@ -1,11 +1,17 @@
 from graphlib import CycleError, TopologicalSorter
 from typing import TYPE_CHECKING, Any
 
-from lua_annotations.api.annotations import ENVIRONMENTS, AnnotationBuildCtx, AnnotationDef, ExtensionRegistry, Extension
+from lua_annotations.api.annotations import (
+    ENVIRONMENTS,
+    AnnotationBuildCtx,
+    AnnotationDef,
+    ExtensionRegistry,
+    Extension,
+)
 from lua_annotations.api.arguments import default_list
 from lua_annotations.build_process import Environment, PostProcessCtx
 from lua_annotations.exceptions import BuildError
-from lua_annotations.parser_schemas import Annotation, ReturnedValue
+from lua_annotations.parser_schemas import Annotation
 
 if TYPE_CHECKING:
     from lua_annotations.extensions.default import ManifestExtension
@@ -24,10 +30,14 @@ def proc_deps(deps: list[str]) -> dict[str, list[str]]:
             out['services'].append(dep)
     return out
 
+
 def get_topo_graph(services: list[Annotation], key: str) -> dict[str, list[str]]:
     return {svc.adornee.returned_name: filter_deps(svc.kwargs_val.get(key, {})) for svc in services}  # pyright: ignore[reportAttributeAccessIssue]
 
+
 type AnotDict = dict[Environment, list[Annotation]]
+
+
 class LifecycleExtension(Extension):
     def __init__(self):
         self.services: AnotDict = {env: [] for env in ENVIRONMENTS}
@@ -43,21 +53,24 @@ class LifecycleExtension(Extension):
         for env in ('server', 'client'):
             services = self.services[env] + self.services['shared']
 
-            self.manifestExt.manifest[env]['services'] = {svc.adornee.returned_name: (  # pyright: ignore[reportAttributeAccessIssue]
-            {
-                'depends': proc_deps(svc.kwargs_val.get('depends', [])),
-                'getAdornee': svc.adornee.get_path(function=True, require=True),  # pyright: ignore[reportAttributeAccessIssue]
-                'kind': svc.name
+            self.manifestExt.manifest[env]['services'] = {
+                svc.adornee.returned_name: (  # pyright: ignore[reportAttributeAccessIssue]
+                    {
+                        'depends': proc_deps(svc.kwargs_val.get('depends', [])),
+                        'getAdornee': svc.adornee.get_path(function=True, require=True),  # pyright: ignore[reportAttributeAccessIssue]
+                        'kind': svc.name,
+                    }
+                    | ({'tags': svc.args_val[0]} if svc.name == 'component' else {})
+                )
+                for svc in services
+                if svc.name != 'dependency'
             }
-                | ({'tags': svc.args_val[0]} if svc.name == 'component' else {})
-            )
-            for svc in services if svc.name != 'dependency'}
 
             load_after_graph = get_topo_graph(services, 'load_after')
             runtime_load_exclude = tuple(load_after_graph.keys())
 
             sorter = TopologicalSorter(get_topo_graph(services, 'depends') | load_after_graph)
-            
+
             try:
                 self.manifestExt.manifest[env]['load_order'] = list([s for s in sorter.static_order() if s not in runtime_load_exclude])
             except CycleError as e:
@@ -71,9 +84,22 @@ class LifecycleExtension(Extension):
 
         self.manifestExt = manifest_ext
 
-        dependency = AnnotationDef('dependency', retention='build', kwargs={'load_after': default_list}, on_build=self.add_service)
+        dependency = AnnotationDef(
+            'dependency',
+            retention='build',
+            kwargs={'load_after': default_list},
+            on_build=self.add_service,
+        )
         ctx.register_anot(dependency)
 
         ctx.register_anot(dependency.extend(AnnotationDef('service', kwargs={'depends': default_list})))
-        ctx.register_anot(AnnotationDef('component', retention='build', args=[default_list], kwargs={'depends': default_list}, on_build=self.add_service))
+        ctx.register_anot(
+            AnnotationDef(
+                'component',
+                retention='build',
+                args=[default_list],
+                kwargs={'depends': default_list},
+                on_build=self.add_service,
+            )
+        )
         ctx.register_anot(AnnotationDef('bindTag', retention='init', args=[default_list], scope='method'))
