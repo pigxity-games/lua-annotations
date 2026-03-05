@@ -4,6 +4,7 @@ import pytest
 
 from lua_annotations.api.annotations import AnnotationDef, SortedRegistry
 from lua_annotations.api.lua_dict import LuaPathResolver
+from lua_annotations.build_process import Workspace
 from lua_annotations.parser import FileParser
 from lua_annotations.parser_schemas import (
     LuaMethod,
@@ -104,13 +105,12 @@ return {
     assert value_anot.adornee.returned_name == "ExportedValue"
     assert value_anot.adornee.get_path(require=True).properties == ["ExportedValue"]
 
-    resolver = LuaPathResolver(
-        {
-            "server": {tmp_path: ":Project"},
-            "client": {},
-            "shared": {},
-        }
-    )
+    workspace: Workspace = {
+        "server": {tmp_path: ":Project"},
+        "client": {},
+        "shared": {},
+    }
+    resolver = LuaPathResolver(workspace)
     assert (
         module.get_expr(resolver)
         == "local ExportedMod = require(ServerScriptService.Project.Submodule).ExportedMod"

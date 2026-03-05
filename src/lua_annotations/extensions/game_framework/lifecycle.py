@@ -1,21 +1,21 @@
 from graphlib import CycleError, TopologicalSorter
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from lua_annotations.api.annotations import ENVIRONMENTS, AnnotationBuildCtx, AnnotationDef, ExtensionRegistry, Extension, scope
+from lua_annotations.api.annotations import ENVIRONMENTS, AnnotationBuildCtx, AnnotationDef, ExtensionRegistry, Extension
 from lua_annotations.api.arguments import default_list
 from lua_annotations.build_process import Environment, PostProcessCtx
 from lua_annotations.exceptions import BuildError
-from lua_annotations.parser_schemas import Annotation
+from lua_annotations.parser_schemas import Annotation, ReturnedValue
 
 if TYPE_CHECKING:
     from lua_annotations.extensions.default import ManifestExtension
 
 
-def filter_deps(deps: list[str]):
+def filter_deps(deps: list[str]) -> list[str]:
     return [d for d in deps if ':' not in d]
 
 
-def proc_deps(deps: list[str]):
+def proc_deps(deps: list[str]) -> dict[str, list[str]]:
     out = {'services': [], 'remotes': []}
     for dep in deps:
         if ':' in dep:
@@ -25,25 +25,28 @@ def proc_deps(deps: list[str]):
     return out
 
 def get_topo_graph(services: list[Annotation], key: str) -> dict[str, list[str]]:
-    return {svc.adornee.returned_name: filter_deps(svc.kwargs_val.get(key, {})) for svc in services}
+    return {svc.adornee.returned_name: filter_deps(svc.kwargs_val.get(key, {})) for svc in services}  # pyright: ignore[reportAttributeAccessIssue]
 
 type AnotDict = dict[Environment, list[Annotation]]
 class LifecycleExtension(Extension):
     def __init__(self):
         self.services: AnotDict = {env: [] for env in ENVIRONMENTS}
         self.dependencies: AnotDict = {env: [] for env in ENVIRONMENTS}
+        self.manifestExt: ManifestExtension | None = None
 
     def add_service(self, ctx: AnnotationBuildCtx):
         self.services[ctx.build_ctx.env].append(ctx.annotation)
 
     def on_post_process(self, ctx: PostProcessCtx):
+        assert self.manifestExt
+
         for env in ('server', 'client'):
             services = self.services[env] + self.services['shared']
 
-            self.manifestExt.manifest[env]['services'] = {svc.adornee.returned_name: (
+            self.manifestExt.manifest[env]['services'] = {svc.adornee.returned_name: (  # pyright: ignore[reportAttributeAccessIssue]
             {
                 'depends': proc_deps(svc.kwargs_val.get('depends', [])),
-                'getAdornee': svc.adornee.get_path(function=True, require=True),
+                'getAdornee': svc.adornee.get_path(function=True, require=True),  # pyright: ignore[reportAttributeAccessIssue]
                 'kind': svc.name
             }
                 | ({'tags': svc.args_val[0]} if svc.name == 'component' else {})
@@ -61,7 +64,12 @@ class LifecycleExtension(Extension):
                 raise BuildError(f"Cycle detected for service graph: {e.args}") from e
 
     def load(self, ctx: ExtensionRegistry):
-        self.manifestExt: ManifestExtension = ctx.extensions['ManifestExtension']
+        from lua_annotations.extensions.default import ManifestExtension
+
+        manifest_ext = ctx.extensions.get('ManifestExtension')
+        assert isinstance(manifest_ext, ManifestExtension)
+
+        self.manifestExt = manifest_ext
 
         dependency = AnnotationDef('dependency', retention='build', kwargs={'load_after': default_list}, on_build=self.add_service)
         ctx.register_anot(dependency)

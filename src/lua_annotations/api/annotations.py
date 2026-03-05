@@ -64,6 +64,8 @@ type FileBuildHook = Callable[[FileBuildCtx], None]
 type PostBuildHook =  Callable[[PostProcessCtx], None]
 
 class Extension():
+    hook_order: Literal['before', 'after'] = 'after'
+
     def on_post_process(self, ctx: PostProcessCtx):
         ...
     def on_file_process(self, ctx: FileBuildCtx):

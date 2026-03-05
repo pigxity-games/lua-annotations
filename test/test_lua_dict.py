@@ -11,15 +11,16 @@ from lua_annotations.api.lua_dict import (
     convert_dict_module,
     convert_dict_type,
 )
-from lua_annotations.build_process import ProcessCtx
+from lua_annotations.build_process import ProcessCtx, Workspace
 
 
-def make_workspace(tmp_path: Path):
-    return {
+def make_workspace(tmp_path: Path) -> Workspace:
+    workspace: Workspace = {
         "server": {tmp_path / "server": ":ServerRoot"},
         "client": {tmp_path / "client": ":ClientRoot"},
         "shared": {tmp_path / "shared": ":SharedRoot"},
     }
+    return workspace
 
 
 def test_luapath_resolves_workspace_paths_and_tracks_imports(tmp_path: Path):

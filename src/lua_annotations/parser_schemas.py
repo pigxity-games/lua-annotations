@@ -105,7 +105,7 @@ class Annotation():
             'name': self.name,
             'args': self.args_val,
             'kwargs': self.kwargs_val,
-            'getAdornee': self.adornee.get_path(require=True, function=True),
+            'getAdornee': self.adornee.get_path(require=True, function=True),  # pyright: ignore[reportAttributeAccessIssue]
         } | self.export_data 
 
 

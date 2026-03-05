@@ -1,0 +1,5 @@
+{
+    "include": ["src", "test"],
+    "exclude": ["build", "**/__pycache__"],
+    "pythonVersion": "3.14"
+}

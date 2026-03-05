@@ -4,15 +4,15 @@ from lua_annotations.build_process import Environment, PostProcessCtx
 from lua_annotations.parser_schemas import LuaType, ReturnedValue
 
 
-def _env(ctx: AnnotationBuildCtx):
+def _env(ctx: AnnotationBuildCtx) -> Environment:
     return ctx.build_ctx.env
-def _name(ctx: AnnotationBuildCtx):
+def _name(ctx: AnnotationBuildCtx) -> str | None:
     return ctx.annotation.kwargs_val.get('name')
 
 
 class IndexExtension(Extension):
     def __init__(self) -> None:
-        self.indexes: dict[Environment, dict[str, LuaPath]]                     = {env: {} for env in ENVIRONMENTS}
+        self.indexes: dict[Environment, dict[str, LuaPath] | LuaPath]                 = {env: {} for env in ENVIRONMENTS}
         self.exported_types: dict[Environment, list[tuple[LuaPath, str]]]       = {env: [] for env in ENVIRONMENTS}
         self.indexed_types: dict[Environment, list[tuple[LuaPath, str, str]]]   = {env: [] for env in ENVIRONMENTS}
 
@@ -50,16 +50,17 @@ class IndexExtension(Extension):
         module = ctx.annotation.adornee
         assert isinstance(module, ReturnedValue)
 
-        dict = self.indexes[_env(ctx)]
+        indexed = self.indexes[_env(ctx)]
         key = _name(ctx) or module.returned_name
         value = module.get_path(require=True)
 
         argval = ctx.annotation.args_val
         if argval:
-            dict.setdefault(argval[0], {})
-            dict[argval[0]][key] = value
+            assert isinstance(indexed, dict)
+            indexed.setdefault(str(argval[0]), {})  # pyright: ignore[reportArgumentType]
+            indexed[argval[0]][key] = value  # pyright: ignore[reportIndexIssue]
         else:
-            dict[key] = value
+            indexed[key] = value  # pyright: ignore[reportIndexIssue]
 
 
     def on_build_export_type(self, ctx: AnnotationBuildCtx):

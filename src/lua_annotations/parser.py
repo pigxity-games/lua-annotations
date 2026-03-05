@@ -2,11 +2,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar
 
-from .api.annotations import AnnotationBuildCtx, AnnotationDef, ExtensionRegistry, SortedRegistry
+from .api.annotations import AnnotationBuildCtx, AnnotationDef, SortedRegistry
 from .parser_schemas import *
 
 if TYPE_CHECKING:
-    from build_process import BuildProcessCtx
+    from .build_process import BuildProcessCtx
 
 #helper functions
 K = TypeVar('K')
@@ -81,7 +81,7 @@ class FileParser():
 
         return args_val, kwargs_val
 
-    def _parse_annotation(self, text: str, ctx: ExtensionRegistry):
+    def _parse_annotation(self, text: str, ctx: SortedRegistry):
         parts = remove_whitespace(ANNOTATION_ARG_RE.split(text.removeprefix(ANNOTATION_PREFIX)))
         name = parts[0]
 
@@ -145,6 +145,7 @@ class FileParser():
         match = FUNCTION_REGEX.search(text)
         if not match:
             self.error(text, 'function is incorrectly defined')
+        assert match is not None
 
         module_name: str = match.group(1)
         fun_name: str = match.group(2)

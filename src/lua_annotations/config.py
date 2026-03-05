@@ -13,7 +13,6 @@ type Environment = Literal['server', 'client', 'shared']
 type ExtensionKind = Literal['library', 'path']
 type PathMap = dict[str, str]
 type WorkspaceMaps = dict[Environment, PathMap]
-DEFAULT_OUT_DIR = 'Generated'
 ENV_KEYS: tuple[Environment, ...] = ('client', 'server', 'shared')
 
 
@@ -23,14 +22,18 @@ def _validation_error(message: str, field_path: str) -> ConfigValidationError:
 
 def _parse_path_map(raw: Any, field_path: str) -> PathMap:
     if not isinstance(raw, dict):
-        raise _validation_error('expected an object mapping paths to lua expressions', field_path)
+        raise _validation_error(
+            'expected an object mapping paths to lua expressions', field_path
+        )
 
     out: PathMap = {}
     for key, value in raw.items():
         if not isinstance(key, str) or key.strip() == '':
             raise _validation_error('path key must be a non-empty string', field_path)
         if not isinstance(value, str) or value.strip() == '':
-            raise _validation_error('lua expression must be a non-empty string', field_path)
+            raise _validation_error(
+                'lua expression must be a non-empty string', field_path
+            )
         out[key] = value
 
     if len(out) == 0:
@@ -44,14 +47,14 @@ def _parse_list_field(raw: Any, field_path: str) -> list[Any]:
     return raw
 
 
-def _parse_environment_maps(
-    raw: dict[str, Any], field_path: str, require_all: bool
-) -> WorkspaceMaps:
+def _parse_environment_maps(raw: dict[str, Any], field_path: str, require_all: bool):
     parsed: WorkspaceMaps = {env: {} for env in ENV_KEYS}
     for env in ENV_KEYS:
         if env not in raw:
             if require_all:
-                raise _validation_error(f'missing required environment `{env}`', field_path)
+                raise _validation_error(
+                    f'missing required environment `{env}`', field_path
+                )
             continue
         parsed[env] = _parse_path_map(raw[env], f'{field_path}.{env}')
     return parsed
@@ -82,8 +85,7 @@ class WorkspaceConfig:
 
         parsed = _parse_environment_maps(raw, field_path, require_all=True)
         merged: dict[Environment, PathMap] = {
-            env: _merge_path_maps(parsed[env], common[env])
-            for env in ENV_KEYS
+            env: _merge_path_maps(parsed[env], common[env]) for env in ENV_KEYS
         }
         return cls(**merged)
 
@@ -102,13 +104,17 @@ class ExtensionConfig:
         # Backward-compatible tuple/list format: ['library' | 'path', 'module.or.path']
         if isinstance(raw, (tuple, list)):
             if len(raw) != 2:
-                raise _validation_error('tuple/list extension must have 2 items', field_path)
+                raise _validation_error(
+                    'tuple/list extension must have 2 items', field_path
+                )
             kind, expr = raw
         elif isinstance(raw, dict):
             kind = raw.get('kind')
             expr = raw.get('expr')
         else:
-            raise _validation_error('expected a 2-item list/tuple or an object', field_path)
+            raise _validation_error(
+                'expected a 2-item list/tuple or an object', field_path
+            )
 
         if kind not in ('library', 'path'):
             raise _validation_error('kind must be `library` or `path`', field_path)
@@ -121,7 +127,7 @@ class ExtensionConfig:
 
 @dataclass(frozen=True)
 class Config:
-    out_dir_name: str = DEFAULT_OUT_DIR
+    out_dir_name: str
     workspaces: list[WorkspaceConfig] = field(default_factory=list)
     extensions: list[ExtensionConfig] = field(default_factory=list)
 
@@ -130,7 +136,7 @@ class Config:
         if not isinstance(data, dict):
             raise _validation_error('expected top-level object', 'config')
 
-        out_dir_name = data.get('outDirName', data.get('out_dir', DEFAULT_OUT_DIR))
+        out_dir_name = data.get('outDirName', data.get('out_dir', 'Generated'))
         if not isinstance(out_dir_name, str) or out_dir_name.strip() == '':
             raise _validation_error('must be a non-empty string', 'outDirName')
 
@@ -148,14 +154,18 @@ class Config:
         ]
 
         raw_extensions = _parse_list_field(data.get('extensions', []), 'extensions')
-        extensions = [ExtensionConfig.from_raw(raw, i) for i, raw in enumerate(raw_extensions)]
+        extensions = [
+            ExtensionConfig.from_raw(raw, i) for i, raw in enumerate(raw_extensions)
+        ]
 
         return cls(out_dir_name, workspaces, extensions)
 
 
 def read_config(config_file: Path):
     if not config_file.exists():
-        raise ConfigFileNotFoundError('Config file not found. Run the program in init mode to create one!')
+        raise ConfigFileNotFoundError(
+            'Config file not found. Run the program in init mode to create one!'
+        )
 
     try:
         data = json.loads(config_file.read_text())
