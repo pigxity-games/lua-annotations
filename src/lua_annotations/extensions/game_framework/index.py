@@ -48,7 +48,7 @@ class IndexExtension(Extension):
 
             # build final file
             out = [HEADER] + resolver.get_import_lines() + [''] + list(imports.values()) + type_lines + ['', 'return nil']
-            ctx.create_file(env, 'Types/Index.lua', '\n'.join(out))
+            ctx.create_file(env, 'TypeIndex.lua', '\n'.join(out))
 
     def on_build_indexed(self, ctx: AnnotationBuildCtx):
         module = ctx.annotation.adornee

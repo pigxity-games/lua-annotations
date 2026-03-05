@@ -30,12 +30,15 @@ def create_config(workdir: Path, config_file: Path):
         print('Config file already exists. Skipping')
 
 
+def resolve_rel_path(path: str, lua_expr: str, workdir: Path, env: Environment):
+    if '@' in path:
+        return process_tags(path, lua_expr, env, workdir)
+    return workdir / Path(path), lua_expr
+
+
 def iter_rel_paths(path_map: dict[str, str], workdir: Path, env: Environment):
     for path, lua_expr in path_map.items():
-        if '@' in path:
-            p, lua_expr = process_tags(path, lua_expr, env, workdir)
-        else:
-            p = workdir / Path(path)
+        p, lua_expr = resolve_rel_path(path, lua_expr, workdir, env)
 
         if not p.is_dir():
             print(f'WARNING: directory {p.as_posix()} does not exist')
@@ -72,7 +75,7 @@ def process_tags(raw: str, raw_expr: str, env: Environment, workdir: Path):
         if not ext_dir:
             raise ConfigError(f'wally package {data} not found under {packages.as_posix()}')
 
-        return ext_dir / data, f'require({raw_expr}.{data})'
+        return ext_dir / data, f'require({raw_expr}["{data}"])'
 
     raise ConfigError(f'invalid path tag: {raw}')
 
@@ -112,7 +115,13 @@ def build(workdir: Path, config: Config):
         for env in ENVIRONMENTS:
             # process output root
             rel_paths = workspace[env]
-            root_path = next(iter(rel_paths.keys()))
+            root_key = workspace_cfg.get_root(env)
+            root_expr = workspace_cfg.get(env)[root_key]
+            root_path, _ = resolve_rel_path(root_key, root_expr, workdir, env)
+            if not root_path.is_dir():
+                raise ConfigError(
+                    f'root directory `{root_path.as_posix()}` does not exist for `{env}` in this workspace.'
+                )
             output_root = root_path / Path(config.out_dir_name)
 
             shutil.rmtree(output_root, True)

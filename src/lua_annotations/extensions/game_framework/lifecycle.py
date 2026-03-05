@@ -60,7 +60,7 @@ class LifecycleExtension(Extension):
                         'getAdornee': svc.adornee.get_path(function=True, require=True),  # pyright: ignore[reportAttributeAccessIssue]
                         'kind': svc.name,
                     }
-                    | ({'tags': svc.args_val[0]} if svc.name == 'component' else {})
+                    | ({'tags': svc.args_val[0]} if svc.name == 'component' and svc.args_val else {})
                 )
                 for svc in services
                 if svc.name != 'dependency'

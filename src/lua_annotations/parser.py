@@ -38,6 +38,9 @@ def map_param_list(params: list[str]):
     return out
 
 
+RETURN_TABLE_MODULE_NAME = '__return_table__'
+
+
 # parsing
 @dataclass
 class FileParser:
@@ -151,29 +154,49 @@ class FileParser:
 
         return ReturnedValue(self.file, name, returned_name, is_submodule)
 
-    def _get_function(self, text: str, modules: dict[str, LuaModule]):
+    def _get_function(
+        self,
+        text: str,
+        modules: dict[str, LuaModule],
+        returned: ReturnDefinition,
+    ):
         match = FUNCTION_REGEX.search(text)
         if not match:
             self.error(text, 'function is incorrectly defined')
         assert match is not None
 
-        module_name: str = match.group(1)
-        fun_name: str = match.group(2)
-        raw_params: str = match.group(3)
+        module_name = match.group(1)
+        fun_name: str = match.group(2) or ''
+        raw_params: str = match.group(3) or ''
         return_type: str = match.group(4) or 'any'
 
-        if not (module_name or fun_name):
+        if fun_name == '':
             self.error(text, 'method is incorrectly defined')
 
-        if not raw_params.strip() == '':
+        if raw_params.strip() != '':
             params = remove_whitespace(raw_params.split(','))
             param_dict = map_param_list(params)
         else:
             param_dict = {}
 
-        if not module_name in modules:
-            self.error(module_name, 'cannot use method annotations for an unindexed module.')
-        return LuaMethod(fun_name, modules[module_name], param_dict, return_type)
+        if module_name is not None:
+            if module_name not in modules:
+                self.error(module_name, 'cannot use method annotations for an unindexed module.')
+            return LuaMethod(fun_name, modules[module_name], param_dict, return_type)
+
+        # Allow `function foo()` to be a method annotation target when `foo`
+        # is exported from a literal return table: `return { alias = foo }`.
+        returned_name, is_submodule = returned.get_returned_name(fun_name)
+        if returned.type != 'dict' or not (returned_name and is_submodule):
+            self.error(fun_name, 'cannot use method annotations for an unindexed module.')
+        assert returned_name is not None
+
+        module = modules.get(RETURN_TABLE_MODULE_NAME)
+        if module is None:
+            module = LuaModule(self.file, RETURN_TABLE_MODULE_NAME, self.file_name, False)
+            modules[module.name] = module
+
+        return LuaMethod(returned_name, module, param_dict, return_type)
 
     # main functions
     def error(self, text: str, message: str):
@@ -217,7 +240,7 @@ class FileParser:
 
                     # methods
                     if scope == 'method':
-                        method = self._get_function(line, self.modules)
+                        method = self._get_function(line, self.modules, returned)
                         set_adornee(self.cur_annotations, method)
 
                     # module

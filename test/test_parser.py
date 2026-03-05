@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import pytest
+import pytest  # pyright: ignore[reportMissingImports]
 
 from lua_annotations.api.annotations import AnnotationDef, SortedRegistry
 from lua_annotations.api.lua_dict import LuaPathResolver
@@ -164,3 +164,33 @@ return Missing
     assert err.file_name == "Broken"
     assert err.line_num == 2
     assert "cannot use method annotations for an unindexed module" in str(err)
+
+
+def test_parser_allows_method_annotation_for_literal_return_table_function(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        "LiteralReturn.lua",
+        """--@methodAnn
+function test()
+end
+
+return {
+    test = test
+}
+""",
+    )
+
+    method_anot = next(a for a in parser.annotations if a.name == "methodAnn")
+    assert isinstance(method_anot.adornee, LuaMethod)
+    assert method_anot.adornee.name == "test"
+
+    workspace: Workspace = {
+        "server": {tmp_path: ":Project"},
+        "client": {},
+        "shared": {},
+    }
+    resolver = LuaPathResolver(workspace)
+    assert (
+        method_anot.adornee.get_path(require=True).to_lua(resolver)
+        == "require(ServerScriptService.Project.LiteralReturn).test"
+    )

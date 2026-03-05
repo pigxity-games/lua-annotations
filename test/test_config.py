@@ -1,6 +1,6 @@
 import json
 
-import pytest
+import pytest  # pyright: ignore[reportMissingImports]
 
 from lua_annotations.config import Config, read_config
 from lua_annotations.exceptions import (
@@ -141,6 +141,35 @@ def test_read_config_workspace_values_override_workspace_common(tmp_path):
     assert shared["src/shared"] == ":"
     assert shared["src/common/shared"] == ":Common"
     assert list(shared.keys())[0] == "src/shared"
+
+
+def test_read_config_tracks_workspace_root_as_first_declared_env_path(tmp_path):
+    config_file = tmp_path / "annotations.config.json"
+    config_file.write_text(
+        json.dumps(
+            {
+                "workspace_common": {
+                    "client": {"src/common/client": ":Common"},
+                    "server": {"src/common/server": ":Common"},
+                    "shared": {"src/common/shared": ":Common"},
+                },
+                "workspaces": [
+                    {
+                        "client": {"src/client-root": ":", "src/client-extra": ":Extra"},
+                        "server": {"src/server-root": ":", "src/server-extra": ":Extra"},
+                        "shared": {"src/shared-root": ":", "src/shared-extra": ":Extra"},
+                    }
+                ],
+            }
+        )
+    )
+
+    config = read_config(config_file)
+    workspace = config.workspaces[0]
+
+    assert workspace.get_root("client") == "src/client-root"
+    assert workspace.get_root("server") == "src/server-root"
+    assert workspace.get_root("shared") == "src/shared-root"
 
 
 def test_read_config_raises_file_not_found_error(tmp_path):

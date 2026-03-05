@@ -1,14 +1,14 @@
 from dataclasses import dataclass, field, fields, replace
 from graphlib import TopologicalSorter
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Literal, Optional
+from typing import TYPE_CHECKING, Any, Callable, Literal
 
 ENVIRONMENTS = ('client', 'server', 'shared')
 
 if TYPE_CHECKING:
     from lua_annotations.build_process import BuildProcessCtx, PostProcessCtx
     from lua_annotations.parser_schemas import Annotation
-    from parser import FileParser
+    from lua_annotations.parser import FileParser
 
 ARG_SEP = ', '
 
@@ -47,8 +47,8 @@ class AnnotationDef:
     scope: scope = 'module'
     mutual_include: list['AnnotationDef'] = field(default_factory=list)
     mutual_exclude: list['AnnotationDef'] = field(default_factory=list)
-    on_build: Optional[OnBuild] = None
-    extends: Optional[AnnotationDef] = None
+    on_build: OnBuild | None = None
+    extends: AnnotationDef | None = None
 
     def extend(self, other: AnnotationDef):
         updates = {}

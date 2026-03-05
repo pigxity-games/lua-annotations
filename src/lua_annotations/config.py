@@ -13,6 +13,7 @@ type Environment = Literal['server', 'client', 'shared']
 type ExtensionKind = Literal['library', 'path']
 type PathMap = dict[str, str]
 type WorkspaceMaps = dict[Environment, PathMap]
+type WorkspaceRoots = dict[Environment, str]
 ENV_KEYS: tuple[Environment, ...] = ('client', 'server', 'shared')
 
 
@@ -67,9 +68,15 @@ class WorkspaceConfig:
     client: PathMap
     server: PathMap
     shared: PathMap
+    client_root: str
+    server_root: str
+    shared_root: str
 
-    def get(self, env: Environment):
+    def get(self, env: Environment) -> PathMap:
         return getattr(self, env)
+
+    def get_root(self, env: Environment) -> str:
+        return getattr(self, f'{env}_root')
 
     @classmethod
     def from_raw(cls, raw: Any, index: int, common: WorkspaceMaps):
@@ -78,8 +85,16 @@ class WorkspaceConfig:
             raise _validation_error('expected an object', field_path)
 
         parsed = _parse_environment_maps(raw, field_path, require_all=True)
-        merged: dict[Environment, PathMap] = {env: _merge_path_maps(parsed[env], common[env]) for env in ENV_KEYS}
-        return cls(**merged)
+        roots: WorkspaceRoots = {env: next(iter(parsed[env].keys())) for env in ENV_KEYS}
+        merged: WorkspaceMaps = {env: _merge_path_maps(parsed[env], common[env]) for env in ENV_KEYS}
+        return cls(
+            merged['client'],
+            merged['server'],
+            merged['shared'],
+            roots['client'],
+            roots['server'],
+            roots['shared'],
+        )
 
 
 @dataclass(frozen=True)
