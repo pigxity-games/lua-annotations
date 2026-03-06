@@ -80,7 +80,6 @@ class BuildProcessCtx(ProcessCtx):
             # meta proc
             if meta:
                 text = meta.process(text)
-                print(text)
 
             if ANNOTATION_PREFIX in text:
                 parser = FileParser(self.reg, file, self)

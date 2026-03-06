@@ -2,6 +2,7 @@ import importlib
 from pathlib import Path
 import shutil
 import sys
+from threading import Thread
 import time
 from datetime import datetime
 
@@ -14,7 +15,7 @@ from .build_process import (
     Workspace,
     get_template,
 )
-from .config import Config, ExtensionConfig, read_config
+from .config import Config, ExtensionConfig, WorkspaceConfig, read_config
 from .exceptions import BuildError, ConfigError
 from .extensions import default as default_ext
 
@@ -75,70 +76,80 @@ def process_tags(raw: str, raw_expr: str, env: Environment, workdir: Path):
         if not ext_dir:
             raise ConfigError(f'wally package {data} not found under {packages.as_posix()}')
 
-        return ext_dir / data, f'require({raw_expr}["{data}"])'
+        return ext_dir / data, f'{raw_expr}["_Index"]["{ext_dir.name}"]["{data}"]'
 
     raise ConfigError(f'invalid path tag: {raw}')
+
+
+def _process_workspace(workdir: Path, config: Config, workspace_cfg: WorkspaceConfig):
+    # process workspace
+    workspace: Workspace = {}
+    for env in ENVIRONMENTS:
+        path_map = workspace_cfg.get(env)
+        rel_paths = dict(iter_rel_paths(path_map, workdir, env))
+        if not rel_paths:
+            raise ConfigError(f'no valid directories were found for `{env}` in this workspace.')
+        workspace[env] = rel_paths
+
+    # load extensions
+    reg = ExtensionRegistry()
+    default_ext.load(reg)
+
+    for ext in config.extensions:
+        # py_entry
+        module = import_extension(ext, workdir)
+        load_fn = getattr(module, 'load')
+
+        if not callable(load_fn):
+            raise BuildError(f'module {ext.expr} does not have a `load()` function')
+        load_fn(reg)
+
+    reg = reg.sort_extensions()
+    print(f'loaded {len(reg.anot_registry)} annotations')
+
+    # env processing
+    build_contexts: BuildCtxList = {}
+
+    for env in ENVIRONMENTS:
+        # process output root
+        rel_paths = workspace[env]
+        root_key = workspace_cfg.get_root(env)
+        root_expr = workspace_cfg.get(env)[root_key]
+        root_path, _ = resolve_rel_path(root_key, root_expr, workdir, env)
+        if not root_path.is_dir():
+            raise ConfigError(
+                f'root directory `{root_path.as_posix()}` does not exist for `{env}` in this workspace.'
+            )
+        output_root = root_path / Path(config.out_dir_name)
+
+        shutil.rmtree(output_root, True)
+        output_root.mkdir(parents=True, exist_ok=True)
+
+        # create and use a ctx
+        ctx = BuildProcessCtx(reg, root_path, workspace, rel_paths, output_root, env)
+        for path in rel_paths:
+            ctx.process_dir(path)
+
+        build_contexts[env] = ctx
+
+    # run post-build hooks
+    if build_contexts:
+        ctx = PostProcessCtx(reg, workdir, workspace, build_contexts)
+        for hook in reg.post_build_hooks:
+            hook(ctx)
 
 
 def build(workdir: Path, config: Config):
     init_time = datetime.now()
 
+    threads: list[Thread] = []
     for workspace_cfg in config.workspaces:
-        # process workspace
-        workspace: Workspace = {}
-        for env in ENVIRONMENTS:
-            path_map = workspace_cfg.get(env)
-            rel_paths = dict(iter_rel_paths(path_map, workdir, env))
-            if not rel_paths:
-                raise ConfigError(f'no valid directories were found for `{env}` in this workspace.')
-            workspace[env] = rel_paths
+        t = Thread(target=_process_workspace, args=(workdir, config, workspace_cfg))
+        threads.append(t)
+        t.start()
 
-        # load extensions
-        reg = ExtensionRegistry()
-        default_ext.load(reg)
-
-        for ext in config.extensions:
-            # py_entry
-            module = import_extension(ext, workdir)
-            load_fn = getattr(module, 'load')
-
-            if not callable(load_fn):
-                raise BuildError(f'module {ext.expr} does not have a `load()` function')
-            load_fn(reg)
-
-        reg = reg.sort_extensions()
-        print(f'loaded {len(reg.anot_registry)} annotations')
-
-        # env processing
-        build_contexts: BuildCtxList = {}
-
-        for env in ENVIRONMENTS:
-            # process output root
-            rel_paths = workspace[env]
-            root_key = workspace_cfg.get_root(env)
-            root_expr = workspace_cfg.get(env)[root_key]
-            root_path, _ = resolve_rel_path(root_key, root_expr, workdir, env)
-            if not root_path.is_dir():
-                raise ConfigError(
-                    f'root directory `{root_path.as_posix()}` does not exist for `{env}` in this workspace.'
-                )
-            output_root = root_path / Path(config.out_dir_name)
-
-            shutil.rmtree(output_root, True)
-            output_root.mkdir(parents=True, exist_ok=True)
-
-            # create and use a ctx
-            ctx = BuildProcessCtx(reg, root_path, workspace, rel_paths, output_root, env)
-            for path in rel_paths:
-                ctx.process_dir(path)
-
-            build_contexts[env] = ctx
-
-        # run post-build hooks
-        if build_contexts:
-            ctx = PostProcessCtx(reg, workdir, workspace, build_contexts)
-            for hook in reg.post_build_hooks:
-                hook(ctx)
+    for t in threads:
+        t.join()
 
     # logging
     delta = datetime.now() - init_time

@@ -53,9 +53,10 @@ class AnnotationDef:
     def extend(self, other: AnnotationDef):
         updates = {}
         for f in fields(type(self)):
+            if f.name == 'extends':
+                continue
             updates[f.name] = merge(getattr(self, f.name), getattr(other, f.name))
-
-        other.extends = self
+        updates['extends'] = self
         return replace(other, **updates)
 
 

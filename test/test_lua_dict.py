@@ -107,7 +107,7 @@ def test_convert_dict_includes_imports_in_environment_order(tmp_path: Path):
     )
 
     assert out.startswith(
-        'local PlayerScripts = game:GetService("Players").LocalPlayer:FindFirstChildOfClass("PlayerScripts") :: PlayerScripts\n'
+        'local PlayerScripts = game:GetService("Players").LocalPlayer.PlayerScripts\n'
         'local ServerScriptService = game:GetService("ServerScriptService")\n'
         'local ReplicatedStorage = game:GetService("ReplicatedStorage")\n\n'
         "return {\n"

@@ -22,8 +22,8 @@ DICT_REGEX = re.compile(r'(\w+)\s*[:=]\s*(.*?)(?:,\s*|$)', re.MULTILINE)
 # use dict_regex for group 2 matches
 FUNCTION_REGEX = re.compile(r'^\s*(?:function\s+)?(?:(\w+)[.:])?(\w+)\s*(?:=\s*function\s*)?\(\s*([^)]*)\s*\)\s*(?::\s([^\s]+))?')
 
-# group 2 if single return, group 1 if table returned (use dict_regex)
-RETURN_REGEX = re.compile(r'return\s*\{([\s\S]*?)\}\s*$|^return\s(\w*)', re.MULTILINE)
+# group 2 if single return expression, group 1 if table returned (use dict_regex)
+RETURN_REGEX = re.compile(r'return\s*\{([\s\S]*?)\}\s*$|^return\s([\w()]*)', re.MULTILINE)
 
 # group 1 exists if exported, group 2 = name, group 3 = contents
 TYPE_REGEX = re.compile(r'^\s*(export\b)?\s*type\s+(\w+)\s*=\s*(\{[\s\S]*?\}|[^\n]+)\s*\s*$', re.MULTILINE)

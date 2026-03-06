@@ -31,8 +31,37 @@ def proc_deps(deps: list[str]) -> dict[str, list[str]]:
     return out
 
 
+def get_service_name(svc: Annotation):
+    return svc.adornee.returned_name  # pyright: ignore[reportAttributeAccessIssue]
+
+
 def get_topo_graph(services: list[Annotation], key: str) -> dict[str, list[str]]:
-    return {svc.adornee.returned_name: filter_deps(svc.kwargs_val.get(key, {})) for svc in services}  # pyright: ignore[reportAttributeAccessIssue]
+    return {get_service_name(svc): filter_deps(svc.kwargs_val.get(key, [])) for svc in services}
+
+
+def merge_graphs(*graphs: dict[str, list[str]]) -> dict[str, list[str]]:
+    merged: dict[str, list[str]] = {}
+
+    for graph in graphs:
+        for node, deps in graph.items():
+            merged.setdefault(node, [])
+
+            for dep in deps:
+                if dep not in merged[node]:
+                    merged[node].append(dep)
+
+    return merged
+
+
+def get_runtime_load_order(services: list[Annotation]):
+    graph = merge_graphs(
+        get_topo_graph(services, 'depends'),
+        get_topo_graph(services, 'load_after'),
+    )
+
+    runtime_load_exclude = {get_service_name(svc) for svc in services if svc.name == 'dependency'}
+    sorter = TopologicalSorter(graph)
+    return [name for name in sorter.static_order() if name not in runtime_load_exclude]
 
 
 type AnotDict = dict[Environment, list[Annotation]]
@@ -66,13 +95,8 @@ class LifecycleExtension(Extension):
                 if svc.name != 'dependency'
             }
 
-            load_after_graph = get_topo_graph(services, 'load_after')
-            runtime_load_exclude = tuple(load_after_graph.keys())
-
-            sorter = TopologicalSorter(get_topo_graph(services, 'depends') | load_after_graph)
-
             try:
-                self.manifestExt.manifest[env]['load_order'] = list([s for s in sorter.static_order() if s not in runtime_load_exclude])
+                self.manifestExt.manifest[env]['load_order'] = get_runtime_load_order(services)
             except CycleError as e:
                 raise BuildError(f"Cycle detected for service graph: {e.args}") from e
 
@@ -98,7 +122,7 @@ class LifecycleExtension(Extension):
                 'component',
                 retention='build',
                 args=[default_list],
-                kwargs={'depends': default_list},
+                kwargs={'depends': default_list, 'data': str},
                 on_build=self.add_service,
             )
         )

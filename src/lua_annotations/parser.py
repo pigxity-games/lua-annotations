@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from pathlib import Path
+import re
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from .api.annotations import AnnotationBuildCtx, AnnotationDef, SortedRegistry
@@ -39,6 +40,20 @@ def map_param_list(params: list[str]):
 
 
 RETURN_TABLE_MODULE_NAME = '__return_table__'
+
+
+def unwrap_return_module(expr: str) -> str | None:
+    cur = expr.strip()
+    while True:
+        direct = re.fullmatch(r'(\w+)', cur)
+        if direct:
+            return direct.group(1)
+
+        wrapper = re.fullmatch(r'\w+\(\s*(.+)\s*\)', cur)
+        if not wrapper:
+            return None
+
+        cur = wrapper.group(1).strip()
 
 
 # parsing
@@ -121,15 +136,25 @@ class FileParser:
 
             return out
 
+    def _map_dict_return(self, v: Any) -> str:
+        module_name = unwrap_return_module(v)
+        if not module_name:
+            self.error(v, 'submodule export is incorrectly defined')
+
+        return module_name
+
     def _get_returned(self, text: str, default_name: str):
         match = RETURN_REGEX.search(text)
         if not match:
             return
 
-        single: str = match.group(2)
+        single_expr: str = (match.group(2) or '').strip()
 
-        if single:
-            return ReturnDefinition(default_name, 'single', single_module=single)
+        if single_expr:
+            single_module = unwrap_return_module(single_expr)
+            if not single_module:
+                self.error(text, 'single module export is incorrectly defined')
+            return ReturnDefinition(default_name, 'single', single_module=single_module)
         else:
             tablestr: str = match.group(1)
             if not tablestr:
@@ -137,7 +162,7 @@ class FileParser:
 
             dict_data = self._get_dict_data(tablestr)
             if dict_data:
-                return ReturnDefinition(default_name, 'dict', dict_val=reverse_dict(dict_data))
+                return ReturnDefinition(default_name, 'dict', dict_val={self._map_dict_return(v): k for k, v in dict_data.items()})
             else:
                 self.error(text, 'module export is not a table')
 

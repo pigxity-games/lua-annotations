@@ -104,7 +104,7 @@ return {
 ```
 
 !!! note
-    * We create an `active` field inside of the component as loops do not automatically endr upon component removal.
+    * We create an `active` field inside of the component as loops do not automatically end upon component removal.
     * Returning a table like this exports the components as "submodules," allowing you to return multiple per file (more info in the `core` docs).
 
 ## The `data` argument
@@ -125,13 +125,13 @@ return m
 ```
 
 !!! note
-    * Making it a dependency is required to ensure load order.
+    * A dependency is similar to a service, except that it is not loaded at runtime. It's useful for modules which contain pure data that you still want/need to DI.
     * Each registry may only be used for one component class.
 
 Creating the component:
 
 ```lua title="src/client/Counter.lua"
---@component, Counter, data=:registries/CounterRegistry
+--@component, Counter, data=CounterRegistry
 local counter = {
     val = 0
 }
@@ -156,6 +156,6 @@ function service:_init(deps)
     print(counter1.val)
 
     --creating a new component (`.create()` is added at runtime)
-    local counter3 = Counters.create(workspace.Part3, {val = 123})
+    local counter3 = Counters.c`reate(workspace.Part3, {val = 123})
 end
 ```

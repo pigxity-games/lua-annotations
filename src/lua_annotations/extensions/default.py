@@ -77,7 +77,9 @@ class ManifestExtension(Extension):
             data = self.manifest[env]
 
             converted = convert_dict(LuaPathResolver(ctx.workspace), data, prefix='local manifest =')
-            out = template.replace('--manifest', converted)
+            out = template \
+                .replace(f'(env)', env) \
+                .replace('--manifest', converted)
 
             ctx.create_file(env, f'AnnotationInit.{env}.lua', out)
 

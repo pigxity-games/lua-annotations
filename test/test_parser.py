@@ -194,3 +194,63 @@ return {
         method_anot.adornee.get_path(require=True).to_lua(resolver)
         == "require(ServerScriptService.Project.LiteralReturn).test"
     )
+
+
+def test_parser_unwraps_wrapper_functions_in_single_return(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        "WrappedReturn.lua",
+        """--@moduleAnn
+local PropertyStorage = {}
+
+return class(PropertyStorage)
+""",
+    )
+
+    module = parser.modules["PropertyStorage"]
+    assert isinstance(module, LuaModule)
+    assert module.returned_name == "WrappedReturn"
+
+
+def test_parser_unwraps_wrapper_functions_in_table_return(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        "WrappedSubmodule.lua",
+        """--@moduleAnn
+local CameraRegion = {}
+
+return {
+    CameraRegion = class(CameraRegion),
+}
+""",
+    )
+
+    module = parser.modules["CameraRegion"]
+    assert isinstance(module, LuaModule)
+    assert module.submodule is True
+    assert module.returned_name == "CameraRegion"
+
+
+def test_parser_handles_multi_submodule_table_return(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        "CameraRegions.lua",
+        """--@moduleAnn
+local CameraRegion = {}
+
+--@moduleAnn
+local ZoneCameraRegion = {}
+
+return {
+    CameraRegion = CameraRegion,
+    ZoneCameraRegion = ZoneCameraRegion,
+}
+""",
+    )
+
+    camera_region = parser.modules["CameraRegion"]
+    zone_camera_region = parser.modules["ZoneCameraRegion"]
+    assert camera_region.returned_name == "CameraRegion"
+    assert zone_camera_region.returned_name == "ZoneCameraRegion"
+    assert camera_region.submodule is True
+    assert zone_camera_region.submodule is True
