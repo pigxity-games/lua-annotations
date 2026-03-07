@@ -3,6 +3,8 @@ from pathlib import Path
 import re
 from typing import TYPE_CHECKING, Any, TypeVar
 
+from lua_annotations.build_process import logger
+
 from .api.annotations import AnnotationBuildCtx, AnnotationDef, SortedRegistry
 from .parser_schemas import *
 
@@ -230,7 +232,7 @@ class FileParser:
     def parse(self, text: str):
         returned = self._get_returned(text, self.file_name)
         if not returned:
-            print(f'Skipping file {self.file_name}; doesn\'t return a value')
+            logger().warn(f'Skipping file {self.file_name}; doesn\'t return a value')
             return
         lines = [l.rstrip() for l in text.splitlines()]
 

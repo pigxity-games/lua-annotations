@@ -1,5 +1,5 @@
 from graphlib import CycleError, TopologicalSorter
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from lua_annotations.api.annotations import (
     ENVIRONMENTS,
@@ -9,9 +9,9 @@ from lua_annotations.api.annotations import (
     Extension,
 )
 from lua_annotations.api.arguments import default_list
-from lua_annotations.build_process import Environment, PostProcessCtx
+from lua_annotations.build_process import Environment, PostProcessCtx, logger
 from lua_annotations.exceptions import BuildError
-from lua_annotations.parser_schemas import Annotation
+from lua_annotations.parser_schemas import Annotation, ReturnedValue
 
 if TYPE_CHECKING:
     from lua_annotations.extensions.default import ManifestExtension
@@ -21,25 +21,65 @@ def filter_deps(deps: list[str]) -> list[str]:
     return [d for d in deps if ':' not in d]
 
 
-def proc_deps(deps: list[str]) -> dict[str, list[str]]:
+def dep_error(svc: Annotation, dep: str, msg: str):
+        raise BuildError(msg + get_service_name(svc) + ': ' + dep)
+
+
+def proc_deps(svc: Annotation, service_map: dict[str, Annotation]):
     out = {'services': [], 'remotes': []}
-    for dep in deps:
+
+    if svc.name == 'component':
+        out['components'] = []
+
+    for dep in svc.kwargs_val.get('depends', []):
         if ':' in dep:
             out['remotes'].append(dep.split(':')[1])
+            continue
+
+        dep_anot = service_map.get(dep)
+        if not dep_anot:
+            dep_error(svc, dep, f'Invalid dependency for service')
+
+        if dep_anot.name == 'component':  # pyright: ignore[reportOptionalMemberAccess]
+            if svc.name != 'component':
+                dep_error(svc, dep, f'Tried to import component in service:')
+
+            out['components'].append(dep)
         else:
             out['services'].append(dep)
+
+    return out
+
+
+def service_todict(svc: Annotation, service_map: dict[str, Annotation]):    
+    out = {
+        'depends': proc_deps(svc, service_map),
+        'getAdornee': svc.adornee.get_path(function=True, require=True),  # pyright: ignore[reportAttributeAccessIssue]
+        'kind': svc.name,
+    }
+    
+    if svc.name == 'component':
+        out['tags'] = svc.args_val[0]
+        
+        data_svc = svc.kwargs_val.get('data', [])
+        if data_svc and not service_map.get(data_svc):
+            logger().warn(f'Invalid data dependency for component {get_service_name(svc)}: "{data_svc}"; ommiting')
+        else:
+            out['data_service'] = data_svc
+
     return out
 
 
 def get_service_name(svc: Annotation):
-    return svc.adornee.returned_name  # pyright: ignore[reportAttributeAccessIssue]
+    assert isinstance(svc.adornee, ReturnedValue)
+    return svc.adornee.returned_name
 
 
-def get_topo_graph(services: list[Annotation], key: str) -> dict[str, list[str]]:
+def get_topo_graph(services: list[Annotation], key: str):
     return {get_service_name(svc): filter_deps(svc.kwargs_val.get(key, [])) for svc in services}
 
 
-def merge_graphs(*graphs: dict[str, list[str]]) -> dict[str, list[str]]:
+def merge_graphs(*graphs: dict[str, list[str]]):
     merged: dict[str, list[str]] = {}
 
     for graph in graphs:
@@ -83,14 +123,7 @@ class LifecycleExtension(Extension):
             services = self.services[env] + self.services['shared']
 
             self.manifestExt.manifest[env]['services'] = {
-                svc.adornee.returned_name: (  # pyright: ignore[reportAttributeAccessIssue]
-                    {
-                        'depends': proc_deps(svc.kwargs_val.get('depends', [])),
-                        'getAdornee': svc.adornee.get_path(function=True, require=True),  # pyright: ignore[reportAttributeAccessIssue]
-                        'kind': svc.name,
-                    }
-                    | ({'tags': svc.args_val[0]} if svc.name == 'component' and svc.args_val else {})
-                )
+                get_service_name(svc): service_todict(svc, {get_service_name(svc): svc for svc in services})
                 for svc in services
                 if svc.name != 'dependency'
             }

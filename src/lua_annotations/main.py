@@ -59,6 +59,3 @@ if __name__ == '__main__':
         main()
     except KeyboardInterrupt:
         print('\nStopped watching.')
-    except LuaAnnotationsError as exc:
-        print(f'Error: {exc}')
-        sys.exit(1)

@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 import json
 from pathlib import Path
+import threading
+import traceback
 from typing import Any, Literal
 from importlib.resources import files
 
@@ -30,6 +32,48 @@ class FileBuildError(BuildError):
 
     def __post_init__(self):
         super().__init__(self.message)
+
+
+WARN = '\033[93m'
+ERROR = '\33[91m'
+WORKSPACE = '\033[96m'
+ENDC = '\033[0m'
+
+@dataclass
+class WorkspaceLogger:
+    id: int | None=None
+
+    def _get_header(self):
+        if self.id is not None:
+             return f'{WORKSPACE}[WS {self.id}]{ENDC}'
+        else:
+            return ''
+
+    def _log(self, msg: str, color: str=''):
+        print(f'{self._get_header()} {color}{msg}{ENDC}')
+
+    def info(self, msg: str):
+        self._log(msg)
+
+    def error(self, msg: str):
+        self._log('ERROR: ' + msg, ERROR)
+
+    def exception(self, error: Exception):
+        self.error(type(error).__name__)
+        raise error
+
+    def warn(self, msg: str):
+        self._log('WARNING: ' + msg, WARN)
+
+
+GLOBAL_LOGGER = WorkspaceLogger()
+_local = threading.local()
+
+def set_logger(log: WorkspaceLogger):
+    _local.logger = log
+
+def logger() -> WorkspaceLogger:
+    return getattr(_local, "logger", GLOBAL_LOGGER)
 
 
 @dataclass

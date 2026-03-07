@@ -17,7 +17,9 @@ local function useCollectionTag(tag, consumer)
         end
 
         local cleanup = consumer(inst)
-        cleanups[inst] = cleanup
+        if cleanup then
+            cleanups[inst] = cleanup
+        end
     end
 
     local function onRemove(inst)

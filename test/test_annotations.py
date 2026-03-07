@@ -1,9 +1,10 @@
-from types import SimpleNamespace
+from pathlib import Path
 
-from lua_annotations.api.annotations import ExtensionRegistry
+from lua_annotations.api.annotations import AnnotationDef, ExtensionRegistry
 from lua_annotations.extensions import default as default_ext
 from lua_annotations.extensions.game_framework import main as game_framework_ext
 from lua_annotations.extensions.game_framework.lifecycle import get_runtime_load_order
+from lua_annotations.parser_schemas import Annotation, ReturnedValue
 
 
 def test_service_annotation_keeps_dependency_parent():
@@ -19,11 +20,9 @@ def test_service_annotation_keeps_dependency_parent():
 
 
 def make_service_anot(name: str, kind: str, kwargs: dict[str, list[str]]):
-    return SimpleNamespace(
-        name=kind,
-        kwargs_val=kwargs,
-        adornee=SimpleNamespace(returned_name=name),
-    )
+    anot = Annotation(AnnotationDef(kind), kind, [], kwargs)
+    anot.adornee = ReturnedValue(Path(f'{name}.lua'), name, name)
+    return anot
 
 
 def test_runtime_load_order_keeps_depends_and_load_after_edges():
@@ -42,7 +41,7 @@ def test_runtime_load_order_keeps_depends_and_load_after_edges():
 def test_runtime_load_order_excludes_dependency_nodes():
     services = [
         make_service_anot('CounterRegistry', 'dependency', {'load_after': ['Counter']}),
-        make_service_anot('Counter', 'component', {'depends': ['CounterRegistry']}),
+        make_service_anot('Counter', 'component', {}),
     ]
 
     load_order = get_runtime_load_order(services)
