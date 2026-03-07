@@ -38,11 +38,12 @@ type function getFields(T: type)
 end
 
 --@indexed
-local function class<T>(class: T)
+-- creates a class out of a module with optional default data (mutates existing module and data table)
+local function class<T>(class: T, data: {})
     class.__index = class 
 
     function class.new(...)
-        local self = setmetatable({}, class)
+        local self = setmetatable(data or {}, class)
         if class._init then
             class._init(self, ...)
         end

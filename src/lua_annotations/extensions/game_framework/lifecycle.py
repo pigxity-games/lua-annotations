@@ -57,7 +57,7 @@ def service_todict(svc: Annotation, service_map: dict[str, Annotation]):
         'getAdornee': svc.adornee.get_path(function=True, require=True),  # pyright: ignore[reportAttributeAccessIssue]
         'kind': svc.name,
     }
-    
+
     if svc.name == 'component':
         out['tags'] = svc.args_val[0]
         
@@ -125,7 +125,6 @@ class LifecycleExtension(Extension):
             self.manifestExt.manifest[env]['services'] = {
                 get_service_name(svc): service_todict(svc, {get_service_name(svc): svc for svc in services})
                 for svc in services
-                if svc.name != 'dependency'
             }
 
             try:
@@ -144,19 +143,18 @@ class LifecycleExtension(Extension):
         dependency = AnnotationDef(
             'dependency',
             retention='build',
-            kwargs={'load_after': default_list},
+            kwargs={'depends': default_list, 'load_after': default_list},
             on_build=self.add_service,
         )
-        ctx.register_anot(dependency)
 
-        ctx.register_anot(dependency.extend(AnnotationDef('service', kwargs={'depends': default_list})))
-        ctx.register_anot(
+        ctx.register_anot(dependency)
+        ctx.register_anot(dependency.extend(AnnotationDef('service')))
+        ctx.register_anot(dependency.extend(
             AnnotationDef(
                 'component',
-                retention='build',
                 args=[default_list],
-                kwargs={'depends': default_list, 'data': str},
-                on_build=self.add_service,
+                kwargs={'data': str},
             )
-        )
+        ))
+
         ctx.register_anot(AnnotationDef('bindTag', retention='init', args=[default_list], scope='method'))

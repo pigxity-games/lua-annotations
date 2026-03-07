@@ -14,11 +14,11 @@ First, let's define a simple service.
 --@service
 local service = {}
 
-function service:_init()
+function service._init()
     print("Hello World!")
 end
 
-function service:greet(name: string)
+function service.greet(name: string)
     print("Hello " .. name .. "!")
 end
 
@@ -26,7 +26,7 @@ return service
 ```
 
 !!! warning
-    Do not place blocking or heavy code inside of a service's `_init()` method as it yeilds before the next service can start. Instead, you may use the `task.spawn` or `task.defer` functions, respectively.
+    Do not place blocking or heavy code inside of a service's `_init()` method as it yeilds before the next service can start. Instead, you may use the `task.spawn` or `task.defer` functions, respectively. Also note that this method should be defined with `.` instead of `:`.
 
 ## Dependency injection
 This project aims to reduce the need for manual requires as much as possible. Thus, the preferred way to utilize services is through dependency injection (DI).
@@ -48,11 +48,11 @@ local DT = require(ServerScriptService.Generated.ServiceTypes)
 --@service, depends=[GreetService]
 local service = {}
 
-function service:_init(deps: DT.PlayerServiceDeps)
-    self.deps = deps
+function service._init(deps: DT.PlayerServiceDeps)
+    service.deps = deps
 
     Players.PlayerAdded:Connect(function(player)
-        self.deps.GreetService:greet(player.Name)
+        deps.GreetService.greet(player.Name)
     end)
 end
 
@@ -69,3 +69,6 @@ In this example:
 
 !!! note
     The build tool will automatically determine the load order of services based on injected dependencies!
+
+## `@dependency`
+This is a simple annotation which `@service` inherits from. Modules annotated with it **are not loaded automatically at runtime**, ie they have no `_init` method. Use this for pure data modules which still need DI.

@@ -5,6 +5,7 @@ local class = require(script.Parent.Utils.class)
 
 local isServer = RunService:IsServer()
 local oppositeEnvName = isServer and "client" or "server" 
+local componentInstances = {}
 
 
 local function useCollectionTag(tag, consumer)
@@ -23,8 +24,10 @@ local function useCollectionTag(tag, consumer)
     end
 
     local function onRemove(inst)
-        cleanups[inst]()
-        cleanups[inst] = nil
+        if cleanups[inst] then
+            cleanups[inst]()
+            cleanups[inst] = nil
+        end
     end
 
     CollectionService:GetInstanceAddedSignal(tag):Connect(onAdd)
@@ -36,19 +39,49 @@ local function useCollectionTag(tag, consumer)
 end
 
 
-local function initService(data, service, ...)
+local function initService(manifest, data, serviceName, service, injectDeps)
     if data.kind == "service" then
-        service:_init(...)
+        service._init(injectDeps)
         return
     end
 
-    class(service)
+    --convert component to class; handle data_service
+    local componentData = {}
+    if data.data_service then
+        componentData = manifest.services[data.data_service].getAdornee()
+    end
+    class(service, componentData)
 
+    local instances = componentInstances[serviceName]
+    if instances == nil then
+        instances = {}
+        componentInstances[serviceName] = instances
+    end
+
+    --bind CollectionService tags
     for _, tag in ipairs(data.tags) do
         useCollectionTag(tag, function(inst)
-            local obj = service.new(inst)
+            local deps = table.clone(injectDeps)
+
+            --inject component deps
+            for _, dep in ipairs(data.depends.components) do
+                local depInstances = componentInstances[dep]
+                local toInject = depInstances and depInstances[inst]
+                if toInject then
+                    injectDeps[dep] = toInject
+                else
+                    error(string.format("No `%s` component currently exists for instance; component `%s` requires it as a dependency.", dep, serviceName))
+                end
+            end
+
+            --create component
+            local obj = service.new(inst, deps)
+            instances[inst] = obj
             return function()
-                obj:_destroy()
+                instances[inst] = nil
+                if obj._destroy then
+                    obj:_destroy()
+                end
             end
         end)
     end
@@ -120,9 +153,9 @@ function module.initServices(manifest)
                     injectDeps[oppositeEnvName][dep] = remotesTable
                 end
 
-                initService(data, service, injectDeps)
+                initService(manifest, data, serviceName, service, injectDeps)
             else
-                initService(data, service)
+                initService(manifest, data, serviceName, service, {})
             end
         end
     end
