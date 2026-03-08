@@ -2,15 +2,28 @@ import importlib
 from pathlib import Path
 import shutil
 import sys
+from threading import Thread
 import time
 from datetime import datetime
 
 from .api.annotations import ENVIRONMENTS, ExtensionRegistry
-from .build_process import BuildCtxList, BuildProcessCtx, Config, Environment, Extension, PostProcessCtx, Workspace, get_template
-from .exceptions import BuildError, ConfigError
+from .build_process import (
+    BuildCtxList,
+    BuildProcessCtx,
+    Environment,
+    PostProcessCtx,
+    Workspace,
+    WorkspaceLogger,
+    get_template,
+    logger,
+    set_logger,
+)
+from .config import Config, ExtensionConfig, WorkspaceConfig, read_config
+from .exceptions import BuildError, ConfigError, LuaAnnotationsError
 from .extensions import default as default_ext
 
 WATCH_FILENAMES = ('*.lua', '*.luau')
+
 
 def create_config(workdir: Path, config_file: Path):
     if not config_file.exists():
@@ -21,15 +34,18 @@ def create_config(workdir: Path, config_file: Path):
         print('Config file already exists. Skipping')
 
 
+def resolve_rel_path(path: str, lua_expr: str, workdir: Path, env: Environment):
+    if '@' in path:
+        return process_tags(path, lua_expr, env, workdir)
+    return workdir / Path(path), lua_expr
+
+
 def iter_rel_paths(path_map: dict[str, str], workdir: Path, env: Environment):
     for path, lua_expr in path_map.items():
-        if '@' in path:
-            p, lua_expr = process_tags(path, lua_expr, env, workdir)
-        else:
-            p = workdir / Path(path)
+        p, lua_expr = resolve_rel_path(path, lua_expr, workdir, env)
 
         if not p.is_dir():
-            print(f'WARNING: directory {p.as_posix()} does not exist')
+            logger().warn(f'directory {p.as_posix()} does not exist')
             continue
 
         yield p, lua_expr
@@ -47,12 +63,10 @@ def import_extension_from_path(workdir: Path, entry: str):
     return importlib.import_module(mod_name)
 
 
-def import_extension(ext: Extension, workdir: Path):
-    entry_type, entry = ext
-
-    if entry_type == 'library':
+def import_extension(ext: ExtensionConfig, workdir: Path):
+    if ext.kind == 'library':
         return importlib.import_module("lua_annotations.extensions.game_framework.main")
-    return import_extension_from_path(workdir, entry)
+    return import_extension_from_path(workdir, ext.expr)
 
 
 def process_tags(raw: str, raw_expr: str, env: Environment, workdir: Path):
@@ -63,102 +77,116 @@ def process_tags(raw: str, raw_expr: str, env: Environment, workdir: Path):
         packages = workdir / package_dir_name / '_Index'
         ext_dir = next(packages.glob(f'*_{data}@*'), None)
         if not ext_dir:
-            raise ConfigError(
-                f'wally package {data} not found under {packages.as_posix()}'
-            )
+            raise ConfigError(f'wally package {data} not found under {packages.as_posix()}')
 
-        return ext_dir / data, f'require({raw_expr}.{data})' 
+        return ext_dir / data, f'{raw_expr}["_Index"]["{ext_dir.name}"]["{data}"]'
 
     raise ConfigError(f'invalid path tag: {raw}')
 
 
-def build(workdir: Path, config: Config):
-    init_time = datetime.now()
+def _process_workspace(workdir: Path, config: Config, workspace_cfg: WorkspaceConfig, log: WorkspaceLogger):
+    set_logger(log)
 
-    for raw_workspace in config.workspaces:
-        #process workspace
+    try:
+        # process workspace
         workspace: Workspace = {}
         for env in ENVIRONMENTS:
-            path_map = raw_workspace.get(env)
-            if not path_map:
-                raise ConfigError(f'path for the `{env}` environment is not defined in the config.')
-
+            path_map = workspace_cfg.get(env)
             rel_paths = dict(iter_rel_paths(path_map, workdir, env))
+            if not rel_paths:
+                raise ConfigError(f'no valid directories were found for `{env}` in this workspace.')
             workspace[env] = rel_paths
 
-
-        #load extensions
+        # load extensions
         reg = ExtensionRegistry()
         default_ext.load(reg)
 
         for ext in config.extensions:
-            #py_entry
+            # py_entry
             module = import_extension(ext, workdir)
             load_fn = getattr(module, 'load')
 
             if not callable(load_fn):
-                raise BuildError(f'module {ext[1]} does not have a `load()` function')
+                raise BuildError(f'module {ext.expr} does not have a `load()` function')
             load_fn(reg)
 
-
+        pending_files = reg.pending_files
         reg = reg.sort_extensions()
-        print(f'loaded {len(reg.anot_registry)} annotations')
+        log.info(f'loaded {len(reg.anot_registry)} annotations')
 
-
-        #env processing
+        # env processing
         build_contexts: BuildCtxList = {}
 
         for env in ENVIRONMENTS:
-            path_map = workspace.get(env)
-            if not path_map:
-                raise ConfigError(f'path for the `{env}` environment is not defined in the config.')
-
-            #process output root
+            # process output root
             rel_paths = workspace[env]
-            root_path = next(iter(rel_paths.keys()))
+            root_key = workspace_cfg.get_root(env)
+            root_expr = workspace_cfg.get(env)[root_key]
+            root_path, _ = resolve_rel_path(root_key, root_expr, workdir, env)
+            if not root_path.is_dir():
+                raise ConfigError(
+                    f'root directory `{root_path.as_posix()}` does not exist for `{env}` in this workspace.'
+                )
             output_root = root_path / Path(config.out_dir_name)
 
             shutil.rmtree(output_root, True)
             output_root.mkdir(parents=True, exist_ok=True)
 
-            #create and use a ctx
+            # create and use a ctx
             ctx = BuildProcessCtx(reg, root_path, workspace, rel_paths, output_root, env)
+
+            # create any pending files
+            for name, content in pending_files[env]:
+                ctx.create_file(name, content)
+
             for path in rel_paths:
                 ctx.process_dir(path)
 
             build_contexts[env] = ctx
-
 
         # run post-build hooks
         if build_contexts:
             ctx = PostProcessCtx(reg, workdir, workspace, build_contexts)
             for hook in reg.post_build_hooks:
                 hook(ctx)
+                
+        log.info(f'finished building')
 
-    #logging
+    except LuaAnnotationsError as e:
+        log.error(str(e))
+    except Exception as e:
+        log.exception(e)
+
+
+def build(workdir: Path, config: Config):
+    init_time = datetime.now()
+
+    threads: list[Thread] = []
+    for i, workspace_cfg in enumerate(config.workspaces):
+        t = Thread(target=_process_workspace, args=(workdir, config, workspace_cfg, WorkspaceLogger(i)))
+        threads.append(t)
+        t.start()
+
+    for t in threads:
+        t.join()
+
+    # logging
     delta = datetime.now() - init_time
     print(f'Built in {delta.total_seconds()}s')
 
 
-#builds a fingerprint of all the last modified times of files
+# builds a fingerprint of all the last modified times of files
 def _watch_fingerprint(workdir: Path, config_file: Path, config: Config):
     output_dir_name = config.out_dir_name
 
-    #track config file
+    # track config file
     tracked: dict[str, int] = {str(config_file): config_file.stat().st_mtime_ns}
 
-    #track workspaces
+    # track workspaces
     for workspace in config.workspaces:
         for env in ENVIRONMENTS:
             path_map = workspace.get(env)
-            if not path_map:
-                continue
-
-            for rel_path in path_map:
-                env_workdir = workdir / rel_path
-                if not env_workdir.exists() or not env_workdir.is_dir():
-                    continue
-
+            for env_workdir, _ in iter_rel_paths(path_map, workdir, env):
                 for pattern in WATCH_FILENAMES:
                     for file in env_workdir.rglob(pattern):
                         if output_dir_name in file.parts:
@@ -176,7 +204,7 @@ def watch(workdir: Path, config_file: Path, poll_interval: float = 1.0):
     last_fingerprint = _watch_fingerprint(workdir, config_file, config)
     print(f'Watching for changes in {workdir} (interval: {poll_interval}s). Press Ctrl+C to stop.')
 
-    #poll fingerprints every `poll_interval` seconds
+    # poll fingerprints every `poll_interval` seconds
     while True:
         time.sleep(poll_interval)
 
@@ -187,11 +215,3 @@ def watch(workdir: Path, config_file: Path, poll_interval: float = 1.0):
             print('Change detected, rebuilding...')
             build(workdir, config)
             last_fingerprint = fingerprint
-
-
-def read_config(config_file: Path):
-    import json
-
-    if not config_file.exists():
-        raise ConfigError('Config file not found. Run the program in init mode to create one!')
-    return Config(json.loads(config_file.read_text()))

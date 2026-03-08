@@ -14,11 +14,11 @@ First, let's define a simple service.
 --@service
 local service = {}
 
-function service:_init()
+function service._init()
     print("Hello World!")
 end
 
-function service:greet(name: string)
+function service.greet(name: string)
     print("Hello " .. name .. "!")
 end
 
@@ -26,7 +26,7 @@ return service
 ```
 
 !!! warning
-    Do not place blocking or heavy code inside of a service's `_init()` method as it yeilds before the next service can start. Instead, you may use the `task.spawn` or `task.defer` functions, respectively.
+    Do not place blocking or heavy code inside of a service's `_init()` method as it yeilds before the next service can start. Instead, you should use the Roblox `task.spawn` or `task.defer` functions. Also note that this method along with any annotated methods should be defined with `.` instead of `:`.
 
 ## Dependency injection
 This project aims to reduce the need for manual requires as much as possible. Thus, the preferred way to utilize services is through dependency injection (DI).
@@ -38,19 +38,20 @@ Utilizing this would decouple your game features and thus allow for modular code
 Let's create a new service that utilizes the `greet()` method of the above `GreetService`.
 
 ```lua title="src/server/PlayerService.lua"
---@service, depends=[GreetService]
 local Players = game:GetService("Players")
-local ST = require(game:GetService("ServerScriptService").Generated.Types.GreetService) --if you care about type checking
+local ServerScriptService = game:GetService("ServerScriptService")
 
+--@service, depends=[GreetService]
 local service = {}
 
-function service:_init(deps: ST.Deps)
-    self.deps = deps
+function service._init(deps)
+    service.deps = deps
 
     Players.PlayerAdded:Connect(function(player)
-        self.deps.GreetService:greet(player.Name)
+        deps.GreetService.greet(player.Name)
     end)
 end
+
 
 return service
 ```
@@ -64,3 +65,24 @@ In this example:
 
 !!! note
     The build tool will automatically determine the load order of services based on injected dependencies!
+
+## `@initService` 
+This annotation basically allows you to use a function as a service. It's great for any one-time loaders which require dependencies.
+
+It's effectively the same as defining a service with only an `_init()` method.
+
+```lua
+local m = {}
+
+--@initService, depends=[GreetService]
+function m.greetPlayer(deps)
+    Players.PlayerAdded:Connect(function(player)
+        deps.GreetService.greet(player.Name)
+    end)
+end
+
+return m
+```
+
+## `@dependency`
+This is a simple annotation which `@service` inherits from. Modules annotated with it **are not loaded automatically at runtime**, ie they have no `_init` method. Use this for pure data modules which still need DI.

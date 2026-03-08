@@ -1,13 +1,12 @@
 -- Generated using lua-anot; do not edit manually.
 
---manifest
-
-
---lifecycle
 local t0 = os.clock()
 
+--manifest
+
+--lifecycle
 for _, fun in ipairs(manifest.init_hooks) do
-    fun(manifest)
+    task.spawn(fun, manifest)
 end
 
 for _, anot in ipairs(manifest.annotations) do
@@ -18,7 +17,7 @@ for _, anot in ipairs(manifest.annotations) do
 end
 
 for _, fun in ipairs(manifest.post_init_hooks) do
-    fun(manifest)
+    task.spawn(fun, manifest)
 end
 
-print("Started services in " .. (os.clock() - t0))
+print("(env) annotations loaded in " .. (os.clock() - t0) .. "s")

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lua-annotations"
-version = "0.1.0"
+version = "0.2.0"
 description = "lua-annotations build-time processor/validator"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -22,4 +22,8 @@ where = ["src"]
 include = ["lua_annotations*"]
 
 [tool.setuptools.package-data]
-lua_annotations = ["templates/**"]
+lua_annotations = ["templates/**", "extensions/game_framework/lua/**"]
+
+[tool.black]
+skip-string-normalization = true
+line-length = 150

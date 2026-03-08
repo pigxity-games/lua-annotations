@@ -21,7 +21,7 @@ The `@remote` annotation takes one argument, that being a literal `event`, `func
     Methods with the `@remote` annotation must be defined with the `.` syntax, not with the self-passing `:` syntax.
 
 
-On the server side, we can import remote services by prefixing them with `:client`.
+On the server side, we can import remote services by prefixing them with the opposite environment name, ie `client:` in this example.
 
 
 ```lua title="server/GreetService.lua"
@@ -30,7 +30,7 @@ local Players = game:GetService("Players")
 --@service, depends=[client:MessageController]
 local service = {}
 
-function module:_init(deps)
+function module._init(deps)
 	self.deps = deps
 
 	task.spawn(function()
