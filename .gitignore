@@ -5,3 +5,7 @@ __pycache__
 build/
 pyenv/
 .pytest_cache
+zzztmp
+tmpuvsrghoq
+.pytest_tmp
+.tmp_probe

@@ -137,7 +137,7 @@ def _process_workspace(workdir: Path, config: Config, workspace_cfg: WorkspaceCo
 
             # create any pending files
             for name, content in pending_files[env]:
-                ctx.create_file(name, content)
+                ctx.create_file('_Internal/' + name, content)
 
             for path in rel_paths:
                 ctx.process_dir(path)

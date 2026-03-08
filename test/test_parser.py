@@ -37,6 +37,15 @@ def parse_text(tmp_path: Path, filename: str, text: str) -> FileParser:
     return parser
 
 
+def make_project_resolver(tmp_path: Path):
+    workspace: Workspace = {
+        'server': {tmp_path: ':Project'},
+        'client': {},
+        'shared': {},
+    }
+    return LuaPathResolver(workspace)
+
+
 def test_parser_builds_lua_module_and_lua_methods_with_state(tmp_path: Path):
     parser = parse_text(
         tmp_path,
@@ -105,12 +114,7 @@ return {
     assert value_anot.adornee.returned_name == "ExportedValue"
     assert value_anot.adornee.get_path(require=True).properties == ["ExportedValue"]
 
-    workspace: Workspace = {
-        "server": {tmp_path: ":Project"},
-        "client": {},
-        "shared": {},
-    }
-    resolver = LuaPathResolver(workspace)
+    resolver = make_project_resolver(tmp_path)
     assert module.get_expr(resolver) == "local ExportedMod = require(ServerScriptService.Project.Submodule).ExportedMod"
 
 
@@ -184,12 +188,7 @@ return {
     assert isinstance(method_anot.adornee, LuaMethod)
     assert method_anot.adornee.name == "test"
 
-    workspace: Workspace = {
-        "server": {tmp_path: ":Project"},
-        "client": {},
-        "shared": {},
-    }
-    resolver = LuaPathResolver(workspace)
+    resolver = make_project_resolver(tmp_path)
     assert (
         method_anot.adornee.get_path(require=True).to_lua(resolver)
         == "require(ServerScriptService.Project.LiteralReturn).test"
@@ -214,12 +213,7 @@ def test_parser_allows_method_annotation_for_literal_submodule_function(tmp_path
     assert isinstance(method_anot.adornee, LuaMethod)
     assert method_anot.adornee.name == 'init'
 
-    workspace: Workspace = {
-        'server': {tmp_path: ':Project'},
-        'client': {},
-        'shared': {},
-    }
-    resolver = LuaPathResolver(workspace)
+    resolver = make_project_resolver(tmp_path)
     assert (
         method_anot.adornee.get_path(require=True).to_lua(resolver)
         == 'require(ServerScriptService.Project.LiteralSubmoduleReturn).init'
@@ -284,3 +278,92 @@ return {
     assert zone_camera_region.returned_name == "ZoneCameraRegion"
     assert camera_region.submodule is True
     assert zone_camera_region.submodule is True
+
+
+def test_parser_handles_inline_method_return_annotations(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        "Test.lua",
+        """
+local test = function()
+end
+
+return {
+    --@methodAnn
+    test = test
+}
+""",
+    )
+    method_anot = next(a for a in parser.annotations if a.name == 'methodAnn')
+    assert isinstance(method_anot.adornee, LuaMethod)
+    assert method_anot.adornee.name == 'test'
+
+    resolver = make_project_resolver(tmp_path)
+    assert method_anot.adornee.get_path(require=True).to_lua(resolver) == 'require(ServerScriptService.Project.Test).test'
+
+
+def test_parser_handles_inline_method_return_annotations_with_inline_method(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        "Test.lua",
+        """
+return {
+    --@methodAnn
+    test = function()
+        --function content
+        print("Example function content")
+    end
+}
+""",
+    )
+    method_anot = next(a for a in parser.annotations if a.name == 'methodAnn')
+    assert isinstance(method_anot.adornee, LuaMethod)
+    assert method_anot.adornee.name == 'test'
+
+    resolver = make_project_resolver(tmp_path)
+    assert method_anot.adornee.get_path(require=True).to_lua(resolver) == 'require(ServerScriptService.Project.Test).test'
+
+
+def test_parser_handles_inline_module_return_annotations(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        "Test.lua",
+        """
+local test = {}
+
+return {
+    --@moduleAnn
+    test = test
+}
+""",
+    )
+    module_anot = next(a for a in parser.annotations if a.name == 'moduleAnn')
+    assert isinstance(module_anot.adornee, LuaModule)
+    assert module_anot.adornee.name == 'test'
+    assert module_anot.adornee.submodule is True
+    assert module_anot.adornee.returned_name == 'test'
+
+    resolver = make_project_resolver(tmp_path)
+    assert module_anot.adornee.get_path(require=True).to_lua(resolver) == 'require(ServerScriptService.Project.Test).test'
+
+
+def test_parser_handles_inline_module_definition_annotations(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        "Test.lua",
+        """
+local test = {
+    --@methodAnn
+    test = function()
+    end
+}
+
+return test
+""",
+    )
+    method_anot = next(a for a in parser.annotations if a.name == 'methodAnn')
+    assert isinstance(method_anot.adornee, LuaMethod)
+    assert method_anot.adornee.name == 'test'
+
+    resolver = make_project_resolver(tmp_path)
+    assert method_anot.adornee.get_path(require=True).to_lua(resolver) == 'require(ServerScriptService.Project.Test).test'

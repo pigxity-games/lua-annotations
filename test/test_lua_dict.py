@@ -6,26 +6,18 @@ from lua_annotations.api.annotations import SortedRegistry
 from lua_annotations.api.lua_dict import (
     LuaExpr,
     LuaPath,
-    LuaPathResolver,
     convert_dict,
     convert_dict_module,
     convert_dict_type,
 )
-from lua_annotations.build_process import ProcessCtx, Workspace
+from lua_annotations.build_process import ProcessCtx
+from lua_annotations.exceptions import BuildError
 
-
-def make_workspace(tmp_path: Path) -> Workspace:
-    workspace: Workspace = {
-        "server": {tmp_path / "server": ":ServerRoot"},
-        "client": {tmp_path / "client": ":ClientRoot"},
-        "shared": {tmp_path / "shared": ":SharedRoot"},
-    }
-    return workspace
+from helpers import make_resolver, make_workspace
 
 
 def test_luapath_resolves_workspace_paths_and_tracks_imports(tmp_path: Path):
-    workspace = make_workspace(tmp_path)
-    resolver = LuaPathResolver(workspace)
+    resolver = make_resolver(tmp_path)
 
     path = LuaPath(tmp_path / "server" / "Services" / "Data.lua", require=True)
     assert path.to_lua(resolver) == "require(ServerScriptService.ServerRoot.Services.Data)"
@@ -33,7 +25,7 @@ def test_luapath_resolves_workspace_paths_and_tracks_imports(tmp_path: Path):
 
 
 def test_luapath_resolves_env_prefixed_paths(tmp_path: Path):
-    resolver = LuaPathResolver(make_workspace(tmp_path))
+    resolver = make_resolver(tmp_path)
     path = LuaPath(PurePath("shared/Util/Math.lua"), require=True)
 
     assert path.to_lua(resolver) == "require(ReplicatedStorage.Util.Math)"
@@ -52,21 +44,66 @@ def test_luapath_relative_and_function_wrapping_behavior():
 
 
 def test_luapath_inline_require_uses_service_expr_without_imports(tmp_path: Path):
-    resolver = LuaPathResolver(make_workspace(tmp_path))
+    resolver = make_resolver(tmp_path)
     path = LuaPath(tmp_path / "server" / "Pkg" / "Remote.lua", require=True)
 
     assert path.to_lua(resolver, inline_require=True) == 'require(game:GetService("ServerScriptService").ServerRoot.Pkg.Remote)'
     assert resolver.get_import_lines() == []
 
 
+def test_luapath_cache_uses_getcached_and_builds_module_paths(tmp_path: Path):
+    resolver = make_resolver(tmp_path)
+    path = LuaPath(tmp_path / 'server' / 'Services' / 'Data.lua', require=True, cache=True)
+
+    assert path.to_lua(resolver) == 'getCached("Data")'
+    assert convert_dict(resolver, resolver.get_cached_module_paths(), prefix='local modulePaths =') == (
+        'local ServerScriptService = game:GetService("ServerScriptService")\n'
+        '\n'
+        'local modulePaths = {\n'
+        '    Data = ServerScriptService.ServerRoot.Services.Data,\n'
+        '}\n'
+    )
+
+
+def test_luapath_cache_works_with_function_and_properties(tmp_path: Path):
+    resolver = make_resolver(tmp_path)
+    path = LuaPath(
+        tmp_path / 'server' / 'Pkg' / 'Remote.lua',
+        require=True,
+        properties=['call'],
+        function=True,
+        cache=True,
+    )
+
+    assert path.to_lua(resolver) == 'function() return getCached("Remote").call end'
+
+
+def test_luapath_cache_requires_require_true(tmp_path: Path):
+    resolver = make_resolver(tmp_path)
+    path = LuaPath(tmp_path / 'server' / 'Pkg' / 'Remote.lua', cache=True)
+
+    with pytest.raises(BuildError, match='LuaPath cache requires require=True'):
+        path.to_lua(resolver)
+
+
+def test_luapath_cache_rejects_duplicate_module_names(tmp_path: Path):
+    resolver = make_resolver(tmp_path)
+    path_a = LuaPath(tmp_path / 'server' / 'PkgA' / 'Remote.lua', require=True, cache=True)
+    path_b = LuaPath(tmp_path / 'server' / 'PkgB' / 'Remote.lua', require=True, cache=True)
+
+    assert path_a.to_lua(resolver) == 'getCached("Remote")'
+    with pytest.raises(BuildError, match='duplicate module name'):
+        path_b.to_lua(resolver)
+
+
 def test_luapathresolver_raises_for_unknown_path(tmp_path: Path):
-    resolver = LuaPathResolver(make_workspace(tmp_path))
+    resolver = make_resolver(tmp_path)
     with pytest.raises(ValueError):
         resolver.normalize(PurePath("/outside/project/Test.lua"))
 
 
 def test_convert_dict_serializes_mixed_values(tmp_path: Path):
-    resolver = LuaPathResolver(make_workspace(tmp_path))
+    resolver = make_resolver(tmp_path)
     out = convert_dict(
         resolver,
         {
@@ -95,8 +132,7 @@ def test_convert_dict_serializes_mixed_values(tmp_path: Path):
 
 
 def test_convert_dict_includes_imports_in_environment_order(tmp_path: Path):
-    workspace = make_workspace(tmp_path)
-    resolver = LuaPathResolver(workspace)
+    resolver = make_resolver(tmp_path)
     out = convert_dict(
         resolver,
         {

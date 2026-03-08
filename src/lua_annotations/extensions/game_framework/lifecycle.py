@@ -24,7 +24,7 @@ def filter_deps(deps: list[str]) -> list[str]:
 
 
 def dep_error(svc: Annotation, dep: str, msg: str):
-        raise BuildError(msg + get_service_name(svc) + ': ' + dep)
+    raise BuildError(msg + get_service_name(svc) + ': ' + dep)
 
 
 def proc_deps(svc: Annotation, service_map: dict[str, Annotation]):
@@ -56,7 +56,7 @@ def proc_deps(svc: Annotation, service_map: dict[str, Annotation]):
 def service_todict(svc: Annotation, service_map: dict[str, Annotation]):    
     out = {
         'depends': proc_deps(svc, service_map),
-        'getAdornee': svc.adornee.get_path(function=True, require=True),  # pyright: ignore[reportAttributeAccessIssue]
+        'getAdornee': svc.adornee.get_path(function=True, require=True, cache=True),  # pyright: ignore[reportAttributeAccessIssue]
         'kind': svc.name,
     }
 
@@ -75,8 +75,9 @@ def service_todict(svc: Annotation, service_map: dict[str, Annotation]):
 def get_service_name(svc: Annotation):
     if isinstance(svc.adornee, ReturnedValue):
         return svc.adornee.returned_name
-    elif isinstance(svc.adornee, LuaMethod):
+    if isinstance(svc.adornee, LuaMethod):
         return svc.adornee.name
+    raise BuildError(f'Unknown service adornee type: {type(svc.adornee).__name__}')
 
 
 def get_topo_graph(services: list[Annotation], key: str):
