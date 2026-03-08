@@ -26,7 +26,7 @@ return service
 ```
 
 !!! warning
-    Do not place blocking or heavy code inside of a service's `_init()` method as it yeilds before the next service can start. Instead, you may use the `task.spawn` or `task.defer` functions, respectively. Also note that this method should be defined with `.` instead of `:`.
+    Do not place blocking or heavy code inside of a service's `_init()` method as it yeilds before the next service can start. Instead, you should use the Roblox `task.spawn` or `task.defer` functions. Also note that this method along with any annotated methods should be defined with `.` instead of `:`.
 
 ## Dependency injection
 This project aims to reduce the need for manual requires as much as possible. Thus, the preferred way to utilize services is through dependency injection (DI).
@@ -41,14 +41,10 @@ Let's create a new service that utilizes the `greet()` method of the above `Gree
 local Players = game:GetService("Players")
 local ServerScriptService = game:GetService("ServerScriptService")
 
---if `service_typegen` is enabled:
-local DT = require(ServerScriptService.Generated.ServiceTypes)
-
-
 --@service, depends=[GreetService]
 local service = {}
 
-function service._init(deps: DT.PlayerServiceDeps)
+function service._init(deps)
     service.deps = deps
 
     Players.PlayerAdded:Connect(function(player)
@@ -69,6 +65,24 @@ In this example:
 
 !!! note
     The build tool will automatically determine the load order of services based on injected dependencies!
+
+## `@initService` 
+This annotation basically allows you to use a function as a service. It's great for any one-time loaders which require dependencies.
+
+It's effectively the same as defining a service with only an `_init()` method.
+
+```lua
+local m = {}
+
+--@initService, depends=[GreetService]
+function m.greetPlayer(deps)
+    Players.PlayerAdded:Connect(function(player)
+        deps.GreetService.greet(player.Name)
+    end)
+end
+
+return m
+```
 
 ## `@dependency`
 This is a simple annotation which `@service` inherits from. Modules annotated with it **are not loaded automatically at runtime**, ie they have no `_init` method. Use this for pure data modules which still need DI.

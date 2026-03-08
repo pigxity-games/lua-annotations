@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Callable, Literal
 ENVIRONMENTS = ('client', 'server', 'shared')
 
 if TYPE_CHECKING:
-    from lua_annotations.build_process import BuildProcessCtx, PostProcessCtx
+    from lua_annotations.build_process import BuildProcessCtx, PostProcessCtx, Environment
     from lua_annotations.parser_schemas import Annotation
     from lua_annotations.parser import FileParser
 
@@ -96,6 +96,7 @@ class ExtensionRegistry:
         self.extensions: dict[str, Extension] = {}
         self.ext_graph: dict[str, list[str]] = {}
         self.ext_load_order: list[str] = []
+        self.pending_files: dict[Environment, list[tuple[str, str]]] = {env: [] for env in ENVIRONMENTS}
 
     def register_extension(
         self,
@@ -107,6 +108,9 @@ class ExtensionRegistry:
         extension.hook_order = hook_order
         self.extensions[name] = extension
         self.ext_graph[name] = deps
+
+    def add_file(self, env: Environment, name: str, content: str):
+        self.pending_files[env].append((name, content))
 
     def register_anot(self, anot: AnnotationDef):
         self.anot_registry[anot.name] = anot

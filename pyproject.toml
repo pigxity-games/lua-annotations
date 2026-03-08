@@ -22,7 +22,7 @@ where = ["src"]
 include = ["lua_annotations*"]
 
 [tool.setuptools.package-data]
-lua_annotations = ["templates/**"]
+lua_annotations = ["templates/**", "extensions/game_framework/lua/**"]
 
 [tool.black]
 skip-string-normalization = true

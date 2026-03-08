@@ -110,6 +110,7 @@ def _process_workspace(workdir: Path, config: Config, workspace_cfg: WorkspaceCo
                 raise BuildError(f'module {ext.expr} does not have a `load()` function')
             load_fn(reg)
 
+        pending_files = reg.pending_files
         reg = reg.sort_extensions()
         log.info(f'loaded {len(reg.anot_registry)} annotations')
 
@@ -133,6 +134,11 @@ def _process_workspace(workdir: Path, config: Config, workspace_cfg: WorkspaceCo
 
             # create and use a ctx
             ctx = BuildProcessCtx(reg, root_path, workspace, rel_paths, output_root, env)
+
+            # create any pending files
+            for name, content in pending_files[env]:
+                ctx.create_file(name, content)
+
             for path in rel_paths:
                 ctx.process_dir(path)
 

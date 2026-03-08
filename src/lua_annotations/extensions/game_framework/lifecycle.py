@@ -11,7 +11,9 @@ from lua_annotations.api.annotations import (
 from lua_annotations.api.arguments import default_list
 from lua_annotations.build_process import Environment, PostProcessCtx, logger
 from lua_annotations.exceptions import BuildError
-from lua_annotations.parser_schemas import Annotation, ReturnedValue
+from lua_annotations.parser_schemas import Annotation, LuaMethod, ReturnedValue
+
+from importlib.resources import files
 
 if TYPE_CHECKING:
     from lua_annotations.extensions.default import ManifestExtension
@@ -71,8 +73,10 @@ def service_todict(svc: Annotation, service_map: dict[str, Annotation]):
 
 
 def get_service_name(svc: Annotation):
-    assert isinstance(svc.adornee, ReturnedValue)
-    return svc.adornee.returned_name
+    if isinstance(svc.adornee, ReturnedValue):
+        return svc.adornee.returned_name
+    elif isinstance(svc.adornee, LuaMethod):
+        return svc.adornee.name
 
 
 def get_topo_graph(services: list[Annotation], key: str):
@@ -132,6 +136,7 @@ class LifecycleExtension(Extension):
             except CycleError as e:
                 raise BuildError(f"Cycle detected for service graph: {e.args}") from e
 
+
     def load(self, ctx: ExtensionRegistry):
         from lua_annotations.extensions.default import ManifestExtension
 
@@ -148,6 +153,7 @@ class LifecycleExtension(Extension):
         )
 
         ctx.register_anot(dependency)
+        ctx.register_anot(dependency.extend(AnnotationDef('initService', scope='method')))
         ctx.register_anot(dependency.extend(AnnotationDef('service')))
         ctx.register_anot(dependency.extend(
             AnnotationDef(
@@ -158,3 +164,6 @@ class LifecycleExtension(Extension):
         ))
 
         ctx.register_anot(AnnotationDef('bindTag', retention='init', args=[default_list], scope='method'))
+
+        t = files('lua_annotations') / 'extensions' / 'game_framework' / 'lua' / 'Lifecycle.lua'
+        ctx.add_file('shared', 'Lifecycle.lua', t.read_text())

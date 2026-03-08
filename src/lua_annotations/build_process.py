@@ -2,7 +2,6 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 import threading
-import traceback
 from typing import Any, Literal
 from importlib.resources import files
 

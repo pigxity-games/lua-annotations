@@ -58,6 +58,10 @@ def unwrap_return_module(expr: str) -> str | None:
         cur = wrapper.group(1).strip()
 
 
+def is_literal_function(expr: str):
+    return bool(re.match(r'^function\s*\(', expr.strip()))
+
+
 # parsing
 @dataclass
 class FileParser:
@@ -71,7 +75,7 @@ class FileParser:
     cur_line = 0
 
     def __post_init__(self):
-        self.file_name = self.file.name.split('.')[0]
+        self.file_name: str = self.file.name.split('.')[0]
 
     # assertion functions
     def _check_anot_scopes(self, line: str, anots: list[AnnotationDef]):
@@ -138,12 +142,15 @@ class FileParser:
 
             return out
 
-    def _map_dict_return(self, v: Any) -> str:
+    def _map_dict_return(self, k: str, v: Any) -> str:
         module_name = unwrap_return_module(v)
-        if not module_name:
-            self.error(v, 'submodule export is incorrectly defined')
+        if module_name:
+            return module_name
 
-        return module_name
+        if is_literal_function(v):
+            return k
+
+        self.error(v, 'submodule export is incorrectly defined')
 
     def _get_returned(self, text: str, default_name: str):
         match = RETURN_REGEX.search(text)
@@ -164,7 +171,11 @@ class FileParser:
 
             dict_data = self._get_dict_data(tablestr)
             if dict_data:
-                return ReturnDefinition(default_name, 'dict', dict_val={self._map_dict_return(v): k for k, v in dict_data.items()})
+                return ReturnDefinition(
+                    default_name,
+                    'dict',
+                    dict_val={self._map_dict_return(k, v): k for k, v in dict_data.items()},
+                )
             else:
                 self.error(text, 'module export is not a table')
 

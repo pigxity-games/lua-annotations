@@ -196,6 +196,36 @@ return {
     )
 
 
+def test_parser_allows_method_annotation_for_literal_submodule_function(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        'LiteralSubmoduleReturn.lua',
+        """return {
+--@methodAnn
+    init = function()
+        --contents
+        --multi-line contents
+    end,
+}
+""",
+    )
+
+    method_anot = next(a for a in parser.annotations if a.name == 'methodAnn')
+    assert isinstance(method_anot.adornee, LuaMethod)
+    assert method_anot.adornee.name == 'init'
+
+    workspace: Workspace = {
+        'server': {tmp_path: ':Project'},
+        'client': {},
+        'shared': {},
+    }
+    resolver = LuaPathResolver(workspace)
+    assert (
+        method_anot.adornee.get_path(require=True).to_lua(resolver)
+        == 'require(ServerScriptService.Project.LiteralSubmoduleReturn).init'
+    )
+
+
 def test_parser_unwraps_wrapper_functions_in_single_return(tmp_path: Path):
     parser = parse_text(
         tmp_path,

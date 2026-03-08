@@ -4,6 +4,7 @@ local RunService = game:GetService("RunService")
 
 local isServer = RunService:IsServer()
 local remoteTargetEnv = isServer and "client" or "server"
+local currentEnv = isServer and "server" or "client"
 local componentInstances = {}
 
 
@@ -67,6 +68,11 @@ local function initService(manifest, data, serviceName, service, baseDeps)
 		if service._init then
 			service._init(baseDeps)
 		end
+		return
+		
+	--initService
+	elseif data.kind == "initService" then
+		service(baseDeps)
 		return
 	end
 
@@ -205,12 +211,8 @@ local function getRemoteTable(folderName)
 end
 
 
---@module
-local module = {}
-
-
 --@annotationInit
-function module.bindTag(anot)
+function bindTag(anot)
 	local adornee = anot.getAdornee()
 
 	for _, tag in ipairs(anot.args[1]) do
@@ -219,8 +221,9 @@ function module.bindTag(anot)
 end
 
 
---@onInit
-function module.initServices(manifest)
+--@onPostInit
+function initServices(manifest)
+	t0 = os.clock()
 	for _, serviceName in ipairs(manifest.load_order) do
 		local data = manifest.services[serviceName]
 		local service = data.getAdornee()
@@ -241,11 +244,13 @@ function module.initServices(manifest)
 
 		initService(manifest, data, serviceName, service, injectDeps)
 	end
+
+	print(currentEnv .. " services started in " .. os.clock() - t0 .. "s")
 end
 
 
 --@annotationInit
-function module.remote(anot)
+function remote(anot)
 	local callback = anot.getAdornee()
 	local anotType = anot.args[1] --event or function
 	local remote = remoteRoot[anot.remote_parent]:WaitForChild(anot.remote_name)
@@ -268,4 +273,8 @@ function module.remote(anot)
 end
 
 
-return module
+return {
+	initServices = initServices,
+	bindTag = bindTag,
+	remote = remote,
+}
