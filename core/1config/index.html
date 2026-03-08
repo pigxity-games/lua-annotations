@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
     
     
       
@@ -851,13 +851,15 @@
 <span class="w">        </span><span class="p">}</span>
 <span class="w">    </span><span class="p">],</span>
 <span class="w">    </span><span class="nt">&quot;extensions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">        </span><span class="p">{</span>
-<span class="w">            </span><span class="nt">&quot;kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;package&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;my_extension.main&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="p">[</span><span class="s2">&quot;package&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;my_extension.main&quot;</span><span class="p">]</span>
 <span class="w">    </span><span class="p">],</span>
 <span class="w">    </span><span class="nt">&quot;flags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="err">...</span>
+<span class="w">        </span><span class="nt">&quot;core&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="err">...</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="nt">&quot;game_framework&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="err">...</span>
+<span class="w">        </span><span class="p">}</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="p">}</span>
 </code></pre></div>
@@ -882,13 +884,10 @@
 <span class="p">]</span>
 </code></pre></div></p>
 <h2 id="extensions"><code>extensions</code></h2>
-<p>A list of python package names to be imported and processed by the CLI tool. These should contain a <code>load()</code> function at the root module which utilizes the <code>Extension</code> API. <code>kind</code> must either be <code>package</code> or <code>path</code>, where <code>value</code> should be the package name or filepath, respectively.</p>
+<p>A list of python package names to be imported and processed by the CLI tool. These should contain a <code>load()</code> function at the root module which utilizes the <code>Extension</code> API. The first value must either be <code>package</code> or <code>path</code>, while the second should be the package name or filepath, respective to the first.</p>
 <h2 id="flags"><code>flags</code></h2>
 <p>A list of boolean flags which can modify behavior of the tool or of extensions:</p>
-<p><strong>game_framework:</strong></p>
-<ul>
-<li><code>game_framework.service_typegen</code>: whether to generate type files for services (True)</li>
-</ul>
+<p>TODO</p>
 
 
 

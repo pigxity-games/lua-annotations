@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
     
     
       
@@ -545,6 +545,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#initservice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        @initService
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dependency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        @dependency
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -693,6 +715,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#initservice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        @initService
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dependency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        @dependency
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -773,11 +817,11 @@
 <div class="highlight"><span class="filename">src/server/GreetService.lua</span><pre><span></span><code><span class="c1">--@service</span>
 <span class="kd">local</span><span class="w"> </span><span class="nv">service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{}</span>
 
-<span class="kr">function</span><span class="w"> </span><span class="nc">service</span><span class="p">:</span><span class="nf">_init</span><span class="p">()</span>
+<span class="kr">function</span><span class="w"> </span><span class="nc">service</span><span class="p">.</span><span class="nf">_init</span><span class="p">()</span>
 <span class="w">    </span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Hello World!&quot;</span><span class="p">)</span>
 <span class="kr">end</span>
 
-<span class="kr">function</span><span class="w"> </span><span class="nc">service</span><span class="p">:</span><span class="nf">greet</span><span class="p">(</span><span class="nv">name</span><span class="p">:</span><span class="w"> </span><span class="py">string</span><span class="p">)</span>
+<span class="kr">function</span><span class="w"> </span><span class="nc">service</span><span class="p">.</span><span class="nf">greet</span><span class="p">(</span><span class="nv">name</span><span class="p">:</span><span class="w"> </span><span class="py">string</span><span class="p">)</span>
 <span class="w">    </span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Hello &quot;</span><span class="w"> </span><span class="o">..</span><span class="w"> </span><span class="nv">name</span><span class="w"> </span><span class="o">..</span><span class="w"> </span><span class="s2">&quot;!&quot;</span><span class="p">)</span>
 <span class="kr">end</span>
 
@@ -785,7 +829,7 @@
 </code></pre></div>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p>Do not place blocking or heavy code inside of a service's <code>_init()</code> method as it yeilds before the next service can start. Instead, you may use the <code>task.spawn</code> or <code>task.defer</code> functions, respectively.</p>
+<p>Do not place blocking or heavy code inside of a service's <code>_init()</code> method as it yeilds before the next service can start. Instead, you should use the Roblox <code>task.spawn</code> or <code>task.defer</code> functions. Also note that this method along with any annotated methods should be defined with <code>.</code> instead of <code>:</code>.</p>
 </div>
 <h2 id="dependency-injection">Dependency injection</h2>
 <p>This project aims to reduce the need for manual requires as much as possible. Thus, the preferred way to utilize services is through dependency injection (DI).
@@ -793,19 +837,20 @@ It is a technique where an object recieves dependencies externally rather than i
 <p>In this case, the runtime loader injects other services into the constructors of services that require them.
 Utilizing this would decouple your game features and thus allow for modular code, easier testing, and easier refactors.</p>
 <p>Let's create a new service that utilizes the <code>greet()</code> method of the above <code>GreetService</code>.</p>
-<div class="highlight"><span class="filename">src/server/PlayerService.lua</span><pre><span></span><code><span class="c1">--@service, depends=[GreetService]</span>
-<span class="kd">local</span><span class="w"> </span><span class="nv">Players</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">game</span><span class="p">:</span><span class="nf">GetService</span><span class="p">(</span><span class="s2">&quot;Players&quot;</span><span class="p">)</span>
-<span class="kd">local</span><span class="w"> </span><span class="nv">ST</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">require</span><span class="p">(</span><span class="nv">game</span><span class="p">:</span><span class="nf">GetService</span><span class="p">(</span><span class="s2">&quot;ServerScriptService&quot;</span><span class="p">).</span><span class="nv">Generated</span><span class="p">.</span><span class="py">Types</span><span class="p">.</span><span class="py">GreetService</span><span class="p">)</span><span class="w"> </span><span class="c1">--if you care about type checking</span>
+<div class="highlight"><span class="filename">src/server/PlayerService.lua</span><pre><span></span><code><span class="kd">local</span><span class="w"> </span><span class="nv">Players</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">game</span><span class="p">:</span><span class="nf">GetService</span><span class="p">(</span><span class="s2">&quot;Players&quot;</span><span class="p">)</span>
+<span class="kd">local</span><span class="w"> </span><span class="nv">ServerScriptService</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">game</span><span class="p">:</span><span class="nf">GetService</span><span class="p">(</span><span class="s2">&quot;ServerScriptService&quot;</span><span class="p">)</span>
 
+<span class="c1">--@service, depends=[GreetService]</span>
 <span class="kd">local</span><span class="w"> </span><span class="nv">service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{}</span>
 
-<span class="kr">function</span><span class="w"> </span><span class="nc">service</span><span class="p">:</span><span class="nf">_init</span><span class="p">(</span><span class="nv">deps</span><span class="p">:</span><span class="w"> </span><span class="py">ST</span><span class="p">.</span><span class="py">Deps</span><span class="p">)</span>
-<span class="w">    </span><span class="nv">self</span><span class="p">.</span><span class="py">deps</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">deps</span>
+<span class="kr">function</span><span class="w"> </span><span class="nc">service</span><span class="p">.</span><span class="nf">_init</span><span class="p">(</span><span class="nv">deps</span><span class="p">)</span>
+<span class="w">    </span><span class="nv">service</span><span class="p">.</span><span class="py">deps</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">deps</span>
 
 <span class="w">    </span><span class="nv">Players</span><span class="p">.</span><span class="py">PlayerAdded</span><span class="p">:</span><span class="nf">Connect</span><span class="p">(</span><span class="kr">function</span><span class="p">(</span><span class="nv">player</span><span class="p">)</span>
-<span class="w">        </span><span class="nv">self</span><span class="p">.</span><span class="py">deps</span><span class="p">.</span><span class="py">GreetService</span><span class="p">:</span><span class="nf">greet</span><span class="p">(</span><span class="nv">player</span><span class="p">.</span><span class="py">Name</span><span class="p">)</span>
+<span class="w">        </span><span class="nv">deps</span><span class="p">.</span><span class="py">GreetService</span><span class="p">.</span><span class="nf">greet</span><span class="p">(</span><span class="nv">player</span><span class="p">.</span><span class="py">Name</span><span class="p">)</span>
 <span class="w">    </span><span class="kr">end</span><span class="p">)</span>
 <span class="kr">end</span>
+
 
 <span class="kr">return</span><span class="w"> </span><span class="nv">service</span>
 </code></pre></div>
@@ -820,6 +865,22 @@ Utilizing this would decouple your game features and thus allow for modular code
 <p class="admonition-title">Note</p>
 <p>The build tool will automatically determine the load order of services based on injected dependencies!</p>
 </div>
+<h2 id="initservice"><code>@initService</code></h2>
+<p>This annotation basically allows you to use a function as a service. It's great for any one-time loaders which require dependencies.</p>
+<p>It's effectively the same as defining a service with only an <code>_init()</code> method.</p>
+<div class="highlight"><pre><span></span><code><span class="kd">local</span><span class="w"> </span><span class="nv">m</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{}</span>
+
+<span class="c1">--@initService, depends=[GreetService]</span>
+<span class="kr">function</span><span class="w"> </span><span class="nc">m</span><span class="p">.</span><span class="nf">greetPlayer</span><span class="p">(</span><span class="nv">deps</span><span class="p">)</span>
+<span class="w">    </span><span class="nv">Players</span><span class="p">.</span><span class="py">PlayerAdded</span><span class="p">:</span><span class="nf">Connect</span><span class="p">(</span><span class="kr">function</span><span class="p">(</span><span class="nv">player</span><span class="p">)</span>
+<span class="w">        </span><span class="nv">deps</span><span class="p">.</span><span class="py">GreetService</span><span class="p">.</span><span class="nf">greet</span><span class="p">(</span><span class="nv">player</span><span class="p">.</span><span class="py">Name</span><span class="p">)</span>
+<span class="w">    </span><span class="kr">end</span><span class="p">)</span>
+<span class="kr">end</span>
+
+<span class="kr">return</span><span class="w"> </span><span class="nv">m</span>
+</code></pre></div>
+<h2 id="dependency"><code>@dependency</code></h2>
+<p>This is a simple annotation which <code>@service</code> inherits from. Modules annotated with it <strong>are not loaded automatically at runtime</strong>, ie they have no <code>_init</code> method. Use this for pure data modules which still need DI.</p>
 
 
 

@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
     
     
       
@@ -690,13 +690,13 @@
 <p class="admonition-title">Note</p>
 <p>Methods with the <code>@remote</code> annotation must be defined with the <code>.</code> syntax, not with the self-passing <code>:</code> syntax.</p>
 </div>
-<p>On the server side, we can import remote services by prefixing them with <code>:client</code>.</p>
+<p>On the server side, we can import remote services by prefixing them with the opposite environment name, ie <code>client:</code> in this example.</p>
 <div class="highlight"><span class="filename">server/GreetService.lua</span><pre><span></span><code><span class="kd">local</span><span class="w"> </span><span class="nv">Players</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">game</span><span class="p">:</span><span class="nf">GetService</span><span class="p">(</span><span class="s2">&quot;Players&quot;</span><span class="p">)</span>
 
 <span class="c1">--@service, depends=[client:MessageController]</span>
 <span class="kd">local</span><span class="w"> </span><span class="nv">service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{}</span>
 
-<span class="kr">function</span><span class="w"> </span><span class="nc">module</span><span class="p">:</span><span class="nf">_init</span><span class="p">(</span><span class="nv">deps</span><span class="p">)</span>
+<span class="kr">function</span><span class="w"> </span><span class="nc">module</span><span class="p">.</span><span class="nf">_init</span><span class="p">(</span><span class="nv">deps</span><span class="p">)</span>
 <span class="w">    </span><span class="nv">self</span><span class="p">.</span><span class="py">deps</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">deps</span>
 
 <span class="w">    </span><span class="nv">task</span><span class="p">.</span><span class="nf">spawn</span><span class="p">(</span><span class="kr">function</span><span class="p">()</span>
