@@ -61,10 +61,10 @@ def service_todict(svc: Annotation, service_map: dict[str, Annotation]):
     if svc.name == 'component':
         out['tags'] = svc.args_val[0]
         
-        data_svc = svc.kwargs_val.get('data', [])
+        data_svc = svc.kwargs_val.get('data', None)
         if data_svc and not service_map.get(data_svc):
             logger().warn(f'Invalid data dependency for component {get_service_name(svc)}: "{data_svc}"; ommiting')
-        else:
+        elif data_svc:
             out['data_service'] = data_svc
 
     return out
