@@ -42,10 +42,18 @@ class LuaMethod:
     name: str
     module: LuaModule
     params: dict[str, str] = field(default_factory=dict)
-    return_type: Optional[str] = None
+    return_type: str = 'nil'
+
+    def __post_init__(self):
+        if not self.return_type:
+            self.return_type = 'nil'
 
     def get_path(self, relative: bool = False, require: bool = False, function: bool = False, cache: bool = False):
         return self.module.get_path(relative, require, [self.name], function, cache)
+
+    def generate_type(self):
+        param_string = ', '.join(self.params.values())
+        return f'({param_string}) -> ({self.return_type if self.return_type != 'nil' else ''})'
 
 
 @dataclass
@@ -89,6 +97,14 @@ class LuaModule(ReturnedValue):
     """For distinguishing between modules (tables) and basic values"""
     
     methods: dict[str, LuaMethod] = field(default_factory=dict)
+
+    def generate_type(self, exclude: list[str] = []):
+        string = '\n'
+        for name, method in self.methods.items():
+            if not name in exclude and not name.startswith('_'):
+                string += f'    {name}: {method.generate_type()},\n'
+        
+        return '{' + string + '}'
 
 
 @dataclass

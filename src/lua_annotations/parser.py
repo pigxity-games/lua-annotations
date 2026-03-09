@@ -63,6 +63,13 @@ def is_literal_function(expr: str):
     return bool(re.match(r'^function\s*\(', expr.strip()))
 
 
+def is_function_definition(text: str):
+    stripped = text.strip()
+    if stripped.startswith('function '):
+        return True
+    return bool(re.match(r'^\s*[\w.]+\s*[:=]\s*function\s*\(', stripped))
+
+
 # parsing
 @dataclass
 class FileParser:
@@ -268,6 +275,9 @@ class FileParser:
         returned: ReturnDefinition,
         strict: bool = True,
     ):
+        if not strict and not is_function_definition(text):
+            return None
+
         match = FUNCTION_REGEX.search(text)
         if not match:
             if returned.type == 'dict':
@@ -279,7 +289,7 @@ class FileParser:
                         returned_name, is_submodule = returned.get_returned_name(module_name)
                         if returned_name and is_submodule:
                             module = self._get_return_table_module(modules)
-                            return LuaMethod(returned_name, module, {}, 'any')
+                            return LuaMethod(returned_name, module, {})
 
             if strict:
                 self.error(text, 'function is incorrectly defined')
@@ -289,7 +299,7 @@ class FileParser:
         module_name = match.group(1)
         fun_name: str = match.group(2) or ''
         raw_params: str = match.group(3) or ''
-        return_type: str = match.group(4) or 'any'
+        return_type: str = match.group(4)
 
         if fun_name == '':
             self.error(text, 'method is incorrectly defined')

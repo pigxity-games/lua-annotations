@@ -82,7 +82,7 @@ return Root
     reset_method = next(a.adornee for a in method_anots if a.adornee.name == "reset")
     assert isinstance(reset_method, LuaMethod)
     assert reset_method.params == {}
-    assert reset_method.return_type == "any"
+    assert reset_method.return_type == "nil"
 
 
 def test_parser_builds_submodule_and_returned_value_states(tmp_path: Path):
@@ -468,6 +468,29 @@ return {
     assert method.return_type == "string"
 
 
+def test_parser_does_not_treat_function_calls_as_methods(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        'Test.lua',
+        """
+--@moduleAnn
+local module = {}
+
+function module.cameraTween(target: BasePart)
+    assert(target and target:IsA("BasePart"), "cameraTween target must be a BasePart")
+end
+
+return module
+""",
+    )
+
+    module = parser.modules['module']
+    camera_tween = module.methods.get('cameraTween')
+    assert isinstance(camera_tween, LuaMethod)
+    assert camera_tween.params['target'] == 'BasePart'
+    assert 'assert' not in module.methods
+
+
 def test_parser_method_types_use_any_if_ommited(tmp_path: Path):
     parser = parse_text(
         tmp_path,
@@ -499,4 +522,4 @@ return m
     assert method.params["param1"] == "number"
     assert method.params["param2"] == "any"
     assert method.params["param3"] == "string"
-    assert method.return_type == "any"
+    assert method.return_type == "nil"

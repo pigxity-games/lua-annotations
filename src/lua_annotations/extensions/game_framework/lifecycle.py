@@ -149,7 +149,7 @@ class LifecycleExtension(Extension):
         dependency = AnnotationDef(
             'dependency',
             retention='build',
-            kwargs={'depends': default_list, 'load_after': default_list},
+            kwargs={'depends': default_list, 'load_after': default_list, 'typegen': str},
             on_build=self.add_service,
         )
 
