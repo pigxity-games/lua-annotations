@@ -65,7 +65,7 @@ class IndexExtension(Extension):
                 dep_string = '{' + ', '.join([f'{dep}: {dep}' for dep in deps]) + '}'
                 
                 if len(dep_string) > 2: #not {}
-                    self.global_types_file[env].append(f'export type {module.returned_name}Deps = {dep_string}')
+                    self.global_types_file[env].append(f'export type {anot.get_adornee_name()}Deps = {dep_string}')
 
             
     def on_build_indexed(self, ctx: AnnotationBuildCtx):

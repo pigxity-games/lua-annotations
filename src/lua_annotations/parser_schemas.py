@@ -137,6 +137,12 @@ class Annotation:
             'getAdornee': self.adornee.get_path(require=True, function=True, cache=True),  # pyright: ignore[reportAttributeAccessIssue]
         } | self.export_data
 
+    def get_adornee_name(self):
+        if isinstance(self.adornee, LuaModule):
+            return self.adornee.returned_name
+        elif isinstance(self.adornee, LuaMethod):
+            return self.adornee.name
+
 
 @dataclass
 class ReturnDefinition:
