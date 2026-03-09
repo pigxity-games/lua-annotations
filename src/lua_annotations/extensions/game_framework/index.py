@@ -39,7 +39,6 @@ class IndexExtension(Extension):
             ctx.create_file(env, 'Index.lua', convert_dict_module(ctx, self.indexes[env]))
             ctx.create_file(env, 'ServiceTypes.lua', '\n'.join([HEADER, ''] + self.global_types_file[env] + ['', 'return nil\n']))
 
-
     def on_file_process(self, ctx: FileBuildCtx):
         env = ctx.build_ctx.env
         for anot in ctx.parser.annotations:
@@ -47,27 +46,26 @@ class IndexExtension(Extension):
                 # service typegen
                 module = anot.adornee
                 assert isinstance(module, LuaModule)
-                
+
                 typegen = anot.kwargs_val.get('typegen')
                 out_type = None
 
                 if typegen == 'registry':
                     load_after = anot.kwargs_val.get('load_after')
-                    out_type = '{' + f'[Instance]: {load_after[0] if load_after and len(load_after) > 0 else 'any'}' + '}'     
+                    out_type = '{' + f'[Instance]: {load_after[0] if load_after and len(load_after) > 0 else 'any'}' + '}'
                 else:
                     out_type = module.generate_type()
-                
+
                 self.global_types_file[env].append(f'export type {module.returned_name} = {out_type}')
-                
+
             if anot.name in TYPEGEN_ANOTS or anot.name == 'initService':
-                #deps types
+                # deps types
                 deps = anot.kwargs_val.get('depends', [])
                 dep_string = '{' + ', '.join([f'{dep}: {dep}' for dep in deps]) + '}'
-                
-                if len(dep_string) > 2: #not {}
+
+                if len(dep_string) > 2:  # not {}
                     self.global_types_file[env].append(f'export type {anot.get_adornee_name()}Deps = {dep_string}')
 
-            
     def on_build_indexed(self, ctx: AnnotationBuildCtx):
         module = ctx.annotation.adornee
         assert isinstance(module, ReturnedValue)
@@ -85,7 +83,6 @@ class IndexExtension(Extension):
             indexed[key] = value  # pyright: ignore[reportIndexIssue]
 
         path = LuaPath(ctx.parser.file, require=True)
-
 
     def load(self, ctx: ExtensionRegistry) -> None:
         ctx.register_anot(

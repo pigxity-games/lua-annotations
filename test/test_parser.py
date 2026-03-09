@@ -189,10 +189,7 @@ return {
     assert method_anot.adornee.name == "test"
 
     resolver = make_project_resolver(tmp_path)
-    assert (
-        method_anot.adornee.get_path(require=True).to_lua(resolver)
-        == "require(ServerScriptService.Project.LiteralReturn).test"
-    )
+    assert method_anot.adornee.get_path(require=True).to_lua(resolver) == "require(ServerScriptService.Project.LiteralReturn).test"
 
 
 def test_parser_allows_method_annotation_for_literal_submodule_function(tmp_path: Path):
@@ -214,10 +211,7 @@ def test_parser_allows_method_annotation_for_literal_submodule_function(tmp_path
     assert method_anot.adornee.name == 'init'
 
     resolver = make_project_resolver(tmp_path)
-    assert (
-        method_anot.adornee.get_path(require=True).to_lua(resolver)
-        == 'require(ServerScriptService.Project.LiteralSubmoduleReturn).init'
-    )
+    assert method_anot.adornee.get_path(require=True).to_lua(resolver) == 'require(ServerScriptService.Project.LiteralSubmoduleReturn).init'
 
 
 def test_parser_unwraps_wrapper_functions_in_single_return(tmp_path: Path):
@@ -383,10 +377,10 @@ end
 return m
 """,
     )
-    module = parser.modules["m"]    
+    module = parser.modules["m"]
     method = module.methods.get("testFun1")
     assert method
-    
+
     assert method.params["param1"] == "string"
     assert method.params["param2"] == "string"
     assert method.return_type == "string"
@@ -409,17 +403,17 @@ end
 return m
 """,
     )
-    module = parser.modules["m"]    
+    module = parser.modules["m"]
     method = module.methods.get("testFun1")
     assert method
-    
+
     assert method.params["param1"] == "string"
     assert method.params["param2"] == "string"
     assert method.return_type == "string"
 
     method2 = module.methods.get("testFun2")
     assert method2
-    
+
     assert method2.params["param1"] == "number"
     assert method2.params["param2"] == "any"
     assert method2.return_type == "SomeGlobalType"
@@ -439,10 +433,10 @@ local m = {
 return m
 """,
     )
-    module = parser.modules["m"]    
+    module = parser.modules["m"]
     method = module.methods.get("testFun1")
     assert method
-    
+
     assert method.params["param1"] == "string"
     assert method.params["param2"] == "string"
     assert method.return_type == "string"
@@ -507,19 +501,52 @@ end
 return m
 """,
     )
-    module = parser.modules["m"]    
-    
+    module = parser.modules["m"]
+
     method = module.methods.get("testFun1")
     assert method
-    
+
     assert method.params["param1"] == "any"
     assert method.params["param2"] == "any"
     assert method.return_type == "string"
 
     method = module.methods.get("testFun2")
     assert method
-    
+
     assert method.params["param1"] == "number"
     assert method.params["param2"] == "any"
     assert method.params["param3"] == "string"
+    assert method.return_type == "nil"
+
+
+def test_parser_method_types_functions(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        "Test.lua",
+        """
+--@moduleAnn
+local m = {}
+
+function testFun1(param1, callback: () -> ()): string
+end
+function testFun2(param1: (number, string, any) -> (string), param2: number)
+end
+
+return m
+""",
+    )
+    module = parser.modules["m"]
+
+    method = module.methods.get("testFun1")
+    assert method
+
+    assert method.params["param1"] == "any"
+    assert method.params["callback"] == "() -> ()"
+    assert method.return_type == "string"
+
+    method = module.methods.get("testFun2")
+    assert method
+
+    assert method.params["param1"] == "(number, string, any) -> (string)"
+    assert method.params["param2"] == "number"
     assert method.return_type == "nil"

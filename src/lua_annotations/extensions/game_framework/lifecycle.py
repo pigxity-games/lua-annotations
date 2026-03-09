@@ -53,7 +53,7 @@ def proc_deps(svc: Annotation, service_map: dict[str, Annotation]):
     return out
 
 
-def service_todict(svc: Annotation, service_map: dict[str, Annotation]):    
+def service_todict(svc: Annotation, service_map: dict[str, Annotation]):
     out = {
         'depends': proc_deps(svc, service_map),
         'getAdornee': svc.adornee.get_path(function=True, require=True, cache=True),  # pyright: ignore[reportAttributeAccessIssue]
@@ -62,7 +62,7 @@ def service_todict(svc: Annotation, service_map: dict[str, Annotation]):
 
     if svc.name == 'component':
         out['tags'] = svc.args_val[0]
-        
+
         data_svc = svc.kwargs_val.get('data', None)
         if data_svc and not service_map.get(data_svc):
             logger().warn(f'Invalid data dependency for component {get_service_name(svc)}: "{data_svc}"; ommiting')
@@ -128,15 +128,13 @@ class LifecycleExtension(Extension):
             services = self.services[env] + self.services['shared']
 
             self.manifestExt.manifest[env]['services'] = {
-                get_service_name(svc): service_todict(svc, {get_service_name(svc): svc for svc in services})
-                for svc in services
+                get_service_name(svc): service_todict(svc, {get_service_name(svc): svc for svc in services}) for svc in services
             }
 
             try:
                 self.manifestExt.manifest[env]['load_order'] = get_runtime_load_order(services)
             except CycleError as e:
                 raise BuildError(f"Cycle detected for service graph: {e.args}") from e
-
 
     def load(self, ctx: ExtensionRegistry):
         from lua_annotations.extensions.default import ManifestExtension
@@ -156,13 +154,15 @@ class LifecycleExtension(Extension):
         ctx.register_anot(dependency)
         ctx.register_anot(dependency.extend(AnnotationDef('initService', scope='method')))
         ctx.register_anot(dependency.extend(AnnotationDef('service')))
-        ctx.register_anot(dependency.extend(
-            AnnotationDef(
-                'component',
-                args=[default_list],
-                kwargs={'data': str},
+        ctx.register_anot(
+            dependency.extend(
+                AnnotationDef(
+                    'component',
+                    args=[default_list],
+                    kwargs={'data': str},
+                )
             )
-        ))
+        )
 
         ctx.register_anot(AnnotationDef('bindTag', retention='init', args=[default_list], scope='method'))
 

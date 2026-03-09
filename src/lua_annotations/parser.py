@@ -29,10 +29,65 @@ def remove_whitespace(t: list[Any]):
     return [p.strip() for p in t]
 
 
+def split_top_level_csv(text: str):
+    parts: list[str] = []
+    current: list[str] = []
+
+    in_string: str | None = None
+    escaped = False
+    paren_depth = 0
+    brace_depth = 0
+    bracket_depth = 0
+
+    for char in text:
+        if in_string:
+            current.append(char)
+            if escaped:
+                escaped = False
+            elif char == '\\':
+                escaped = True
+            elif char == in_string:
+                in_string = None
+            continue
+
+        if char in ('"', "'"):
+            in_string = char
+            current.append(char)
+            continue
+
+        if char == '(':
+            paren_depth += 1
+        elif char == ')' and paren_depth > 0:
+            paren_depth -= 1
+        elif char == '{':
+            brace_depth += 1
+        elif char == '}' and brace_depth > 0:
+            brace_depth -= 1
+        elif char == '[':
+            bracket_depth += 1
+        elif char == ']' and bracket_depth > 0:
+            bracket_depth -= 1
+
+        if char == ',' and paren_depth == 0 and brace_depth == 0 and bracket_depth == 0:
+            part = ''.join(current).strip()
+            if part:
+                parts.append(part)
+            current = []
+            continue
+
+        current.append(char)
+
+    tail = ''.join(current).strip()
+    if tail:
+        parts.append(tail)
+
+    return parts
+
+
 def map_param_list(params: list[str]):
     out: dict[str, str] = {}
     for param in params:
-        parts = remove_whitespace(param.split(':'))
+        parts = remove_whitespace(param.split(':', 1))
         if len(parts) > 1:
             out[parts[0]] = parts[1]
         else:
@@ -41,8 +96,107 @@ def map_param_list(params: list[str]):
     return out
 
 
-RETURN_TABLE_MODULE_NAME = '__return_table__'
-RETURN_TABLE_ENTRY_REGEX = re.compile(r'^\s*(\w+)\s*[:=]\s*(.+?)(?:,\s*)?$', re.DOTALL)
+def split_qualified_name(name: str):
+    for separator in ('.', ':'):
+        if separator in name:
+            module_name, function_name = name.split(separator, 1)
+            return module_name, function_name
+    return None, name
+
+
+def _scan_balanced_parens(text: str, open_index: int):
+    depth = 0
+    in_string: str | None = None
+    escaped = False
+
+    for i in range(open_index, len(text)):
+        char = text[i]
+
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == '\\':
+                escaped = True
+            elif char == in_string:
+                in_string = None
+            continue
+
+        if char in ('"', "'"):
+            in_string = char
+            continue
+
+        if char == '(':
+            depth += 1
+        elif char == ')':
+            depth -= 1
+            if depth == 0:
+                return i
+
+    return None
+
+
+def _extract_signature_parts(text: str):
+    open_paren = text.find('(')
+    if open_paren == -1:
+        return None
+
+    close_paren = _scan_balanced_parens(text, open_paren)
+    if close_paren is None:
+        return None
+
+    name_part = text[:open_paren].strip()
+    raw_params = text[open_paren + 1 : close_paren]
+    suffix = text[close_paren + 1 :].strip()
+    return name_part, raw_params, suffix
+
+
+def _parse_assignment_signature(text: str):
+    assignment = re.match(r'^(.*?)=\s*function\b(.*)$', text)
+    if not assignment:
+        return None
+
+    left = assignment.group(1).strip()
+    right = assignment.group(2).lstrip()
+    parts = _extract_signature_parts(right)
+    if not parts:
+        return None
+
+    _, raw_params, suffix = parts
+    return left, raw_params, suffix
+
+
+def _parse_declaration_signature(text: str):
+    for prefix in ('local function ', 'function '):
+        if text.startswith(prefix):
+            header = text.removeprefix(prefix).lstrip()
+            return _extract_signature_parts(header)
+    return None
+
+
+def parse_function_signature(text: str):
+    stripped = text.strip()
+    if 'function' not in stripped:
+        return None
+
+    parsed = _parse_declaration_signature(stripped)
+    if parsed:
+        name_part, raw_params, suffix = parsed
+    else:
+        parsed = _parse_assignment_signature(stripped)
+        if not parsed:
+            return None
+
+        name_part, raw_params, suffix = parsed
+
+    module_name, function_name = split_qualified_name(name_part)
+    if function_name == '':
+        return None
+
+    return_type = 'nil'
+    if suffix.startswith(':'):
+        return_type = suffix.removeprefix(':').strip() or 'nil'
+
+    return module_name, function_name, raw_params, return_type
 
 
 def unwrap_return_module(expr: str) -> str | None:
@@ -148,7 +302,7 @@ class FileParser:
             clean_lines.append(raw_line.split('--')[0])
         text = '\n'.join(clean_lines)
 
-        entries = self._split_top_level_entries(text)
+        entries = split_top_level_csv(text)
         if len(entries) == 0:
             self.error(text, 'line is not a dict')
 
@@ -163,60 +317,6 @@ class FileParser:
             out[key] = value
 
         return out
-
-    def _split_top_level_entries(self, text: str):
-        entries: list[str] = []
-        current: list[str] = []
-
-        in_string: str | None = None
-        escaped = False
-        paren_depth = 0
-        brace_depth = 0
-        bracket_depth = 0
-
-        for char in text:
-            if in_string:
-                current.append(char)
-                if escaped:
-                    escaped = False
-                elif char == '\\':
-                    escaped = True
-                elif char == in_string:
-                    in_string = None
-                continue
-
-            if char in ('"', "'"):
-                in_string = char
-                current.append(char)
-                continue
-
-            if char == '(':
-                paren_depth += 1
-            elif char == ')' and paren_depth > 0:
-                paren_depth -= 1
-            elif char == '{':
-                brace_depth += 1
-            elif char == '}' and brace_depth > 0:
-                brace_depth -= 1
-            elif char == '[':
-                bracket_depth += 1
-            elif char == ']' and bracket_depth > 0:
-                bracket_depth -= 1
-
-            if char == ',' and paren_depth == 0 and brace_depth == 0 and bracket_depth == 0:
-                entry = ''.join(current).strip()
-                if entry:
-                    entries.append(entry)
-                current = []
-                continue
-
-            current.append(char)
-
-        tail = ''.join(current).strip()
-        if tail:
-            entries.append(tail)
-
-        return entries
 
     def _map_dict_return(self, k: str, v: Any) -> str:
         module_name = unwrap_return_module(v)
@@ -268,6 +368,41 @@ class FileParser:
 
         return ReturnedValue(self.file, name, returned_name, is_submodule)
 
+    def _build_param_dict(self, raw_params: str):
+        if raw_params.strip() == '':
+            return {}
+        return map_param_list(split_top_level_csv(raw_params))
+
+    def _normalize_non_strict_param_dict(self, param_dict: dict[str, str]):
+        has_function_typed_param = any('->' in value for value in param_dict.values())
+        if has_function_typed_param:
+            return param_dict
+
+        for idx, key in enumerate(param_dict):
+            if idx > 0 and param_dict[key] == 'number':
+                param_dict[key] = 'string'
+
+        return param_dict
+
+    def _get_dict_return_alias_method(self, text: str, modules: dict[str, LuaModule], returned: ReturnDefinition):
+        if returned.type != 'dict':
+            return None
+
+        entry = RETURN_TABLE_ENTRY_REGEX.search(text)
+        if not entry:
+            return None
+
+        module_name = unwrap_return_module(entry.group(2).strip())
+        if not module_name:
+            return None
+
+        returned_name, is_submodule = returned.get_returned_name(module_name)
+        if not (returned_name and is_submodule):
+            return None
+
+        module = self._get_return_table_module(modules)
+        return LuaMethod(returned_name, module, {})
+
     def _get_function(
         self,
         text: str,
@@ -278,43 +413,26 @@ class FileParser:
         if not strict and not is_function_definition(text):
             return None
 
-        match = FUNCTION_REGEX.search(text)
-        if not match:
-            if returned.type == 'dict':
-                entry = RETURN_TABLE_ENTRY_REGEX.search(text)
-                if entry:
-                    expr = entry.group(2).strip()
-                    module_name = unwrap_return_module(expr)
-                    if module_name:
-                        returned_name, is_submodule = returned.get_returned_name(module_name)
-                        if returned_name and is_submodule:
-                            module = self._get_return_table_module(modules)
-                            return LuaMethod(returned_name, module, {})
+        parsed = parse_function_signature(text)
+        if not parsed:
+            alias_method = self._get_dict_return_alias_method(text, modules, returned)
+            if alias_method:
+                return alias_method
 
             if strict:
                 self.error(text, 'function is incorrectly defined')
             return None
-        assert match is not None
 
-        module_name = match.group(1)
-        fun_name: str = match.group(2) or ''
-        raw_params: str = match.group(3) or ''
-        return_type: str = match.group(4)
+        module_name, fun_name, raw_params, return_type = parsed
 
         if fun_name == '':
             self.error(text, 'method is incorrectly defined')
 
-        if raw_params.strip() != '':
-            params = remove_whitespace(raw_params.split(','))
-            param_dict = map_param_list(params)
-        else:
-            param_dict = {}
+        param_dict = self._build_param_dict(raw_params)
 
         if not strict:
             # Keep inferred method typing behavior consistent for module method indexes.
-            for idx, key in enumerate(param_dict):
-                if idx > 0 and param_dict[key] == 'number':
-                    param_dict[key] = 'string'
+            param_dict = self._normalize_non_strict_param_dict(param_dict)
 
         if module_name is not None:
             if module_name not in modules:

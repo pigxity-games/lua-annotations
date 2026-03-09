@@ -124,9 +124,7 @@ def _process_workspace(workdir: Path, config: Config, workspace_cfg: WorkspaceCo
             root_expr = workspace_cfg.get(env)[root_key]
             root_path, _ = resolve_rel_path(root_key, root_expr, workdir, env)
             if not root_path.is_dir():
-                raise ConfigError(
-                    f'root directory `{root_path.as_posix()}` does not exist for `{env}` in this workspace.'
-                )
+                raise ConfigError(f'root directory `{root_path.as_posix()}` does not exist for `{env}` in this workspace.')
             output_root = root_path / Path(config.out_dir_name)
 
             shutil.rmtree(output_root, True)
@@ -149,7 +147,7 @@ def _process_workspace(workdir: Path, config: Config, workspace_cfg: WorkspaceCo
             ctx = PostProcessCtx(reg, workdir, workspace, build_contexts)
             for hook in reg.post_build_hooks:
                 hook(ctx)
-                
+
         log.info(f'finished building')
 
     except LuaAnnotationsError as e:

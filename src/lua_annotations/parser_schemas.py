@@ -37,6 +37,10 @@ VARIABLE_REGEX = re.compile(r'^\s*(?:local\s+)?(?:function\s+)?(\w+)\s*(?:<[^>]+
 type Adornee = ReturnedValue | LuaModule | LuaMethod | LuaType
 
 
+RETURN_TABLE_MODULE_NAME = '__return_table__'
+RETURN_TABLE_ENTRY_REGEX = re.compile(r'^\s*(\w+)\s*[:=]\s*(.+?)(?:,\s*)?$', re.DOTALL)
+
+
 @dataclass
 class LuaMethod:
     name: str
@@ -73,6 +77,7 @@ class ReturnedValue:
     ):
         """Similar to the LuaPath constructor, but it takes the module's submodule status into account."""
         from .api.lua_dict import LuaPath
+
         props = properties or []
 
         if self.submodule:
@@ -95,7 +100,7 @@ class ReturnedValue:
 @dataclass
 class LuaModule(ReturnedValue):
     """For distinguishing between modules (tables) and basic values"""
-    
+
     methods: dict[str, LuaMethod] = field(default_factory=dict)
 
     def generate_type(self, exclude: list[str] = []):
@@ -103,7 +108,7 @@ class LuaModule(ReturnedValue):
         for name, method in self.methods.items():
             if not name in exclude and not name.startswith('_'):
                 string += f'    {name}: {method.generate_type()},\n'
-        
+
         return '{' + string + '}'
 
 

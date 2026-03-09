@@ -14,12 +14,8 @@ def test_manifest_extension_generates_module_paths_with_clean_lua_paths(tmp_path
     post_ctx = PostProcessCtx(SortedRegistry([], [], {}), tmp_path, workspace, build_ctxs)
 
     ext = ManifestExtension()
-    ext.manifest['shared']['init_hooks'].append(
-        LuaPath(tmp_path / 'shared' / 'Generated' / '_Internal' / 'Lifecycle.lua', require=True, cache=True)
-    )
-    ext.manifest['client']['init_hooks'].append(
-        LuaPath(tmp_path / 'client' / 'Handlers' / 'NpcAnimation.lua', require=True, cache=True)
-    )
+    ext.manifest['shared']['init_hooks'].append(LuaPath(tmp_path / 'shared' / 'Generated' / '_Internal' / 'Lifecycle.lua', require=True, cache=True))
+    ext.manifest['client']['init_hooks'].append(LuaPath(tmp_path / 'client' / 'Handlers' / 'NpcAnimation.lua', require=True, cache=True))
 
     ext.on_post_process(post_ctx)
 

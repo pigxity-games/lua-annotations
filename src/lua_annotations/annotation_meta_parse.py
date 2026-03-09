@@ -1,4 +1,3 @@
-
 import json
 from pathlib import Path
 import re
@@ -8,11 +7,12 @@ from lua_annotations.exceptions import BuildError
 META_FILE_NAME = 'annotation-meta.json'
 
 
-def validate_meta_dict(key: Any, value: Any, filename: str, name: str='regex_annotate'):
+def validate_meta_dict(key: Any, value: Any, filename: str, name: str = 'regex_annotate'):
     if not isinstance(key, str):
         raise BuildError(f'`{name}` key in {filename} must be a string')
     if not isinstance(value, str):
         raise BuildError(f'`{name}["{value}"]` in {filename} must be a string')
+
 
 def normalize_annotation(annotation: str):
     annotation = annotation.strip()
@@ -22,13 +22,14 @@ def normalize_annotation(annotation: str):
         return f'--{annotation}'
     return f'--@{annotation}'
 
-class AnnotationMeta():
+
+class AnnotationMeta:
     regex_annotate: dict[re.Pattern[str], str]
 
     def __init__(self, file: Path):
         # init
         raw = json.loads(file.read_text())
-        
+
         self.regex_annotate = {}
 
         # regex_annotate
@@ -37,7 +38,7 @@ class AnnotationMeta():
             return []
         if not isinstance(regex_annotate, dict):
             raise BuildError(f'`regex_annotate` in {file.as_posix()} must be an object')
-        
+
         for k, v in regex_annotate.items():
             validate_meta_dict(k, v, file.name)
             self.regex_annotate[re.compile(k, re.MULTILINE)] = normalize_annotation(v)

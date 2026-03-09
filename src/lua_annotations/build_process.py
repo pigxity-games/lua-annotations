@@ -38,17 +38,18 @@ ERROR = '\33[91m'
 WORKSPACE = '\033[96m'
 ENDC = '\033[0m'
 
+
 @dataclass
 class WorkspaceLogger:
-    id: int | None=None
+    id: int | None = None
 
     def _get_header(self):
         if self.id is not None:
-             return f'{WORKSPACE}[WS {self.id}]{ENDC}'
+            return f'{WORKSPACE}[WS {self.id}]{ENDC}'
         else:
             return ''
 
-    def _log(self, msg: str, color: str=''):
+    def _log(self, msg: str, color: str = ''):
         print(f'{self._get_header()} {color}{msg}{ENDC}')
 
     def info(self, msg: str):
@@ -68,8 +69,10 @@ class WorkspaceLogger:
 GLOBAL_LOGGER = WorkspaceLogger()
 _local = threading.local()
 
+
 def set_logger(log: WorkspaceLogger):
     _local.logger = log
+
 
 def logger() -> WorkspaceLogger:
     return getattr(_local, "logger", GLOBAL_LOGGER)
@@ -112,7 +115,6 @@ class BuildProcessCtx(ProcessCtx):
         file.write_text(text)
 
         return file
-    
 
     def process_file(self, file: Path, meta: AnnotationMeta | None = None):
         from .parser import FileParser
@@ -134,7 +136,6 @@ class BuildProcessCtx(ProcessCtx):
 
                 return parser
 
-
     def process_dir(self, dir: Path):
         meta_file = dir / META_FILE_NAME
 
@@ -142,7 +143,7 @@ class BuildProcessCtx(ProcessCtx):
         if meta_file.exists():
             meta = AnnotationMeta(meta_file)
 
-        for file in dir.iterdir():            
+        for file in dir.iterdir():
             if file.is_dir():
                 self.process_dir(file)
 
