@@ -87,8 +87,8 @@ class ReturnedValue:
 @dataclass
 class LuaModule(ReturnedValue):
     """For distinguishing between modules (tables) and basic values"""
-
-    pass
+    
+    methods: dict[str, LuaMethod] = field(default_factory=dict)
 
 
 @dataclass

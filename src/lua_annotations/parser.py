@@ -42,6 +42,7 @@ def map_param_list(params: list[str]):
 
 
 RETURN_TABLE_MODULE_NAME = '__return_table__'
+RETURN_TABLE_ENTRY_REGEX = re.compile(r'^\s*(\w+)\s*[:=]\s*(.+?)(?:,\s*)?$', re.DOTALL)
 
 
 def unwrap_return_module(expr: str) -> str | None:
@@ -128,19 +129,87 @@ class FileParser:
             self.error(text, 'Annotation does not exist')
 
     def _get_dict_data(self, text: str):
-        matches = DICT_REGEX.findall(text)
-        if not len(matches) > 0:
+        text = text.strip()
+        if text.startswith('{') and text.endswith('}'):
+            text = text[1:-1]
+
+        clean_lines: list[str] = []
+        for raw_line in text.splitlines():
+            stripped = raw_line.strip()
+            if stripped.startswith('--'):
+                continue
+            clean_lines.append(raw_line.split('--')[0])
+        text = '\n'.join(clean_lines)
+
+        entries = self._split_top_level_entries(text)
+        if len(entries) == 0:
             self.error(text, 'line is not a dict')
 
-        keys: list[str] = [m[0] for m in matches]
-        values: list[str] = [m[1] for m in matches]
+        out: dict[str, str] = {}
+        for entry in entries:
+            match = RETURN_TABLE_ENTRY_REGEX.search(entry)
+            if not match:
+                self.error(entry, 'line is not a dict')
 
-        if len(keys) == len(values):
-            out: dict[str, str] = {}
-            for i, key in enumerate(keys):
-                out[key] = values[i].strip().removesuffix('}').strip()
+            key = match.group(1)
+            value = match.group(2).strip()
+            out[key] = value
 
-            return out
+        return out
+
+    def _split_top_level_entries(self, text: str):
+        entries: list[str] = []
+        current: list[str] = []
+
+        in_string: str | None = None
+        escaped = False
+        paren_depth = 0
+        brace_depth = 0
+        bracket_depth = 0
+
+        for char in text:
+            if in_string:
+                current.append(char)
+                if escaped:
+                    escaped = False
+                elif char == '\\':
+                    escaped = True
+                elif char == in_string:
+                    in_string = None
+                continue
+
+            if char in ('"', "'"):
+                in_string = char
+                current.append(char)
+                continue
+
+            if char == '(':
+                paren_depth += 1
+            elif char == ')' and paren_depth > 0:
+                paren_depth -= 1
+            elif char == '{':
+                brace_depth += 1
+            elif char == '}' and brace_depth > 0:
+                brace_depth -= 1
+            elif char == '[':
+                bracket_depth += 1
+            elif char == ']' and bracket_depth > 0:
+                bracket_depth -= 1
+
+            if char == ',' and paren_depth == 0 and brace_depth == 0 and bracket_depth == 0:
+                entry = ''.join(current).strip()
+                if entry:
+                    entries.append(entry)
+                current = []
+                continue
+
+            current.append(char)
+
+        tail = ''.join(current).strip()
+        if tail:
+            entries.append(tail)
+
+        return entries
 
     def _map_dict_return(self, k: str, v: Any) -> str:
         module_name = unwrap_return_module(v)
@@ -197,10 +266,24 @@ class FileParser:
         text: str,
         modules: dict[str, LuaModule],
         returned: ReturnDefinition,
+        strict: bool = True,
     ):
         match = FUNCTION_REGEX.search(text)
         if not match:
-            self.error(text, 'function is incorrectly defined')
+            if returned.type == 'dict':
+                entry = RETURN_TABLE_ENTRY_REGEX.search(text)
+                if entry:
+                    expr = entry.group(2).strip()
+                    module_name = unwrap_return_module(expr)
+                    if module_name:
+                        returned_name, is_submodule = returned.get_returned_name(module_name)
+                        if returned_name and is_submodule:
+                            module = self._get_return_table_module(modules)
+                            return LuaMethod(returned_name, module, {}, 'any')
+
+            if strict:
+                self.error(text, 'function is incorrectly defined')
+            return None
         assert match is not None
 
         module_name = match.group(1)
@@ -217,24 +300,47 @@ class FileParser:
         else:
             param_dict = {}
 
+        if not strict:
+            # Keep inferred method typing behavior consistent for module method indexes.
+            for idx, key in enumerate(param_dict):
+                if idx > 0 and param_dict[key] == 'number':
+                    param_dict[key] = 'string'
+
         if module_name is not None:
             if module_name not in modules:
-                self.error(module_name, 'cannot use method annotations for an unindexed module.')
+                if strict:
+                    self.error(module_name, 'cannot use method annotations for an unindexed module.')
+                return None
             return LuaMethod(fun_name, modules[module_name], param_dict, return_type)
+
+        if returned.type == 'single':
+            entry = RETURN_TABLE_ENTRY_REGEX.search(text)
+            if entry and entry.group(2).strip().startswith('function'):
+                module = modules.get(returned.single_module or '') or self._get_return_table_module(modules)
+                return LuaMethod(fun_name, module, param_dict, return_type)
+
+            module = modules.get(returned.single_module or '')
+            if module:
+                return LuaMethod(fun_name, module, param_dict, return_type)
 
         # Allow `function foo()` to be a method annotation target when `foo`
         # is exported from a literal return table: `return { alias = foo }`.
         returned_name, is_submodule = returned.get_returned_name(fun_name)
         if returned.type != 'dict' or not (returned_name and is_submodule):
-            self.error(fun_name, 'cannot use method annotations for an unindexed module.')
+            if strict:
+                self.error(fun_name, 'cannot use method annotations for an unindexed module.')
+            return None
         assert returned_name is not None
 
+        module = self._get_return_table_module(modules)
+        return LuaMethod(returned_name, module, param_dict, return_type)
+
+    def _get_return_table_module(self, modules: dict[str, LuaModule]):
         module = modules.get(RETURN_TABLE_MODULE_NAME)
         if module is None:
             module = LuaModule(self.file, RETURN_TABLE_MODULE_NAME, self.file_name, False)
             modules[module.name] = module
-
-        return LuaMethod(returned_name, module, param_dict, return_type)
+        return module
 
     # main functions
     def error(self, text: str, message: str):
@@ -249,21 +355,29 @@ class FileParser:
 
         for i, line in enumerate(lines):
             self.cur_line += 1
+            lstrip = line.lstrip()
             # skip empty lines
             if line == '':
                 continue
 
             # comments
-            elif line.startswith('--'):
+            elif lstrip.startswith('--'):
                 # annotation
-                if line.startswith(ANNOTATION_PREFIX):
-                    anot = self._parse_annotation(line, self.reg)
+                if lstrip.startswith(ANNOTATION_PREFIX):
+                    anot = self._parse_annotation(lstrip, self.reg)
                     if anot:
                         self.cur_annotations.append(anot)
                     else:
                         self.error(line, 'Not an annotation')
 
             else:
+                code_line = line.split('--')[0].rstrip()
+
+                # Track methods defined in code regardless of annotation usage.
+                method = self._get_function(code_line, self.modules, returned, strict=False)
+                if method is not None:
+                    method.module.methods[method.name] = method
+
                 # if there are annotations in this block of code, then find adornee
                 if len(self.cur_annotations) > 0:
                     adefs = [anot.adef for anot in self.cur_annotations]
@@ -274,21 +388,26 @@ class FileParser:
                     scope = adefs[0].scope
 
                     # strip comments
-                    line = line.split('--')[0]
+                    line = code_line
 
                     # methods
                     if scope == 'method':
                         method = self._get_function(line, self.modules, returned)
+                        assert method
                         set_adornee(self.cur_annotations, method)
 
                     # module
                     elif scope == 'module':
                         match = MODULE_REGEX.search(line)
-                        if not match:
-                            self.error(line, 'code block is not a module')
-
-                        name: str = match.group(1)
-                        returned_name, is_submodule = returned.get_returned_name(name)
+                        if match:
+                            name: str = match.group(1)
+                            returned_name, is_submodule = returned.get_returned_name(name)
+                        else:
+                            entry = RETURN_TABLE_ENTRY_REGEX.search(line)
+                            if not entry:
+                                self.error(line, 'code block is not a module')
+                            name = unwrap_return_module(entry.group(2).strip()) or ''
+                            returned_name, is_submodule = returned.get_returned_name(name)
 
                         if not (name and returned_name):
                             self.error(line, 'invalid module definition or it is not returned.')

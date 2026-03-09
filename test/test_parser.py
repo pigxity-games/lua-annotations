@@ -5,7 +5,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 from lua_annotations.api.annotations import AnnotationDef, SortedRegistry
 from lua_annotations.api.lua_dict import LuaPathResolver
 from lua_annotations.build_process import Workspace
-from lua_annotations.parser import FileParser
+from lua_annotations.parser import RETURN_TABLE_MODULE_NAME, FileParser
 from lua_annotations.parser_schemas import (
     LuaMethod,
     LuaModule,
@@ -367,3 +367,136 @@ return test
 
     resolver = make_project_resolver(tmp_path)
     assert method_anot.adornee.get_path(require=True).to_lua(resolver) == 'require(ServerScriptService.Project.Test).test'
+
+
+def test_parser_method_types(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        "Test.lua",
+        """
+--@moduleAnn
+local m = {}
+
+function testFun1(param1: string, param2: number): string
+end
+
+return m
+""",
+    )
+    module = parser.modules["m"]    
+    method = module.methods.get("testFun1")
+    assert method
+    
+    assert method.params["param1"] == "string"
+    assert method.params["param2"] == "string"
+    assert method.return_type == "string"
+
+
+def test_parser_method_types_multiple(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        "Test.lua",
+        """
+--@moduleAnn
+local m = {}
+
+function testFun1(param1: string, param2: number): string
+end
+
+function testFun2(param1: number, param2: any): SomeGlobalType
+end
+
+return m
+""",
+    )
+    module = parser.modules["m"]    
+    method = module.methods.get("testFun1")
+    assert method
+    
+    assert method.params["param1"] == "string"
+    assert method.params["param2"] == "string"
+    assert method.return_type == "string"
+
+    method2 = module.methods.get("testFun2")
+    assert method2
+    
+    assert method2.params["param1"] == "number"
+    assert method2.params["param2"] == "any"
+    assert method2.return_type == "SomeGlobalType"
+
+
+def test_parser_method_types_inline(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        "Test.lua",
+        """
+--@moduleAnn
+local m = {
+    testFun1 = function(param1: string, param2: number): string
+    end
+}
+
+return m
+""",
+    )
+    module = parser.modules["m"]    
+    method = module.methods.get("testFun1")
+    assert method
+    
+    assert method.params["param1"] == "string"
+    assert method.params["param2"] == "string"
+    assert method.return_type == "string"
+
+
+def test_parser_method_types_inline_return(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        "Test.lua",
+        """
+return {
+    testFun1 = function(param1: string, param2: number): string
+    end
+}
+""",
+    )
+    module = parser.modules[RETURN_TABLE_MODULE_NAME]
+    method = module.methods["testFun1"]
+    assert isinstance(method, LuaMethod)
+
+    assert method.params["param1"] == "string"
+    assert method.params["param2"] == "string"
+    assert method.return_type == "string"
+
+
+def test_parser_method_types_use_any_if_ommited(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        "Test.lua",
+        """
+--@moduleAnn
+local m = {}
+
+function testFun1(param1, param2): string
+end
+function testFun2(param1: number, param2, param3: string)
+end
+
+return m
+""",
+    )
+    module = parser.modules["m"]    
+    
+    method = module.methods.get("testFun1")
+    assert method
+    
+    assert method.params["param1"] == "any"
+    assert method.params["param2"] == "any"
+    assert method.return_type == "string"
+
+    method = module.methods.get("testFun2")
+    assert method
+    
+    assert method.params["param1"] == "number"
+    assert method.params["param2"] == "any"
+    assert method.params["param3"] == "string"
+    assert method.return_type == "any"
