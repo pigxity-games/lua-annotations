@@ -5,13 +5,14 @@ import pytest  # pyright: ignore[reportMissingImports]
 from lua_annotations.api.annotations import AnnotationDef, SortedRegistry
 from lua_annotations.api.lua_dict import LuaPathResolver
 from lua_annotations.build_process import Workspace
-from lua_annotations.parser import RETURN_TABLE_MODULE_NAME, FileParser
+from lua_annotations.parser import FileParser
 from lua_annotations.parser_schemas import (
     LuaMethod,
     LuaModule,
     LuaParserError,
     LuaType,
     ReturnedValue,
+    RETURN_TABLE_MODULE_NAME,
 )
 
 
@@ -493,9 +494,9 @@ def test_parser_method_types_use_any_if_ommited(tmp_path: Path):
 --@moduleAnn
 local m = {}
 
-function testFun1(param1, param2): string
+function m.testFun1(param1, param2): string
 end
-function testFun2(param1: number, param2, param3: string)
+function m.testFun2(param1: number, param2, param3: string)
 end
 
 return m
@@ -527,9 +528,9 @@ def test_parser_method_types_functions(tmp_path: Path):
 --@moduleAnn
 local m = {}
 
-function testFun1(param1, callback: () -> ()): string
+function m.testFun1(param1, callback: () -> ()): string
 end
-function testFun2(param1: (number, string, any) -> (string), param2: number)
+function m.testFun2(param1: (number, string, any) -> (string), param2: number)
 end
 
 return m
@@ -550,3 +551,68 @@ return m
     assert method.params["param1"] == "(number, string, any) -> (string)"
     assert method.params["param2"] == "number"
     assert method.return_type == "nil"
+
+
+def test_parser_does_not_parse_toplevel_functions(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        "Test.lua",
+        """
+--@moduleAnn
+local m = {}
+
+function testFun1(param1: string, param2: number): string
+end
+function m.testFun2(param1: number, param2: string): string
+    local function testFun3()
+    end
+end
+
+return m
+""",
+    )
+    module = parser.modules["m"]
+
+    method = module.methods.get("testFun1")
+    assert method is None
+
+    method = module.methods.get("testFun3")
+    assert method is None
+
+    method = module.methods.get("testFun2")
+    assert method
+
+    assert method.params["param1"] == "number"
+
+
+def test_parser_method_call_type(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        "Test.lua",
+        """
+--@moduleAnn
+local m = {}
+
+function m:testFun1(param1: string, param2: number): string
+end
+function m.testFun1(param1, param2: number): string
+end
+
+return m
+""",
+    )
+    module = parser.modules["m"]
+
+    method = module.methods.get("testFun1")
+    assert method
+
+    assert method.call_type == ':'
+
+    # types are unchanged
+    assert method.params["param1"] == "string"
+
+    method = module.methods.get("testFun2")
+    assert method
+
+    assert method.call_type == '.'
+    assert method.params["param1"] == "any"

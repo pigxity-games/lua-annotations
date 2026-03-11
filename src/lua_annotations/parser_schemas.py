@@ -47,6 +47,7 @@ class LuaMethod:
     module: LuaModule
     params: dict[str, str] = field(default_factory=dict)
     return_type: str = 'nil'
+    call_type: str = '.'
 
     def __post_init__(self):
         if not self.return_type:
@@ -56,7 +57,7 @@ class LuaMethod:
         return self.module.get_path(relative, require, [self.name], function, cache)
 
     def generate_type(self):
-        param_string = ', '.join(self.params.values())
+        param_string = ', '.join([self.module.returned_name] if self.call_type == ':' else [] + list(self.params.values()))
         return f'({param_string}) -> ({self.return_type if self.return_type != 'nil' else ''})'
 
 

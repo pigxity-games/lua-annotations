@@ -100,8 +100,8 @@ def split_qualified_name(name: str):
     for separator in ('.', ':'):
         if separator in name:
             module_name, function_name = name.split(separator, 1)
-            return module_name, function_name
-    return None, name
+            return module_name, function_name, separator
+    return None, name, ''
 
 
 def _scan_balanced_parens(text: str, open_index: int):
@@ -188,7 +188,7 @@ def parse_function_signature(text: str):
 
         name_part, raw_params, suffix = parsed
 
-    module_name, function_name = split_qualified_name(name_part)
+    module_name, function_name, call_type = split_qualified_name(name_part)
     if function_name == '':
         return None
 
@@ -196,7 +196,7 @@ def parse_function_signature(text: str):
     if suffix.startswith(':'):
         return_type = suffix.removeprefix(':').strip() or 'nil'
 
-    return module_name, function_name, raw_params, return_type
+    return module_name, function_name, call_type, raw_params, return_type
 
 
 def unwrap_return_module(expr: str) -> str | None:
@@ -234,6 +234,8 @@ class FileParser:
     cur_annotations: list[Annotation] = field(default_factory=list)
     modules: dict[str, LuaModule] = field(default_factory=dict)
     types: dict[str, LuaType] = field(default_factory=dict)
+    explicit_method_modules: set[str] = field(default_factory=set)
+    implicit_method_names: dict[str, set[str]] = field(default_factory=dict)
     cur_line = 0
 
     def __post_init__(self):
@@ -403,6 +405,49 @@ class FileParser:
         module = self._get_return_table_module(modules)
         return LuaMethod(returned_name, module, {})
 
+    def _next_method_name(self, method_name: str):
+        match = re.match(r'^(.*?)(\d+)$', method_name)
+        if match:
+            base = match.group(1)
+            index = int(match.group(2)) + 1
+            return f'{base}{index}'
+        return f'{method_name}2'
+
+    def _resolve_method_name_collision(self, method: LuaMethod):
+        module_methods = method.module.methods
+        name = method.name
+
+        if name not in module_methods:
+            return name
+
+        existing = module_methods[name]
+        if existing.call_type == method.call_type:
+            return name
+
+        candidate = self._next_method_name(name)
+        while candidate in module_methods:
+            candidate = self._next_method_name(candidate)
+        return candidate
+
+    def _track_method(self, method: LuaMethod):
+        module_name = method.module.name
+        is_implicit = method.call_type == ''
+
+        if not is_implicit:
+            self.explicit_method_modules.add(module_name)
+            implicit_names = self.implicit_method_names.pop(module_name, set())
+            for name in implicit_names:
+                method.module.methods.pop(name, None)
+
+        if is_implicit and module_name in self.explicit_method_modules:
+            return
+
+        method.name = self._resolve_method_name_collision(method)
+        method.module.methods[method.name] = method
+
+        if is_implicit:
+            self.implicit_method_names.setdefault(module_name, set()).add(method.name)
+
     def _get_function(
         self,
         text: str,
@@ -423,7 +468,7 @@ class FileParser:
                 self.error(text, 'function is incorrectly defined')
             return None
 
-        module_name, fun_name, raw_params, return_type = parsed
+        module_name, fun_name, call_type, raw_params, return_type = parsed
 
         if fun_name == '':
             self.error(text, 'method is incorrectly defined')
@@ -439,17 +484,17 @@ class FileParser:
                 if strict:
                     self.error(module_name, 'cannot use method annotations for an unindexed module.')
                 return None
-            return LuaMethod(fun_name, modules[module_name], param_dict, return_type)
+            return LuaMethod(fun_name, modules[module_name], param_dict, return_type, call_type)
 
         if returned.type == 'single':
             entry = RETURN_TABLE_ENTRY_REGEX.search(text)
             if entry and entry.group(2).strip().startswith('function'):
                 module = modules.get(returned.single_module or '') or self._get_return_table_module(modules)
-                return LuaMethod(fun_name, module, param_dict, return_type)
+                return LuaMethod(fun_name, module, param_dict, return_type, call_type)
 
             module = modules.get(returned.single_module or '')
             if module:
-                return LuaMethod(fun_name, module, param_dict, return_type)
+                return LuaMethod(fun_name, module, param_dict, return_type, call_type)
 
         # Allow `function foo()` to be a method annotation target when `foo`
         # is exported from a literal return table: `return { alias = foo }`.
@@ -461,7 +506,7 @@ class FileParser:
         assert returned_name is not None
 
         module = self._get_return_table_module(modules)
-        return LuaMethod(returned_name, module, param_dict, return_type)
+        return LuaMethod(returned_name, module, param_dict, return_type, call_type)
 
     def _get_return_table_module(self, modules: dict[str, LuaModule]):
         module = modules.get(RETURN_TABLE_MODULE_NAME)
@@ -504,7 +549,7 @@ class FileParser:
                 # Track methods defined in code regardless of annotation usage.
                 method = self._get_function(code_line, self.modules, returned, strict=False)
                 if method is not None:
-                    method.module.methods[method.name] = method
+                    self._track_method(method)
 
                 # if there are annotations in this block of code, then find adornee
                 if len(self.cur_annotations) > 0:
