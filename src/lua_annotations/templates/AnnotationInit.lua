@@ -5,10 +5,18 @@ local t0 = os.clock()
 --modulePaths
 
 local cache = {}
+local function waitForPath(path)
+    local cur = path[1]
+    for i = 2, #path do
+        cur = cur:WaitForChild(path[i])
+    end
+    return cur
+end
+
 local function getCached(moduleName)
     local m = cache[moduleName]
     if not m then
-        m = require(modulePaths[moduleName])
+        m = require(waitForPath(modulePaths[moduleName]))
         cache[moduleName] = m
     end
     return m

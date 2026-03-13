@@ -50,12 +50,19 @@ def convert_dict(
         entries = [f'{key_to_lua(k, level)}{sep}{to_lua(v, level + 1)},' for k, v in value.items()]
         return table_block(entries, level)
 
+    def inline_list(value: LuaInlineList, level: int):
+        entries = ', '.join(to_lua(item, level + 1) for item in value.items)
+        return '{' + entries + '}'
+
     def to_lua(value: Any, level: int):
         if isinstance(value, LuaExpr):
             return value.string
 
         if isinstance(value, LuaPath):
             return value.to_lua(resolver)
+
+        if isinstance(value, LuaInlineList):
+            return inline_list(value, level)
 
         if isinstance(value, SupportsAsDict):
             return process_dict(value.asdict(), level)
@@ -101,7 +108,7 @@ class LuaPathResolver:
     def __init__(self, workspace: Workspace):
         self.workspace = workspace
         self.used_imports: set[Environment] = set()
-        self.cached_module_paths: dict[str, str] = {}
+        self.cached_module_paths: dict[str, LuaInlineList] = {}
 
     @staticmethod
     def _collapse_dots(expr: str):
@@ -150,17 +157,17 @@ class LuaPathResolver:
 
         return import_lines
 
-    def register_cached_module(self, module_name: str, path_expr: str):
+    def register_cached_module(self, module_name: str, path: LuaInlineList):
         current = self.cached_module_paths.get(module_name)
         if current is None:
-            self.cached_module_paths[module_name] = path_expr
+            self.cached_module_paths[module_name] = path
             return
 
-        if current != path_expr:
+        if current != path:
             raise BuildError(f'duplicate module name found for cache lookup: {module_name}')
 
     def get_cached_module_paths(self):
-        return {name: LuaExpr(path) for name, path in self.cached_module_paths.items()}
+        return self.cached_module_paths
 
 
 @dataclass
@@ -170,6 +177,11 @@ class LuaExpr:
     """
 
     string: str
+
+
+@dataclass
+class LuaInlineList:
+    items: list[LuaExpr | LuaPath | str]
 
 
 @dataclass
@@ -204,7 +216,13 @@ class LuaPath:
     def _collapse_dots(self, string: str):
         return LuaPathResolver._collapse_dots(string)
 
-    def _post_process(self, string: str, module_name: str, resolver: LuaPathResolver | None = None):
+    def _post_process(
+        self,
+        string: str,
+        module_name: str,
+        resolver: LuaPathResolver | None = None,
+        cache_path: LuaInlineList | None = None,
+    ):
         if self.cache:
             if not self.require:
                 raise BuildError('LuaPath cache requires require=True')
@@ -212,8 +230,8 @@ class LuaPath:
             if resolver is None:
                 raise BuildError('LuaPath cache requires a LuaPathResolver')
 
-            string = self._collapse_dots(string)
-            resolver.register_cached_module(module_name, string)
+            assert cache_path is not None
+            resolver.register_cached_module(module_name, cache_path)
             escaped = module_name.replace('\\', '\\\\').replace('"', '\\"')
             string = f'getCached("{escaped}")'
         elif self.require or len(self.properties) > 0:
@@ -235,9 +253,11 @@ class LuaPath:
 
         # relative path (script.Parent.Example.Path)
         parts = self._parts_no_ext(self.path)
-        expr = self._append_parts('script.Parent', parts)
+        expr_root = 'script.Parent'
+        expr = self._append_parts(expr_root, parts)
+        cache_path = LuaInlineList([LuaExpr(expr_root), *parts])
         module_name = self.path.with_suffix('').name
-        return self._post_process(expr, module_name, resolver)
+        return self._post_process(expr, module_name, resolver, cache_path)
 
     def to_lua(self, resolver: LuaPathResolver, inline_require: bool = False):
         if self.relative:
@@ -250,7 +270,8 @@ class LuaPath:
 
         parts = self._parts_no_ext(rel)
         expr = self._append_parts(expr_root, parts)
-        return self._post_process(expr, rel.with_suffix('').name, resolver)
+        cache_path = LuaInlineList([LuaExpr(expr_root), *parts])
+        return self._post_process(expr, rel.with_suffix('').name, resolver, cache_path)
 
 
 # public api

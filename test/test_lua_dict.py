@@ -60,7 +60,7 @@ def test_luapath_cache_uses_getcached_and_builds_module_paths(tmp_path: Path):
         'local ServerScriptService = game:GetService("ServerScriptService")\n'
         '\n'
         'local modulePaths = {\n'
-        '    Data = ServerScriptService.ServerRoot.Services.Data,\n'
+        '    Data = {ServerScriptService.ServerRoot, "Services", "Data"},\n'
         '}\n'
     )
 

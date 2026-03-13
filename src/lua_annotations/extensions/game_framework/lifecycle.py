@@ -7,6 +7,7 @@ from lua_annotations.api.annotations import (
     AnnotationDef,
     ExtensionRegistry,
     Extension,
+    FileBuildCtx,
 )
 from lua_annotations.api.arguments import default_list
 from lua_annotations.build_process import Environment, PostProcessCtx, logger
@@ -23,11 +24,26 @@ def filter_deps(deps: list[str]) -> list[str]:
     return [d for d in deps if ':' not in d]
 
 
+def remote_dep(dep: str) -> tuple[Environment, str] | None:
+    if ':' not in dep:
+        return None
+
+    remote_env, remote_name = dep.split(':', 1)
+    if remote_env not in ENVIRONMENTS:
+        return None
+
+    return remote_env, remote_name
+
+
 def dep_error(svc: Annotation, dep: str, msg: str):
     raise BuildError(msg + get_service_name(svc) + ': ' + dep)
 
 
-def proc_deps(svc: Annotation, service_map: dict[str, Annotation]):
+def proc_deps(
+    svc: Annotation,
+    service_map: dict[str, Annotation],
+    remote_map: dict[Environment, set[str]],
+):
     out = {'services': [], 'remotes': []}
 
     if svc.name == 'component':
@@ -35,7 +51,16 @@ def proc_deps(svc: Annotation, service_map: dict[str, Annotation]):
 
     for dep in svc.kwargs_val.get('depends', []):
         if ':' in dep:
-            out['remotes'].append(dep.split(':')[1])
+            remote = remote_dep(dep)
+            if not remote:
+                dep_error(svc, dep, 'Invalid remote dependency for service')
+            assert remote is not None
+
+            remote_env, remote_name = remote
+            if remote_name not in remote_map[remote_env]:
+                dep_error(svc, dep, 'Invalid remote dependency for service')
+
+            out['remotes'].append(remote_name)
             continue
 
         dep_anot = service_map.get(dep)
@@ -53,9 +78,13 @@ def proc_deps(svc: Annotation, service_map: dict[str, Annotation]):
     return out
 
 
-def service_todict(svc: Annotation, service_map: dict[str, Annotation]):
+def service_todict(
+    svc: Annotation,
+    service_map: dict[str, Annotation],
+    remote_map: dict[Environment, set[str]],
+):
     out = {
-        'depends': proc_deps(svc, service_map),
+        'depends': proc_deps(svc, service_map, remote_map),
         'getAdornee': svc.adornee.get_path(function=True, require=True, cache=True),  # pyright: ignore[reportAttributeAccessIssue]
         'kind': svc.name,
     }
@@ -116,10 +145,20 @@ class LifecycleExtension(Extension):
     def __init__(self):
         self.services: AnotDict = {env: [] for env in ENVIRONMENTS}
         self.dependencies: AnotDict = {env: [] for env in ENVIRONMENTS}
+        self.remote_services: dict[Environment, set[str]] = {env: set() for env in ENVIRONMENTS}
         self.manifestExt: ManifestExtension | None = None
 
     def add_service(self, ctx: AnnotationBuildCtx):
         self.services[ctx.build_ctx.env].append(ctx.annotation)
+
+    def on_file_process(self, ctx: FileBuildCtx):
+        for anot in ctx.parser.annotations:
+            if anot.name != 'remote':
+                continue
+
+            adornee = anot.adornee
+            assert isinstance(adornee, LuaMethod)
+            self.remote_services[ctx.build_ctx.env].add(adornee.module.returned_name)
 
     def on_post_process(self, ctx: PostProcessCtx):
         assert self.manifestExt
@@ -128,7 +167,12 @@ class LifecycleExtension(Extension):
             services = self.services[env] + self.services['shared']
 
             self.manifestExt.manifest[env]['services'] = {
-                get_service_name(svc): service_todict(svc, {get_service_name(svc): svc for svc in services}) for svc in services
+                get_service_name(svc): service_todict(
+                    svc,
+                    {get_service_name(svc): svc for svc in services},
+                    self.remote_services,
+                )
+                for svc in services
             }
 
             try:

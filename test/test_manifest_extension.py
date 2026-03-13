@@ -24,8 +24,8 @@ def test_manifest_extension_generates_module_paths_with_clean_lua_paths(tmp_path
 
     module_paths_block = extract_block(out, 'local modulePaths = {', 'local cache = {}')
 
-    assert 'Lifecycle = ReplicatedStorage.Generated._Internal.Lifecycle' in module_paths_block
-    assert 'NpcAnimation = PlayerScripts.Handlers.NpcAnimation' in module_paths_block
+    assert 'Lifecycle = {ReplicatedStorage, "Generated", "_Internal", "Lifecycle"}' in module_paths_block
+    assert 'NpcAnimation = {PlayerScripts, "Handlers", "NpcAnimation"}' in module_paths_block
     assert '..' not in module_paths_block
     assert 'require(' not in module_paths_block
     assert 'getCached("Lifecycle")' in out
