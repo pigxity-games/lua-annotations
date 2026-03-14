@@ -351,8 +351,15 @@ class FileParser:
             if not tablestr:
                 self.error(text, 'module export is incorrectly defined')
 
-            dict_data = self._get_dict_data(tablestr)
+            try:
+                dict_data = self._get_dict_data(tablestr)
+            except LuaParserError:
+                return ReturnDefinition(default_name, 'single', single_module=RETURN_TABLE_MODULE_NAME)
+
             if dict_data:
+                if any(not unwrap_return_module(v) and not is_literal_function(v) for v in dict_data.values()):
+                    return ReturnDefinition(default_name, 'single', single_module=RETURN_TABLE_MODULE_NAME)
+
                 return ReturnDefinition(
                     default_name,
                     'dict',
@@ -362,6 +369,9 @@ class FileParser:
                 self.error(text, 'module export is not a table')
 
     def _get_returned_value(self, text: str, returned: ReturnDefinition):
+        if text.lstrip().startswith('return') and returned.single_module == RETURN_TABLE_MODULE_NAME:
+            return ReturnedValue(self.file, self.file_name, self.file_name)
+
         match = VARIABLE_REGEX.search(text)
         if not match:
             self.error(text, 'code block is not a variable declaration')

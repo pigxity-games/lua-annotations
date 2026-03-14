@@ -652,3 +652,61 @@ return {
     assert module
     assert module.methods.get("test")
     assert not module.methods.get("test2")
+
+
+def test_parser_handles_literal_table_returns(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        "Test.lua",
+        """
+local val4 = 99
+
+--@valueAnn
+return {
+    val = "string",
+    num = 10,
+    nested = {
+        nestedVal = 100,
+        val4 = val4
+    }
+}
+""",
+    )
+
+    value_anot = next(a for a in parser.annotations if a.name == "valueAnn")
+    assert value_anot
+
+    assert len(parser.modules) == 0
+
+
+def test_parser_handles_literal_table_returns_2(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        "Test.lua",
+        """
+--@valueAnn
+return {
+	[1] = {
+		music = {
+			soundId = 12434204041,
+			volume = 0.5,
+		},
+	},
+	[15] = {
+		music = {
+			soundId = 17279172858,
+			volume = 0.6,
+		},
+	},
+	[25] = {
+		music = {
+			soundId = 17279274530,
+			volume = 0.3,
+		},
+	},
+}
+
+""",
+    )
+
+    assert len(parser.modules) == 0
