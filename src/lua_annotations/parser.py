@@ -331,7 +331,11 @@ class FileParser:
         self.error(v, 'submodule export is incorrectly defined')
 
     def _get_returned(self, text: str, default_name: str):
-        match = RETURN_REGEX.search(text)
+        return_starts = list(re.finditer(r'^return\b', text, re.MULTILINE))
+        if len(return_starts) == 0:
+            return
+
+        match = RETURN_REGEX.search(text[return_starts[-1].start() :])
         if not match:
             return
 

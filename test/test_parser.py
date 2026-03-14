@@ -616,3 +616,39 @@ return m
 
     assert method.call_type == '.'
     assert method.params["param1"] == "any"
+
+def test_parser_does_not_handle_function_return(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        "Test.lua",
+        """
+--@moduleAnn
+local m = {}
+
+function m.test()
+    local val = "s"
+    local val2 = 56
+
+    local function test2()
+        return {mult = val2 * 2, div = val2 / 2}
+    end
+
+    return {
+        string = val,
+        num = 56,
+        modifiedValues = test2()
+    }
+end
+
+return {
+    module = m
+}
+""",
+    )
+
+    assert len(parser.modules) == 1
+
+    module = parser.modules["m"]
+    assert module
+    assert module.methods.get("test")
+    assert not module.methods.get("test2")
