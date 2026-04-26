@@ -27,3 +27,6 @@ lua_annotations = ["templates/**", "extensions/game_framework/lua/**"]
 [tool.black]
 skip-string-normalization = true
 line-length = 150
+
+[tool.pytest.ini_options]
+addopts = "--basetemp=.pytest_tmp"

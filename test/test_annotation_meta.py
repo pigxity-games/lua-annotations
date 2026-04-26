@@ -20,32 +20,20 @@ def test_annotation_meta_regex_annotates_direct_children_only(tmp_path: Path):
     nested = src / "nested"
     nested.mkdir()
 
-    (src / "annotation-meta.json").write_text(
-        json.dumps(
-            {
-                "regex_annotate": {
-                    r"^local \w+ = [\w{}]+": "@moduleAnn"
-                }
-            }
-        )
-    )
+    (src / "annotation-meta.json").write_text(json.dumps({"regex_annotate": {r"^local \w+ = [\w{}]+": "@moduleAnn"}}))
 
-    (src / "Top.lua").write_text(
-        """local Top = {}
+    (src / "Top.lua").write_text("""local Top = {}
 
 return {
     Top = Top
 }
-"""
-    )
-    (nested / "Nested.lua").write_text(
-        """local Nested = {}
+""")
+    (nested / "Nested.lua").write_text("""local Nested = {}
 
 return {
     Nested = Nested
 }
-"""
-    )
+""")
 
     parsed: dict[str, FileParser] = {}
 
@@ -77,24 +65,14 @@ def test_annotation_meta_accepts_annotation_without_prefix(tmp_path: Path):
     src = tmp_path / "src"
     src.mkdir()
 
-    (src / "annotation-meta.json").write_text(
-        json.dumps(
-            {
-                "regex_annotate": {
-                    r"^local \w+ = [\w{}]+": "moduleAnn"
-                }
-            }
-        )
-    )
+    (src / "annotation-meta.json").write_text(json.dumps({"regex_annotate": {r"^local \w+ = [\w{}]+": "moduleAnn"}}))
 
-    (src / "Top.lua").write_text(
-        """local Top = {}
+    (src / "Top.lua").write_text("""local Top = {}
 
 return {
     Top = Top
 }
-"""
-    )
+""")
 
     parsed: dict[str, FileParser] = {}
 

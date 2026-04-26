@@ -37,15 +37,28 @@ VARIABLE_REGEX = re.compile(r'^\s*(?:local\s+)?(?:function\s+)?(\w+)\s*(?:<[^>]+
 type Adornee = ReturnedValue | LuaModule | LuaMethod | LuaType
 
 
+RETURN_TABLE_MODULE_NAME = '__return_table__'
+RETURN_TABLE_ENTRY_REGEX = re.compile(r'^\s*(\w+)\s*[:=]\s*(.+?)(?:,\s*)?$', re.DOTALL)
+
+
 @dataclass
 class LuaMethod:
     name: str
     module: LuaModule
     params: dict[str, str] = field(default_factory=dict)
-    return_type: Optional[str] = None
+    return_type: str = 'nil'
+    call_type: str = '.'
 
-    def get_path(self, relative: bool = False, require: bool = False, function: bool = False):
-        return self.module.get_path(relative, require, [self.name], function)
+    def __post_init__(self):
+        if not self.return_type:
+            self.return_type = 'nil'
+
+    def get_path(self, relative: bool = False, require: bool = False, function: bool = False, cache: bool = False):
+        return self.module.get_path(relative, require, [self.name], function, cache)
+
+    def generate_type(self):
+        param_string = ', '.join([self.module.returned_name] if self.call_type == ':' else [] + list(self.params.values()))
+        return f'({param_string}) -> ({self.return_type if self.return_type != 'nil' else ''})'
 
 
 @dataclass
@@ -59,22 +72,26 @@ class ReturnedValue:
         self,
         relative: bool = False,
         require: bool = False,
-        properties: list[str] = [],
+        properties: list[str] | None = None,
         function: bool = False,
+        cache: bool = False,
     ):
         """Similar to the LuaPath constructor, but it takes the module's submodule status into account."""
         from .api.lua_dict import LuaPath
+
+        props = properties or []
 
         if self.submodule:
             return LuaPath(
                 self.file,
                 relative,
                 require,
-                [self.returned_name] + properties,
+                [self.returned_name] + props,
                 function,
+                cache,
             )
         else:
-            return LuaPath(self.file, relative, require, properties, function)
+            return LuaPath(self.file, relative, require, props, function, cache)
 
     def get_expr(self, resolver: LuaPathResolver, relative: bool = False):
         path = self.get_path(relative, True)
@@ -85,7 +102,15 @@ class ReturnedValue:
 class LuaModule(ReturnedValue):
     """For distinguishing between modules (tables) and basic values"""
 
-    pass
+    methods: dict[str, LuaMethod] = field(default_factory=dict)
+
+    def generate_type(self, exclude: list[str] = []):
+        string = '\n'
+        for name, method in self.methods.items():
+            if not name in exclude and not name.startswith('_'):
+                string += f'    {name}: {method.generate_type()},\n'
+
+        return '{' + string + '}'
 
 
 @dataclass
@@ -115,8 +140,14 @@ class Annotation:
             'name': self.name,
             'args': self.args_val,
             'kwargs': self.kwargs_val,
-            'getAdornee': self.adornee.get_path(require=True, function=True),  # pyright: ignore[reportAttributeAccessIssue]
+            'getAdornee': self.adornee.get_path(require=True, function=True, cache=True),  # pyright: ignore[reportAttributeAccessIssue]
         } | self.export_data
+
+    def get_adornee_name(self):
+        if isinstance(self.adornee, LuaModule):
+            return self.adornee.returned_name
+        elif isinstance(self.adornee, LuaMethod):
+            return self.adornee.name
 
 
 @dataclass

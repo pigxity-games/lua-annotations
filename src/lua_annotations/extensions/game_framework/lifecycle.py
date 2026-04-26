@@ -7,6 +7,7 @@ from lua_annotations.api.annotations import (
     AnnotationDef,
     ExtensionRegistry,
     Extension,
+    FileBuildCtx,
 )
 from lua_annotations.api.arguments import default_list
 from lua_annotations.build_process import Environment, PostProcessCtx, logger
@@ -23,11 +24,26 @@ def filter_deps(deps: list[str]) -> list[str]:
     return [d for d in deps if ':' not in d]
 
 
+def remote_dep(dep: str) -> tuple[Environment, str] | None:
+    if ':' not in dep:
+        return None
+
+    remote_env, remote_name = dep.split(':', 1)
+    if remote_env not in ENVIRONMENTS:
+        return None
+
+    return remote_env, remote_name
+
+
 def dep_error(svc: Annotation, dep: str, msg: str):
-        raise BuildError(msg + get_service_name(svc) + ': ' + dep)
+    raise BuildError(msg + get_service_name(svc) + ': ' + dep)
 
 
-def proc_deps(svc: Annotation, service_map: dict[str, Annotation]):
+def proc_deps(
+    svc: Annotation,
+    service_map: dict[str, Annotation],
+    remote_map: dict[Environment, set[str]],
+):
     out = {'services': [], 'remotes': []}
 
     if svc.name == 'component':
@@ -35,7 +51,16 @@ def proc_deps(svc: Annotation, service_map: dict[str, Annotation]):
 
     for dep in svc.kwargs_val.get('depends', []):
         if ':' in dep:
-            out['remotes'].append(dep.split(':')[1])
+            remote = remote_dep(dep)
+            if not remote:
+                dep_error(svc, dep, 'Invalid remote dependency for service')
+            assert remote is not None
+
+            remote_env, remote_name = remote
+            if remote_name not in remote_map[remote_env]:
+                dep_error(svc, dep, 'Invalid remote dependency for service')
+
+            out['remotes'].append(remote_name)
             continue
 
         dep_anot = service_map.get(dep)
@@ -53,16 +78,20 @@ def proc_deps(svc: Annotation, service_map: dict[str, Annotation]):
     return out
 
 
-def service_todict(svc: Annotation, service_map: dict[str, Annotation]):    
+def service_todict(
+    svc: Annotation,
+    service_map: dict[str, Annotation],
+    remote_map: dict[Environment, set[str]],
+):
     out = {
-        'depends': proc_deps(svc, service_map),
-        'getAdornee': svc.adornee.get_path(function=True, require=True),  # pyright: ignore[reportAttributeAccessIssue]
+        'depends': proc_deps(svc, service_map, remote_map),
+        'getAdornee': svc.adornee.get_path(function=True, require=True, cache=True),  # pyright: ignore[reportAttributeAccessIssue]
         'kind': svc.name,
     }
 
     if svc.name == 'component':
         out['tags'] = svc.args_val[0]
-        
+
         data_svc = svc.kwargs_val.get('data', None)
         if data_svc and not service_map.get(data_svc):
             logger().warn(f'Invalid data dependency for component {get_service_name(svc)}: "{data_svc}"; ommiting')
@@ -75,8 +104,9 @@ def service_todict(svc: Annotation, service_map: dict[str, Annotation]):
 def get_service_name(svc: Annotation):
     if isinstance(svc.adornee, ReturnedValue):
         return svc.adornee.returned_name
-    elif isinstance(svc.adornee, LuaMethod):
+    if isinstance(svc.adornee, LuaMethod):
         return svc.adornee.name
+    raise BuildError(f'Unknown service adornee type: {type(svc.adornee).__name__}')
 
 
 def get_topo_graph(services: list[Annotation], key: str):
@@ -115,10 +145,20 @@ class LifecycleExtension(Extension):
     def __init__(self):
         self.services: AnotDict = {env: [] for env in ENVIRONMENTS}
         self.dependencies: AnotDict = {env: [] for env in ENVIRONMENTS}
+        self.remote_services: dict[Environment, set[str]] = {env: set() for env in ENVIRONMENTS}
         self.manifestExt: ManifestExtension | None = None
 
     def add_service(self, ctx: AnnotationBuildCtx):
         self.services[ctx.build_ctx.env].append(ctx.annotation)
+
+    def on_file_process(self, ctx: FileBuildCtx):
+        for anot in ctx.parser.annotations:
+            if anot.name != 'remote':
+                continue
+
+            adornee = anot.adornee
+            assert isinstance(adornee, LuaMethod)
+            self.remote_services[ctx.build_ctx.env].add(adornee.module.returned_name)
 
     def on_post_process(self, ctx: PostProcessCtx):
         assert self.manifestExt
@@ -127,7 +167,11 @@ class LifecycleExtension(Extension):
             services = self.services[env] + self.services['shared']
 
             self.manifestExt.manifest[env]['services'] = {
-                get_service_name(svc): service_todict(svc, {get_service_name(svc): svc for svc in services})
+                get_service_name(svc): service_todict(
+                    svc,
+                    {get_service_name(svc): svc for svc in services},
+                    self.remote_services,
+                )
                 for svc in services
             }
 
@@ -135,7 +179,6 @@ class LifecycleExtension(Extension):
                 self.manifestExt.manifest[env]['load_order'] = get_runtime_load_order(services)
             except CycleError as e:
                 raise BuildError(f"Cycle detected for service graph: {e.args}") from e
-
 
     def load(self, ctx: ExtensionRegistry):
         from lua_annotations.extensions.default import ManifestExtension
@@ -148,20 +191,22 @@ class LifecycleExtension(Extension):
         dependency = AnnotationDef(
             'dependency',
             retention='build',
-            kwargs={'depends': default_list, 'load_after': default_list},
+            kwargs={'depends': default_list, 'load_after': default_list, 'typegen': str},
             on_build=self.add_service,
         )
 
         ctx.register_anot(dependency)
         ctx.register_anot(dependency.extend(AnnotationDef('initService', scope='method')))
         ctx.register_anot(dependency.extend(AnnotationDef('service')))
-        ctx.register_anot(dependency.extend(
-            AnnotationDef(
-                'component',
-                args=[default_list],
-                kwargs={'data': str},
+        ctx.register_anot(
+            dependency.extend(
+                AnnotationDef(
+                    'component',
+                    args=[default_list],
+                    kwargs={'data': str},
+                )
             )
-        ))
+        )
 
         ctx.register_anot(AnnotationDef('bindTag', retention='init', args=[default_list], scope='method'))
 

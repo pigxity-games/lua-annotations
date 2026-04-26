@@ -1,5 +1,5 @@
 {
-    "out_dir": "Generated",
+    "outDirName": "Generated",
     "workspaces": [
         {
             "client": {"src/client": ":"},
@@ -8,6 +8,6 @@
         }
     ],
     "extensions": [
-        ["library", "lua-annotations.extensions.game_framework.main"]
+        ["library", "lua_annotations.extensions.game_framework.main"]
     ]
 }

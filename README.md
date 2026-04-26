@@ -12,8 +12,8 @@ A lua annotation processor written in python; it's targeted toward Roblox develo
 
 ### Game framework
 - Services (`@service`) define individual game logic
-- Controllers (`@controller`) define per-instance behavior and are automatically mapped to instances containing CollectionService tags
-- Dependency injection for services and controllers with automatic load ordering
+- Components (`@component`) define per-instance behavior and are automatically mapped to instances containing CollectionService tags
+- Dependency injection for services and components with automatic load ordering
 - Seamless networking bridge; simply import "remote services" (wrappers of RemoteEvents/Functions) 
 
 ----
@@ -28,36 +28,42 @@ The program also has a watch command, which detects changes and automatically re
 
 ### Multiple workspaces
 A workspace represents one individual place synced with rojo. Multi-place games would require using multiple.
-It is also possible to have multiple paths per ennvironment, if you want to.
+It is also possible to have multiple paths per environment, if you want to.
 
 ## Defining custom annotations
 The program contains an easy API to do so!
 ```python
-#Runs after annotation parsing
+from lua_annotations.api.annotations import AnnotationBuildCtx, AnnotationDef, Extension, ExtensionRegistry
+from lua_annotations.build_process import PostProcessCtx
+
+
 class MyExtension(Extension):
-    def on_build_test_anot(ctx: AnnotationBuildCtx):
+    # Runs after annotation parsing.
+    def on_build_test_anot(self, ctx: AnnotationBuildCtx):
         print(f'Hello World, {ctx.annotation.name}!')
 
-    #Runs after all files have been processed
-    def on_post_process(ctx: PostProcessCtx):
+    # Runs after all files have been processed.
+    def on_post_process(self, ctx: PostProcessCtx):
         print('Build finished!')
 
-    def load(ctx: ExtensionRegistry):
-        ctx.register_anot(AnnotationDef('moduleTest', scope='module', on_build=self.on_build_test_anot)
+    def load(self, ctx: ExtensionRegistry):
+        ctx.register_anot(AnnotationDef('moduleTest', scope='module', on_build=self.on_build_test_anot))
 
 
 def load(ctx: ExtensionRegistry):
     ctx.register_extension(MyExtension())
 ```
 
-add it to your project's config file:
+Add it to your project's config file:
 `annotations.config.json`
 ```json
-extensions = [
-    ["path", "my_extension/main.py"]
-]
+{
+    "extensions": [
+        ["path", "my_extension/main.py"]
+    ]
+}
 ```
 
 **Note: see the documentation for more info.**
 
-**Since the project uses this API internally for optional extensions, you may also see the sourcecode under `/src/extensions/` for reference!**
+**Since the project uses this API internally for optional extensions, you may also see the source code under `src/lua_annotations/extensions` for reference!**

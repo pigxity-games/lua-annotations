@@ -26,13 +26,13 @@ class ManifestExtension(Extension):
         adornee = ctx.annotation.adornee
         assert isinstance(adornee, LuaMethod)
 
-        self.manifest[ctx.build_ctx.env][key].append(adornee.get_path(require=True))
+        self.manifest[ctx.build_ctx.env][key].append(adornee.get_path(require=True, cache=True))
 
     def on_build_annotation_init(self, ctx: AnnotationBuildCtx):
         adornee = ctx.annotation.adornee
         assert isinstance(adornee, LuaMethod)
 
-        self.manifest[ctx.build_ctx.env]['anot_hooks'][ctx.annotation.adornee.name] = adornee.get_path(require=True)
+        self.manifest[ctx.build_ctx.env]['anot_hooks'][ctx.annotation.adornee.name] = adornee.get_path(require=True, cache=True)
 
     def load(self, ctx: ExtensionRegistry):
         ctx.register_anot(
@@ -75,11 +75,11 @@ class ManifestExtension(Extension):
                 else:
                     self.manifest[env][key] += self.manifest['shared'][key]
             data = self.manifest[env]
+            resolver = LuaPathResolver(ctx.workspace)
 
-            converted = convert_dict(LuaPathResolver(ctx.workspace), data, prefix='local manifest =')
-            out = template \
-                .replace(f'(env)', env) \
-                .replace('--manifest', converted)
+            converted = convert_dict(resolver, data, prefix='local manifest =', include_imports=False)
+            module_paths = convert_dict(resolver, resolver.get_cached_module_paths(), prefix='local modulePaths =')
+            out = template.replace(f'(env)', env).replace('--modulePaths', module_paths).replace('--manifest', converted)
 
             ctx.create_file(env, f'AnnotationInit.{env}.lua', out)
 

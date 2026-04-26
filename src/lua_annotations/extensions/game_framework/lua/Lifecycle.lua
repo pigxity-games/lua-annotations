@@ -170,7 +170,21 @@ end
 local function getRemoteMethod(remote: RemoteFunction | RemoteEvent)
 	if remote:IsA("RemoteEvent") then
 		if isServer then
-			return remote.FireClient
+			return function(self, player, ...)
+				--handle "all" players
+				if player == "all" then
+					remote.FireAllClients(self, ...)
+
+				--handle player lists
+				elseif typeof(player) == "table" then
+					for _, plr in ipairs(player) do
+						remote.FireClient(self, plr, ...)
+					end
+
+				else
+					remote.FireClient(self, player, ...)
+				end
+			end
 		else
 			return remote.FireServer
 		end

@@ -1,7 +1,11 @@
 test/**/generated/
+test/**/Generated/
 test/sourcemap.json
 __pycache__
 **.egg-info
 build/
 pyenv/
 .pytest_cache
+.pytest_tmp
+.tmp_probe
+test_tmp_pytest
