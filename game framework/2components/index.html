@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -265,6 +265,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -377,7 +381,63 @@
   <span class="md-ellipsis">
     
   
-    API usage
+    API Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../core/3runtime_annotations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Annotations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../core/4lua_dict/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lua Table Generation
   
 
     
@@ -806,16 +866,16 @@
 
 
 <h1 id="components">Components</h1>
-<p>Unlike services, components represent <strong>individual Roblox instances</strong> which are bound by CollectionService tags. They usually control services.</p>
+<p>Unlike services, components represent <strong>individual Roblox instances</strong> which are bound by CollectionService tags. They usually use services.</p>
 <h2 id="simple-components-bindtag">Simple components (<code>@bindTag</code>)</h2>
-<p>For simplicity, we'll start with the <code>@bindTag</code> annotation, which could be considered as a "simple component" of some sorts. It bind to a function which is called for each tagged instance. This is good for simple objects that you have a lot of, such as obby killbricks.</p>
+<p>For simplicity, we'll start with the <code>@bindTag</code> annotation, which could be considered as a "simple component" of some sorts. It binds to a function which is called for each tagged instance. This is good for simple objects that you have a lot of, such as obby killbricks.</p>
 <div class="highlight"><span class="filename">src/server/KillBrick.lua</span><pre><span></span><code><span class="c1">--@module</span>
 <span class="kd">local</span><span class="w"> </span><span class="nv">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{}</span>
 
 <span class="c1">--@bindTag, KillBrick</span>
 <span class="kr">function</span><span class="w"> </span><span class="nc">module</span><span class="p">.</span><span class="nf">killBrick</span><span class="p">(</span><span class="nv">inst</span><span class="p">:</span><span class="w"> </span><span class="py">BasePart</span><span class="p">)</span>
 <span class="w">    </span><span class="kd">local</span><span class="w"> </span><span class="nv">conn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">inst</span><span class="p">.</span><span class="py">Touched</span><span class="p">:</span><span class="nf">Connect</span><span class="p">(</span><span class="kr">function</span><span class="p">(</span><span class="nv">p</span><span class="p">)</span>
-<span class="w">        </span><span class="kd">local</span><span class="w"> </span><span class="nv">hum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">p</span><span class="p">.</span><span class="py">Parent</span><span class="p">:</span><span class="nf">FindFirstChild</span><span class="p">(</span><span class="s2">&quot;Humanoid&quot;</span><span class="p">)</span><span class="w"> </span><span class="p">::</span><span class="w"> </span><span class="nl">Humanoid</span>
+<span class="w">        </span><span class="kd">local</span><span class="w"> </span><span class="nv">hum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">p</span><span class="p">.</span><span class="py">Parent</span><span class="p">:</span><span class="nf">FindFirstChild</span><span class="p">(</span><span class="s1">&#39;Humanoid&#39;</span><span class="p">)</span><span class="w"> </span><span class="p">::</span><span class="w"> </span><span class="nl">Humanoid</span>
 <span class="w">        </span><span class="nl">if</span><span class="w"> </span><span class="nl">hum</span><span class="w"> </span><span class="nl">then</span>
 <span class="w">            </span><span class="nl">hum</span><span class="err">.</span><span class="nl">Health</span><span class="w"> </span><span class="err">=</span><span class="w"> </span><span class="err">0</span>
 <span class="w">        </span><span class="nl">end</span>
@@ -831,7 +891,7 @@
 <ul>
 <li>The <code>@module</code> annotation simply indexes the module to be processed by the parser.</li>
 <li>We bind a <code>Touched</code> listener to the instance, which kills any model with a <code>Humanoid</code>.</li>
-<li>We return a cleanup function that disconnects  the listener, running on tag remove.</li>
+<li>We return a cleanup function that disconnects the listener, running on tag remove.</li>
 </ul>
 <h2 id="component"><code>@component</code></h2>
 <p>You may want to inject services, store state into components, or pass them in functions like objects. To do so, you need to create a component class.</p>
@@ -843,50 +903,60 @@
 
 <span class="kr">function</span><span class="w"> </span><span class="nc">counter</span><span class="p">:</span><span class="nf">_init</span><span class="p">(</span><span class="nv">inst</span><span class="p">:</span><span class="w"> </span><span class="py">BasePart</span><span class="p">)</span>
 <span class="w">    </span><span class="nv">self</span><span class="p">.</span><span class="py">instance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">inst</span>
-<span class="w">    </span><span class="kd">local</span><span class="w"> </span><span class="nv">detector</span><span class="p">:</span><span class="w"> </span><span class="py">ClickDetector</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">inst</span><span class="p">:</span><span class="nf">WaitForChild</span><span class="p">(</span><span class="s2">&quot;ClickDetector&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="kd">local</span><span class="w"> </span><span class="nv">detector</span><span class="p">:</span><span class="w"> </span><span class="py">ClickDetector</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">inst</span><span class="p">:</span><span class="nf">WaitForChild</span><span class="p">(</span><span class="s1">&#39;ClickDetector&#39;</span><span class="p">)</span>
 <span class="w">    </span><span class="kd">local</span><span class="w"> </span><span class="nv">label</span><span class="p">:</span><span class="w"> </span><span class="py">TextLabel</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">inst</span><span class="p">.</span><span class="py">SurfaceGui</span><span class="p">.</span><span class="py">TextLabel</span>
 
 <span class="w">    </span><span class="nv">self</span><span class="p">.</span><span class="py">conn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">detector</span><span class="p">.</span><span class="py">MouseClick</span><span class="p">:</span><span class="nf">Connect</span><span class="p">(</span><span class="kr">function</span><span class="p">(</span><span class="nv">player</span><span class="p">)</span>
-<span class="w">        </span><span class="nv">self</span><span class="p">:</span><span class="nf">increment</span><span class="p">(</span><span class="nv">player</span><span class="p">)</span>
+<span class="w">        </span><span class="nv">self</span><span class="p">:</span><span class="nf">increment</span><span class="p">(</span><span class="nv">player</span><span class="p">,</span><span class="w"> </span><span class="nv">label</span><span class="p">)</span>
 <span class="w">    </span><span class="kr">end</span><span class="p">)</span>
 <span class="kr">end</span>
 
-<span class="kr">function</span><span class="w"> </span><span class="nc">counter</span><span class="p">:</span><span class="nf">increment</span><span class="p">(</span><span class="nv">player</span><span class="p">:</span><span class="w"> </span><span class="py">Player</span><span class="p">)</span>
+<span class="kr">function</span><span class="w"> </span><span class="nc">counter</span><span class="p">:</span><span class="nf">increment</span><span class="p">(</span><span class="nv">player</span><span class="p">:</span><span class="w"> </span><span class="py">Player</span><span class="p">,</span><span class="w"> </span><span class="nv">label</span><span class="p">:</span><span class="w"> </span><span class="py">TextLabel</span><span class="p">)</span>
 <span class="w">    </span><span class="nv">self</span><span class="p">.</span><span class="py">count</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="mi">1</span>
-<span class="w">    </span><span class="nv">label</span><span class="p">.</span><span class="py">Text</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;Count: &quot;</span><span class="w"> </span><span class="o">..</span><span class="w"> </span><span class="nv">self</span><span class="p">.</span><span class="py">count</span>
+<span class="w">    </span><span class="nv">label</span><span class="p">.</span><span class="py">Text</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;Count: &#39;</span><span class="w"> </span><span class="o">..</span><span class="w"> </span><span class="nv">self</span><span class="p">.</span><span class="py">count</span>
 <span class="kr">end</span>
 
 <span class="kr">function</span><span class="w"> </span><span class="nc">counter</span><span class="p">:</span><span class="nf">_destroy</span><span class="p">()</span>
 <span class="w">    </span><span class="nv">self</span><span class="p">.</span><span class="py">conn</span><span class="p">:</span><span class="nf">Disconnect</span><span class="p">()</span>
 <span class="kr">end</span>
+
+<span class="kr">return</span><span class="w"> </span><span class="nv">counter</span>
 </code></pre></div></p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>At runtime, this module will be converted to a multi-instanced class. Components defined like this require an <code>_init()</code> method, for injecting the instance and services, and a <code>_destroy()</code> method, which is called on component remove.</p>
-<p>To inject a service, simply do so like another service. Note that you cannot inject components into services, due to their multi-instanced nature. If you would like to create components programatically, you should add a tag to the instance. </p>
+<p>To inject a service, simply do so like another service. Note that you cannot inject components into services, due to their multi-instanced nature. If you would like to create components programmatically, you should add a tag to the instance. </p>
 </div>
+<p>The first argument to <code>@component</code> is the tag name. It may also be a list of tags:</p>
+<div class="highlight"><pre><span></span><code><span class="c1">--@component, [Counter, ClickCounter]</span>
+<span class="kd">local</span><span class="w"> </span><span class="nv">counter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{}</span>
+
+<span class="kr">return</span><span class="w"> </span><span class="nv">counter</span>
+</code></pre></div>
+<p>The first tag is considered the main tag and is used when another component dependency needs to be created automatically.</p>
 <h2 id="depending-on-components">Depending on components</h2>
 <p>Sometimes you may want to add additional, optional functionality to a component based on another component. To do this, we may depend on the other component from the main component.</p>
 <p>Consider our counter example. Let's say we want to add a "logger" component which periodically prints the counter's <code>count</code> value. We could put this inside of the same file as the counter for simplicity.</p>
 <div class="highlight"><pre><span></span><code><span class="c1">--@component, CounterLogger, depends=[Counter]</span>
 <span class="kd">local</span><span class="w"> </span><span class="nv">logger</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nv">active</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">True</span>
+<span class="w">    </span><span class="nv">active</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 <span class="p">}</span>
 
-<span class="kr">function</span><span class="w"> </span><span class="nc">logger</span><span class="p">:</span><span class="nf">_init</span><span class="p">(</span><span class="nv">inst</span><span class="p">:</span><span class="w"> </span><span class="py">BasePart</span><span class="p">)</span>
+<span class="kr">function</span><span class="w"> </span><span class="nc">logger</span><span class="p">:</span><span class="nf">_init</span><span class="p">(</span><span class="nv">inst</span><span class="p">:</span><span class="w"> </span><span class="py">BasePart</span><span class="p">,</span><span class="w"> </span><span class="nv">deps</span><span class="p">)</span>
 <span class="w">    </span><span class="nv">self</span><span class="p">.</span><span class="py">inst</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">inst</span>
 <span class="w">    </span><span class="nv">self</span><span class="p">.</span><span class="py">Counter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">deps</span><span class="p">.</span><span class="py">Counter</span>
+<span class="w">    </span><span class="nv">self</span><span class="p">.</span><span class="py">active</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 
 <span class="w">    </span><span class="nv">task</span><span class="p">.</span><span class="nf">spawn</span><span class="p">(</span><span class="kr">function</span><span class="p">()</span>
-<span class="w">        </span><span class="kr">while</span><span class="w"> </span><span class="nv">active</span><span class="w"> </span><span class="kr">do</span>
-<span class="w">            </span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Counter: &quot;</span><span class="w"> </span><span class="o">..</span><span class="w"> </span><span class="nv">self</span><span class="p">.</span><span class="py">inst</span><span class="p">.</span><span class="py">Name</span><span class="w"> </span><span class="o">..</span><span class="w"> </span><span class="s2">&quot; : count = &quot;</span><span class="w"> </span><span class="o">..</span><span class="w"> </span><span class="nv">self</span><span class="p">.</span><span class="py">Counter</span><span class="p">.</span><span class="py">count</span><span class="p">)</span>
+<span class="w">        </span><span class="kr">while</span><span class="w"> </span><span class="nv">self</span><span class="p">.</span><span class="py">active</span><span class="w"> </span><span class="kr">do</span>
+<span class="w">            </span><span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Counter: &#39;</span><span class="w"> </span><span class="o">..</span><span class="w"> </span><span class="nv">self</span><span class="p">.</span><span class="py">inst</span><span class="p">.</span><span class="py">Name</span><span class="w"> </span><span class="o">..</span><span class="w"> </span><span class="s1">&#39; : count = &#39;</span><span class="w"> </span><span class="o">..</span><span class="w"> </span><span class="nv">self</span><span class="p">.</span><span class="py">Counter</span><span class="p">.</span><span class="py">count</span><span class="p">)</span>
 <span class="w">            </span><span class="nv">task</span><span class="p">.</span><span class="nf">wait</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
 <span class="w">        </span><span class="kr">end</span>
 <span class="w">    </span><span class="kr">end</span><span class="p">)</span>
 <span class="kr">end</span>
 
 <span class="kr">function</span><span class="w"> </span><span class="nc">logger</span><span class="p">:</span><span class="nf">_destroy</span><span class="p">()</span>
-<span class="w">    </span><span class="nv">self</span><span class="p">.</span><span class="py">active</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">False</span>
+<span class="w">    </span><span class="nv">self</span><span class="p">.</span><span class="py">active</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span>
 <span class="kr">end</span>
 
 
@@ -903,9 +973,9 @@
 </ul>
 </div>
 <h2 id="the-data-argument">The <code>data</code> argument</h2>
-<p>You may use the <code>data</code> kwarg to specify a path to a "component registry". When a comonent is created, it uses data from this table to create it. This allows for specifying initial data or for easy access of components from elsewhere.</p>
+<p>You may use the <code>data</code> kwarg to specify a "component registry". When a component is created, it uses data from this table to create it. This allows for specifying initial data or for easy access of components from elsewhere.</p>
 <p>Registries are simple tables that map instances to initial data. If some instances here do not have the component tag, it is automatically added.</p>
-<div class="highlight"><span class="filename">src/client/registries/CounterRegistry.lua</span><pre><span></span><code><span class="c1">--@dependency, load_after=[Counter]</span>
+<div class="highlight"><span class="filename">src/client/registries/CounterRegistry.lua</span><pre><span></span><code><span class="c1">--@dependency, load_after=[Counter], typegen=registry</span>
 <span class="kd">local</span><span class="w"> </span><span class="nv">m</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="p">[</span><span class="nv">workspace</span><span class="p">.</span><span class="py">Part1</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
 <span class="w">        </span><span class="nv">val</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">123</span>
@@ -920,6 +990,7 @@
 <ul>
 <li>A dependency is similar to a service, except that it is not loaded at runtime. It's useful for modules which contain pure data that you still want/need to DI.</li>
 <li>Each registry may only be used for one component class.</li>
+<li><code>typegen=registry</code> generates a registry-shaped type in <code>ServiceTypes.lua</code>.</li>
 </ul>
 </div>
 <p>Creating the component:</p>
@@ -936,7 +1007,10 @@
 <span class="kr">return</span><span class="w"> </span><span class="nv">counter</span>
 </code></pre></div>
 <p>You may then access the counter registry via dependency injection.</p>
-<div class="highlight"><pre><span></span><code><span class="kr">function</span><span class="w"> </span><span class="nc">service</span><span class="p">:</span><span class="nf">_init</span><span class="p">(</span><span class="nv">deps</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="c1">--@service, depends=[CounterRegistry]</span>
+<span class="kd">local</span><span class="w"> </span><span class="nv">service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{}</span>
+
+<span class="kr">function</span><span class="w"> </span><span class="nc">service</span><span class="p">.</span><span class="nf">_init</span><span class="p">(</span><span class="nv">deps</span><span class="p">)</span>
 <span class="w">    </span><span class="kd">local</span><span class="w"> </span><span class="nv">Counters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">deps</span><span class="p">.</span><span class="py">CounterRegistry</span>
 
 <span class="w">    </span><span class="c1">--getting a component</span>
@@ -944,9 +1018,13 @@
 <span class="w">    </span><span class="nv">counter1</span><span class="p">:</span><span class="nf">increment</span><span class="p">()</span>
 <span class="w">    </span><span class="nb">print</span><span class="p">(</span><span class="nv">counter1</span><span class="p">.</span><span class="py">val</span><span class="p">)</span>
 
-<span class="w">    </span><span class="c1">--creating a new component (`.create()` is added at runtime)</span>
-<span class="w">    </span><span class="kd">local</span><span class="w"> </span><span class="nv">counter3</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Counters</span><span class="p">.</span><span class="py">c</span><span class="err">`</span><span class="nf">reate</span><span class="p">(</span><span class="nv">workspace</span><span class="p">.</span><span class="py">Part3</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="nv">val</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">123</span><span class="p">})</span>
+<span class="w">    </span><span class="c1">--creating a new component</span>
+<span class="w">    </span><span class="kd">local</span><span class="w"> </span><span class="nv">part3</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">workspace</span><span class="p">.</span><span class="py">Part3</span>
+<span class="w">    </span><span class="nv">Counters</span><span class="p">[</span><span class="nv">part3</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="nv">val</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">123</span><span class="p">}</span>
+<span class="w">    </span><span class="nv">part3</span><span class="p">:</span><span class="nf">AddTag</span><span class="p">(</span><span class="s1">&#39;Counter&#39;</span><span class="p">)</span>
 <span class="kr">end</span>
+
+<span class="kr">return</span><span class="w"> </span><span class="nv">service</span>
 </code></pre></div>
 
 

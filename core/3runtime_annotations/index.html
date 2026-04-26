@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://pigxity.github.io/core/2api/">
+        <link rel="canonical" href="https://pigxity.github.io/core/3runtime_annotations/">
       
       
-        <link rel="prev" href="../1config/">
+        <link rel="prev" href="../2api/">
       
       
-        <link rel="next" href="../3runtime_annotations/">
+        <link rel="next" href="../4lua_dict/">
       
       
         
@@ -25,7 +25,7 @@
     
     
       
-        <title>API Usage - lua-annotations</title>
+        <title>Runtime Annotations - lua-annotations</title>
       
     
     
@@ -74,7 +74,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#api-usage" class="md-skip">
+        <a href="#runtime-annotations" class="md-skip">
           Skip to content
         </a>
       
@@ -110,7 +110,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              API Usage
+              Runtime Annotations
             
           </span>
         </div>
@@ -371,6 +371,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../2api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -390,7 +418,7 @@
   <span class="md-ellipsis">
     
   
-    API Usage
+    Runtime Annotations
   
 
     
@@ -408,7 +436,7 @@
   <span class="md-ellipsis">
     
   
-    API Usage
+    Runtime Annotations
   
 
     
@@ -434,10 +462,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#annotation-definitions" class="md-nav__link">
+  <a href="#generated-init-files" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Annotation definitions
+        Generated init files
       
     </span>
   </a>
@@ -445,10 +473,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#extension-hooks" class="md-nav__link">
+  <a href="#manifest-data" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Extension hooks
+        Manifest data
       
     </span>
   </a>
@@ -456,10 +484,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#registering-extensions" class="md-nav__link">
+  <a href="#retention" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Registering extensions
+        Retention
       
     </span>
   </a>
@@ -467,10 +495,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#parser-notes" class="md-nav__link">
+  <a href="#defining-runtime-effects" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Parser notes
+        Defining runtime effects
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-build-time-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding build-time data
       
     </span>
   </a>
@@ -481,34 +520,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../3runtime_annotations/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Annotations
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -754,10 +765,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#annotation-definitions" class="md-nav__link">
+  <a href="#generated-init-files" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Annotation definitions
+        Generated init files
       
     </span>
   </a>
@@ -765,10 +776,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#extension-hooks" class="md-nav__link">
+  <a href="#manifest-data" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Extension hooks
+        Manifest data
       
     </span>
   </a>
@@ -776,10 +787,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#registering-extensions" class="md-nav__link">
+  <a href="#retention" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Registering extensions
+        Retention
       
     </span>
   </a>
@@ -787,10 +798,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#parser-notes" class="md-nav__link">
+  <a href="#defining-runtime-effects" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Parser notes
+        Defining runtime effects
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-build-time-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding build-time data
       
     </span>
   </a>
@@ -865,110 +887,133 @@
   
 
 
-<h1 id="api-usage">API Usage</h1>
-<p>Extensions are python modules which register annotations and build hooks. The default manifest extension and the game framework extension both use this API internally, so you may see the source code <code>src/lua_annotations/extensions</code> for examples.</p>
-<p>Every extension module needs a <code>load(ctx)</code> function:</p>
-<div class="highlight"><span class="filename">tools/my_extension.py</span><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">lua_annotations.api.annotations</span><span class="w"> </span><span class="kn">import</span> <span class="n">AnnotationBuildCtx</span><span class="p">,</span> <span class="n">AnnotationDef</span><span class="p">,</span> <span class="n">Extension</span><span class="p">,</span> <span class="n">ExtensionRegistry</span>
+<h1 id="runtime-annotations">Runtime Annotations</h1>
+<p>Some annotations only matter while the project is being built, while others need to affect the code at runtime. The core extension generates an init file, a manifest table, and a hook system.</p>
+<p>The game framework's <code>Lifecycle.lua</code> is the best example of this. It defines runtime behavior for annotations like <code>@bindTag</code> and <code>@remote</code>, and it starts services after other runtime annotations, using <code>@onPostInit</code>.</p>
+<h2 id="generated-init-files">Generated init files</h2>
+<p>The core extension creates these files:</p>
+<ul>
+<li><code>Generated/AnnotationInit.server.lua</code></li>
+<li><code>Generated/AnnotationInit.client.lua</code></li>
+</ul>
+<p>Each file contains a generated lua <code>manifest</code> table containing runtime hooks/annotations. Each loader runs hooks in this order:</p>
+<ul>
+<li><code>@onInit</code>: before runtime annotation code.</li>
+<li><code>@annotationInit</code>: registers a handler function for a retained annotation.</li>
+<li><code>@onPostInit</code>: after retained annotations are handled. These hooks are run in parallel with <code>task.spawn</code>.</li>
+</ul>
+<p>Server and client init files both receive shared runtime data. There is no separate shared init file.</p>
+<details class="example">
+<summary>Loader Code</summary>
+<div class="highlight"><span class="filename">AnnotationInit.x.lua</span><pre><span></span><code><span class="kr">for</span><span class="w"> </span><span class="nv">_</span><span class="p">,</span><span class="w"> </span><span class="nv">fun</span><span class="w"> </span><span class="kr">in</span><span class="w"> </span><span class="nb">ipairs</span><span class="p">(</span><span class="nv">manifest</span><span class="p">.</span><span class="py">init_hooks</span><span class="p">)</span><span class="w"> </span><span class="kr">do</span>
+<span class="w">    </span><span class="nf">fun</span><span class="p">(</span><span class="nv">manifest</span><span class="p">)</span>
+<span class="kr">end</span>
+
+<span class="kr">for</span><span class="w"> </span><span class="nv">_</span><span class="p">,</span><span class="w"> </span><span class="nv">anot</span><span class="w"> </span><span class="kr">in</span><span class="w"> </span><span class="nb">ipairs</span><span class="p">(</span><span class="nv">manifest</span><span class="p">.</span><span class="py">annotations</span><span class="p">)</span><span class="w"> </span><span class="kr">do</span>
+<span class="w">    </span><span class="kd">local</span><span class="w"> </span><span class="nv">fun</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">manifest</span><span class="p">.</span><span class="py">anot_hooks</span><span class="p">[</span><span class="nv">anot</span><span class="p">.</span><span class="py">name</span><span class="p">]</span>
+<span class="w">    </span><span class="kr">if</span><span class="w"> </span><span class="nv">fun</span><span class="w"> </span><span class="kr">then</span>
+<span class="w">        </span><span class="nf">fun</span><span class="p">(</span><span class="nv">anot</span><span class="p">,</span><span class="w"> </span><span class="nv">manifest</span><span class="p">)</span>
+<span class="w">    </span><span class="kr">end</span>
+<span class="kr">end</span>
+
+<span class="kr">for</span><span class="w"> </span><span class="nv">_</span><span class="p">,</span><span class="w"> </span><span class="nv">fun</span><span class="w"> </span><span class="kr">in</span><span class="w"> </span><span class="nb">ipairs</span><span class="p">(</span><span class="nv">manifest</span><span class="p">.</span><span class="py">post_init_hooks</span><span class="p">)</span><span class="w"> </span><span class="kr">do</span>
+<span class="w">    </span><span class="nv">task</span><span class="p">.</span><span class="nf">spawn</span><span class="p">(</span><span class="nv">fun</span><span class="p">,</span><span class="w"> </span><span class="nv">manifest</span><span class="p">)</span>
+<span class="kr">end</span>
+</code></pre></div>
+</details>
+<h2 id="manifest-data">Manifest data</h2>
+<p>The manifest is built from annotations and extension output. The core manifest contains these keys:</p>
+<ul>
+<li><code>anot_hooks</code>: a map of annotation names to runtime handler functions.</li>
+<li><code>init_hooks</code>: functions annotated with <code>@onInit</code>.</li>
+<li><code>post_init_hooks</code>: functions annotated with <code>@onPostInit</code>.</li>
+<li><code>annotations</code>: parsed annotations whose <code>retention</code> is not <code>build</code>.</li>
+</ul>
+<p>Each annotation in <code>manifest.annotations</code> is converted into a lua table with:</p>
+<ul>
+<li><code>name</code>: the annotation name.</li>
+<li><code>args</code>: parsed positional arguments.</li>
+<li><code>kwargs</code>: parsed keyword arguments.</li>
+<li><code>getAdornee</code>: a function that returns the annotated module, method, or value.</li>
+<li>any extra data written to <code>annotation.export_data</code> by python build code.</li>
+</ul>
+<p>For example, the networking extension writes <code>remote_name</code> and <code>remote_parent</code> during build, so its runtime handler can find the generated Roblox remote instance.</p>
+<h2 id="retention">Retention</h2>
+<p><code>AnnotationDef.retention</code> controls whether an annotation is placed in the runtime manifest.</p>
+<div class="highlight"><pre><span></span><code><span class="n">AnnotationDef</span><span class="p">(</span>
+    <span class="s1">&#39;myRuntimeAnnotation&#39;</span><span class="p">,</span>
+    <span class="n">scope</span><span class="o">=</span><span class="s1">&#39;method&#39;</span><span class="p">,</span>
+    <span class="n">retention</span><span class="o">=</span><span class="s1">&#39;init&#39;</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+<p><code>build</code> is the default and means the annotation is only used by python build hooks.</p>
+<p><code>init</code> and <code>runtime</code> are both included in <code>manifest.annotations</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Currently <code>runtime</code> and <code>init</code> are effectively the same. There are plans to make <code>runtime</code> emit annotation metadata into module tables.</p>
+</div>
+<h2 id="defining-runtime-effects">Defining runtime effects</h2>
+<p>Runtime annotation effects usually have two parts:</p>
+<ol>
+<li>A python extension registers the annotation with <code>retention='init'</code>.</li>
+<li>The extension adds a lua runtime file which contains an <code>@annotationInit</code> handler with the same function name as the annotation.</li>
+</ol>
+<p><code>ctx.add_file(env, name, content)</code> writes generated runtime lua under <code>Generated/_Internal</code>. Files added this way are processed by the parser during the same build, so their <code>@annotationInit</code>, <code>@onInit</code>, and <code>@onPostInit</code> annotations are included in the manifest.</p>
+<p>For example, this registers a <code>@addHelloWorld</code> method annotation that adds a function to the module table:</p>
+<div class="highlight"><span class="filename">tools/print_effect.py</span><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">importlib.resources</span><span class="w"> </span><span class="kn">import</span> <span class="n">files</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">lua_annotations.api.annotations</span><span class="w"> </span><span class="kn">import</span> <span class="n">AnnotationDef</span><span class="p">,</span> <span class="n">Extension</span><span class="p">,</span> <span class="n">ExtensionRegistry</span>
 
 
-<span class="k">class</span><span class="w"> </span><span class="nc">MyExtension</span><span class="p">(</span><span class="n">Extension</span><span class="p">):</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">on_build_module</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">AnnotationBuildCtx</span><span class="p">):</span>
-        <span class="nb">print</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">annotation</span><span class="o">.</span><span class="n">get_adornee_name</span><span class="p">())</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">HelloWorldExtension</span><span class="p">(</span><span class="n">Extension</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">ExtensionRegistry</span><span class="p">):</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">register_anot</span><span class="p">(</span><span class="n">AnnotationDef</span><span class="p">(</span><span class="s1">&#39;addHelloWorld&#39;</span><span class="p">,</span> <span class="n">retention</span><span class="o">=</span><span class="s1">&#39;init&#39;</span><span class="p">))</span>
+
+        <span class="n">runtime_file</span> <span class="o">=</span> <span class="n">files</span><span class="p">(</span><span class="s1">&#39;my_package&#39;</span><span class="p">)</span> <span class="o">/</span> <span class="s1">&#39;lua&#39;</span> <span class="o">/</span> <span class="s1">&#39;MyAnnotations.lua&#39;</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">add_file</span><span class="p">(</span><span class="s1">&#39;shared&#39;</span><span class="p">,</span> <span class="s1">&#39;MyAnnotations.lua&#39;</span><span class="p">,</span> <span class="n">runtime_file</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">ExtensionRegistry</span><span class="p">):</span>
+    <span class="n">ctx</span><span class="o">.</span><span class="n">register_extension</span><span class="p">(</span><span class="n">PrintEffectExtension</span><span class="p">())</span>
+</code></pre></div>
+<p>And the lua runtime file:</p>
+<div class="highlight"><span class="filename">MyAnnotations.lua</span><pre><span></span><code><span class="c1">--@annotationInit</span>
+<span class="kd">local</span><span class="w"> </span><span class="kr">function</span><span class="w"> </span><span class="nf">addHelloWorld</span><span class="p">(</span><span class="nv">anot</span><span class="p">,</span><span class="w"> </span><span class="nv">manifest</span><span class="p">)</span>
+<span class="w">    </span><span class="kd">local</span><span class="w"> </span><span class="nv">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">anot</span><span class="p">.</span><span class="nf">getAdornee</span><span class="p">()</span>
+<span class="w">    </span><span class="nv">module</span><span class="p">.</span><span class="py">helloWorld</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kr">function</span><span class="p">()</span>
+<span class="w">        </span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Hello World!&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="kr">end</span>
+<span class="kr">end</span>
+
+<span class="kr">return</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nv">addHelloWorld</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">addHelloWorld</span><span class="p">,</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Now a project file can use the runtime annotation, and the <code>helloWorld</code> function will be added automatically.</p>
+<h2 id="adding-build-time-data">Adding build-time data</h2>
+<p>Runtime handlers often need data that is easier to compute in python. Use the annotation's <code>export_data</code> dictionary inside an <code>on_build</code> callback.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">lua_annotations.api.annotations</span><span class="w"> </span><span class="kn">import</span> <span class="n">AnnotationBuildCtx</span><span class="p">,</span> <span class="n">AnnotationDef</span><span class="p">,</span> <span class="n">Extension</span><span class="p">,</span> <span class="n">ExtensionRegistry</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">lua_annotations.parser_schemas</span><span class="w"> </span><span class="kn">import</span> <span class="n">LuaMethod</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">SignalExtension</span><span class="p">(</span><span class="n">Extension</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">on_build_signal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">AnnotationBuildCtx</span><span class="p">):</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">annotation</span><span class="o">.</span><span class="n">adornee</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="n">LuaMethod</span><span class="p">)</span>
+
+        <span class="n">ctx</span><span class="o">.</span><span class="n">annotation</span><span class="o">.</span><span class="n">export_data</span><span class="p">[</span><span class="s1">&#39;method_name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">method</span><span class="o">.</span><span class="n">name</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">annotation</span><span class="o">.</span><span class="n">export_data</span><span class="p">[</span><span class="s1">&#39;module_name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">method</span><span class="o">.</span><span class="n">module</span><span class="o">.</span><span class="n">returned_name</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">ExtensionRegistry</span><span class="p">):</span>
         <span class="n">ctx</span><span class="o">.</span><span class="n">register_anot</span><span class="p">(</span>
             <span class="n">AnnotationDef</span><span class="p">(</span>
-                <span class="s1">&#39;myModule&#39;</span><span class="p">,</span>
-                <span class="n">scope</span><span class="o">=</span><span class="s1">&#39;module&#39;</span><span class="p">,</span>
-                <span class="n">on_build</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">on_build_module</span><span class="p">,</span>
+                <span class="s1">&#39;signal&#39;</span><span class="p">,</span>
+                <span class="n">scope</span><span class="o">=</span><span class="s1">&#39;method&#39;</span><span class="p">,</span>
+                <span class="n">retention</span><span class="o">=</span><span class="s1">&#39;init&#39;</span><span class="p">,</span>
+                <span class="n">on_build</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">on_build_signal</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="p">)</span>
-
-
-<span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">ExtensionRegistry</span><span class="p">):</span>
-    <span class="n">ctx</span><span class="o">.</span><span class="n">register_extension</span><span class="p">(</span><span class="n">MyExtension</span><span class="p">())</span>
 </code></pre></div>
-<p>Then add it to your config:</p>
-<div class="highlight"><span class="filename">annotations.config.json</span><pre><span></span><code><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;extensions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">        </span><span class="p">{</span><span class="nt">&quot;kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;path&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;expr&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;tools/my_extension.py&quot;</span><span class="p">}</span>
-<span class="w">    </span><span class="p">]</span>
-<span class="p">}</span>
-</code></pre></div>
-<h2 id="annotation-definitions">Annotation definitions</h2>
-<p><code>AnnotationDef</code> describes how an annotation is parsed and when it is exported to runtime.</p>
-<div class="highlight"><pre><span></span><code><span class="n">AnnotationDef</span><span class="p">(</span>
-    <span class="n">name</span><span class="o">=</span><span class="s1">&#39;example&#39;</span><span class="p">,</span>
-    <span class="n">args</span><span class="o">=</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
-    <span class="n">kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;depends&#39;</span><span class="p">:</span> <span class="n">default_list</span><span class="p">},</span>
-    <span class="n">retention</span><span class="o">=</span><span class="s1">&#39;build&#39;</span><span class="p">,</span>
-    <span class="n">scope</span><span class="o">=</span><span class="s1">&#39;module&#39;</span><span class="p">,</span>
-    <span class="n">on_build</span><span class="o">=</span><span class="n">callback</span><span class="p">,</span>
-<span class="p">)</span>
-</code></pre></div>
-<p>Important fields:</p>
-<ul>
-<li><code>name</code>: the annotation name used after <code>--@</code>.</li>
-<li><code>args</code>: positional argument processors. For example, <code>str</code>, <code>default_list</code>, or a custom function.</li>
-<li><code>kwargs</code>: keyword argument processors.</li>
-<li><code>scope</code>: what the annotation may be attached to: <code>module</code>, <code>method</code>, <code>type</code>, or <code>returned_value</code>.</li>
-<li><code>retention</code>: <code>build</code>, <code>init</code>, or <code>runtime</code>. Non-build annotations are written into the generated init manifest.</li>
-<li><code>on_build</code>: a callback called after the annotation is parsed.</li>
-</ul>
-<p>The helper functions in <code>lua_annotations.api.arguments</code> are useful for common argument shapes:</p>
-<ul>
-<li><code>list_arg</code>: parses <code>[A, B, C]</code>.</li>
-<li><code>default_list</code>: parses <code>[A, B]</code>, or wraps a single value as <code>[A]</code>.</li>
-<li><code>literal_builder</code>: creates an argument parser limited to a set of strings.</li>
-</ul>
-<h2 id="extension-hooks">Extension hooks</h2>
-<p>An <code>Extension</code> may implement these methods:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">lua_annotations.api.annotations</span><span class="w"> </span><span class="kn">import</span> <span class="n">Extension</span><span class="p">,</span> <span class="n">ExtensionRegistry</span><span class="p">,</span> <span class="n">FileBuildCtx</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">lua_annotations.build_process</span><span class="w"> </span><span class="kn">import</span> <span class="n">PostProcessCtx</span>
-
-
-<span class="k">class</span><span class="w"> </span><span class="nc">MyExtension</span><span class="p">(</span><span class="n">Extension</span><span class="p">):</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">ExtensionRegistry</span><span class="p">):</span>
-        <span class="o">...</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">on_file_process</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">FileBuildCtx</span><span class="p">):</span>
-        <span class="o">...</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">on_post_process</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">PostProcessCtx</span><span class="p">):</span>
-        <span class="o">...</span>
-</code></pre></div>
-<p><code>load</code> is where annotations and dependent extensions are registered.</p>
-<p><code>on_file_process</code> runs after a lua file with annotations has been parsed.</p>
-<p><code>on_post_process</code> runs after all environments in a workspace have been processed. Use this for generated files that need global information.</p>
-<h2 id="registering-extensions">Registering extensions</h2>
-<p>Inside a module-level <code>load(ctx)</code> function, register an instance of your extension:</p>
-<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">ExtensionRegistry</span><span class="p">):</span>
-    <span class="n">ctx</span><span class="o">.</span><span class="n">register_extension</span><span class="p">(</span><span class="n">MyExtension</span><span class="p">())</span>
-</code></pre></div>
-<p>You can also declare dependencies and hook ordering:</p>
-<div class="highlight"><pre><span></span><code><span class="n">ctx</span><span class="o">.</span><span class="n">register_extension</span><span class="p">(</span><span class="n">MyExtension</span><span class="p">(),</span> <span class="n">deps</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;ManifestExtension&#39;</span><span class="p">],</span> <span class="n">hook_order</span><span class="o">=</span><span class="s1">&#39;before&#39;</span><span class="p">)</span>
-</code></pre></div>
-<p><code>deps</code> affects extension load order. <code>hook_order='before'</code> moves the extension's file and post-process hooks earlier, which is useful when one extension needs to add data before another one writes output.</p>
-<h2 id="parser-notes">Parser notes</h2>
-<p>Annotations are lua comments which should be placed immediately before the thing they annotate:</p>
-<div class="highlight"><pre><span></span><code><span class="c1">--@module</span>
-<span class="kd">local</span><span class="w"> </span><span class="nv">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{}</span>
-
-<span class="c1">--@myMethod, hello, depends=[A, B]</span>
-<span class="kr">function</span><span class="w"> </span><span class="nc">module</span><span class="p">.</span><span class="nf">run</span><span class="p">()</span>
-<span class="kr">end</span>
-
-<span class="kr">return</span><span class="w"> </span><span class="nv">module</span>
-</code></pre></div>
-<p>The parser understands modules returned directly, modules returned through table entries, inline method definitions, literal return tables, and Luau type declarations.</p>
-<p>If you want to annotate many files with the same rule, add an <code>annotation-meta.json</code> file to a directory:</p>
-<div class="highlight"><span class="filename">annotation-meta.json</span><pre><span></span><code><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;regex_annotate&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="nt">&quot;^local \\w+ = \\{\\}&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;module&quot;</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="p">}</span>
-</code></pre></div>
-<p>The regex rules apply to direct lua files in that directory.</p>
+<p>The lua handler can then read <code>anot.method_name</code> and <code>anot.module_name</code>.</p>
 
 
 

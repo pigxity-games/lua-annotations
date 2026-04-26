@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -267,6 +267,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -402,10 +406,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#out_dir" class="md-nav__link">
+  <a href="#outdirname" class="md-nav__link">
     <span class="md-ellipsis">
       
-        out_dir
+        outDirName
       
     </span>
   </a>
@@ -421,7 +425,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="workspaces">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#workspace_common" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        workspace_common
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="workspace_common">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -451,17 +466,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#flags" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        flags
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -485,7 +489,63 @@
   <span class="md-ellipsis">
     
   
-    API usage
+    API Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../3runtime_annotations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Annotations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../4lua_dict/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lua Table Generation
   
 
     
@@ -711,10 +771,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#out_dir" class="md-nav__link">
+  <a href="#outdirname" class="md-nav__link">
     <span class="md-ellipsis">
       
-        out_dir
+        outDirName
       
     </span>
   </a>
@@ -730,7 +790,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="workspaces">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#workspace_common" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        workspace_common
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="workspace_common">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -754,17 +825,6 @@
     <span class="md-ellipsis">
       
         extensions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#flags" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        flags
       
     </span>
   </a>
@@ -842,7 +902,10 @@
 <h1 id="config-format">Config format</h1>
 <p>This is a rundown of the initial config file.</p>
 <div class="highlight"><span class="filename">annotations.config.json</span><pre><span></span><code><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;out_dir&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Generated&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;outDirName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Generated&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;workspace_common&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;shared&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;wally@game-framework&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;:Packages&quot;</span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span>
 <span class="w">    </span><span class="nt">&quot;workspaces&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">        </span><span class="p">{</span>
 <span class="w">            </span><span class="nt">&quot;client&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;src/client&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;:&quot;</span><span class="p">},</span>
@@ -851,43 +914,73 @@
 <span class="w">        </span><span class="p">}</span>
 <span class="w">    </span><span class="p">],</span>
 <span class="w">    </span><span class="nt">&quot;extensions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">        </span><span class="p">[</span><span class="s2">&quot;package&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;my_extension.main&quot;</span><span class="p">]</span>
-<span class="w">    </span><span class="p">],</span>
-<span class="w">    </span><span class="nt">&quot;flags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="nt">&quot;core&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">            </span><span class="err">...</span>
-<span class="w">        </span><span class="p">},</span>
-<span class="w">        </span><span class="nt">&quot;game_framework&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">            </span><span class="err">...</span>
-<span class="w">        </span><span class="p">}</span>
-<span class="w">    </span><span class="p">}</span>
+<span class="w">        </span><span class="p">[</span><span class="s2">&quot;library&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;lua_annotations.extensions.game_framework.main&quot;</span><span class="p">],</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;path&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;expr&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;tools/my_extension.py&quot;</span><span class="p">}</span>
+<span class="w">    </span><span class="p">]</span>
 <span class="p">}</span>
 </code></pre></div>
-<h2 id="out_dir"><code>out_dir</code></h2>
-<p>The name of the directory of where generated files would be placed. Relative to the root of each environment per workspace</p>
+<h2 id="outdirname"><code>outDirName</code></h2>
+<p>The name of the directory where generated files are placed. It is relative to the root of each environment per workspace.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code>out_dir</code> is still accepted for older config files, but <code>outDirName</code> is preferred.</p>
+</div>
 <p>Don't forget to add this directory to your <code>.gitignore</code>!
 <div class="highlight"><span class="filename">.gitignore</span><pre><span></span><code>**Generated/
 </code></pre></div></p>
 <h2 id="workspaces"><code>workspaces</code></h2>
 <p>These represent individual lua projects which are processed in parallel. Multiple workspaces are especially useful for multi-place Roblox games.</p>
-<p>Each workspace must contain an environment map, that is a dictionary with the <code>client</code>, <code>server</code>, and <code>shared</code> keys. Each environment value should contain a map of filesystem paths (relative to the config directory) to lua expressions that represent the path at runtime (where <code>:</code> is replaced with the environement root.)</p>
+<p>Each workspace must contain an environment map, that is a dictionary with the <code>client</code>, <code>server</code>, and <code>shared</code> keys. Each environment value should contain a map of filesystem paths (relative to the config directory) to lua expressions that represent the path at runtime. The <code>:</code> character is replaced with the environment root.</p>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>
-<p>Each environment can contain multiple processed paths, but the first one is the root. (where the <code>Generated</code> directory is created)</p>
+<p>Each environment can contain multiple processed paths, but the first one is the root, where the <code>Generated</code> directory is created.</p>
 <p>Other paths are good for having packages be processed, for example.</p>
 </div>
+<h2 id="workspace_common"><code>workspace_common</code></h2>
+<p><code>workspace_common</code> lets you add the same paths to every workspace without repeating them. It uses the same <code>client</code>, <code>server</code>, and <code>shared</code> maps as a workspace, but each key is optional.</p>
+<p>Workspace-specific paths are still declared first and are used as the environment roots. If a workspace and <code>workspace_common</code> define the same path, the workspace value wins.</p>
+<div class="highlight"><span class="filename">annotations.config.json</span><pre><span></span><code><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;workspace_common&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;shared&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;src/common/shared&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;:Common&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;wally@game-framework&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;:Packages&quot;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;workspaces&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;client&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;src/client&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;:&quot;</span><span class="p">},</span>
+<span class="w">            </span><span class="nt">&quot;server&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;src/server&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;:&quot;</span><span class="p">},</span>
+<span class="w">            </span><span class="nt">&quot;shared&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;src/shared&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;:&quot;</span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">]</span>
+<span class="p">}</span>
+</code></pre></div>
 <h3 id="path-tags">Path tags</h3>
 <p>Instead of a literal filesystem path and lua expression, you may use a tag to resolve paths automatically.</p>
 <p><code>wally</code>: resolves a path based on a package name (<code>my-package</code>, in this example). The value must be the package directory at lua runtime (such as <code>:Packages</code>)
-<div class="highlight"><span class="filename">annotations.config.json</span><pre><span></span><code><span class="nt">&quot;workspaces&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">    </span><span class="nt">&quot;shared&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;wally@my-package&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;:Packages&quot;</span><span class="p">}</span>
-<span class="p">]</span>
+<div class="highlight"><span class="filename">annotations.config.json</span><pre><span></span><code><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;workspaces&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;client&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;src/client&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;:&quot;</span><span class="p">},</span>
+<span class="w">            </span><span class="nt">&quot;server&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;src/server&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;:&quot;</span><span class="p">},</span>
+<span class="w">            </span><span class="nt">&quot;shared&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;src/shared&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;:&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;wally@my-package&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;:Packages&quot;</span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">]</span>
+<span class="p">}</span>
 </code></pre></div></p>
 <h2 id="extensions"><code>extensions</code></h2>
-<p>A list of python package names to be imported and processed by the CLI tool. These should contain a <code>load()</code> function at the root module which utilizes the <code>Extension</code> API. The first value must either be <code>package</code> or <code>path</code>, while the second should be the package name or filepath, respective to the first.</p>
-<h2 id="flags"><code>flags</code></h2>
-<p>A list of boolean flags which can modify behavior of the tool or of extensions:</p>
-<p>TODO</p>
+<p>A list of python extension modules to be imported and processed by the CLI tool. Each extension module should contain a <code>load(ctx)</code> function which utilizes the <code>Extension</code> API.</p>
+<p>Extension entries may be written as a two-item list:</p>
+<div class="highlight"><pre><span></span><code><span class="p">[</span><span class="s2">&quot;path&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;tools/my_extension.py&quot;</span><span class="p">]</span>
+</code></pre></div>
+<p>Or as an object:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span><span class="nt">&quot;kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;path&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;expr&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;tools/my_extension.py&quot;</span><span class="p">}</span>
+</code></pre></div>
+<p>The <code>kind</code> value must be either <code>library</code> or <code>path</code>.</p>
+<ul>
+<li><code>library</code>: loads the bundled game framework extension. The usual value is <code>lua_annotations.extensions.game_framework.main</code>.</li>
+<li><code>path</code>: imports a python file relative to the project directory.</li>
+</ul>
 
 
 

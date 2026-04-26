@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -267,6 +267,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -395,6 +399,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#generated-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generated files
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -446,7 +461,63 @@
   <span class="md-ellipsis">
     
   
-    API usage
+    API Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../3runtime_annotations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Annotations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../4lua_dict/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lua Table Generation
   
 
     
@@ -693,6 +764,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#generated-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generated files
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -762,7 +844,7 @@
 
 
 <h1 id="cli-usage">CLI Usage</h1>
-<p>The CLI tool can be ran with the following command:
+<p>The CLI tool can be run with the following command:
 <div class="highlight"><pre><span></span><code>lua-anot<span class="w"> </span><span class="o">{</span>mode<span class="o">}</span><span class="w"> </span><span class="o">{</span>args<span class="o">}</span><span class="w"> </span><span class="o">{</span>workdir:<span class="w"> </span><span class="nv">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>.<span class="o">}</span>
 </code></pre></div></p>
 <h2 id="modes">Modes</h2>
@@ -773,9 +855,16 @@
 </ul>
 <h2 id="args">Args</h2>
 <ul>
-<li><code>-c</code>/<code>--config</code>: path to the config file to use (default = 'annotations.config.json')</li>
+<li><code>-c</code>/<code>--config</code>: path to the config file to use, relative to <code>workdir</code> (default = <code>annotations.config.json</code>)</li>
 <li><code>--watch-interval</code>: polling interval (in seconds) for watch mode.</li>
 </ul>
+<h2 id="generated-files">Generated files</h2>
+<p>Build mode deletes and recreates the generated directory for each environment root. By default this directory is named <code>Generated</code>.</p>
+<p>The core extension creates runtime init files for the server and client. The game framework extension also creates files such as <code>Index.lua</code>, <code>ServiceTypes.lua</code>, <code>_Internal/Lifecycle.lua</code>, and <code>Remotes.model.json</code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Do not edit files under <code>Generated</code> manually. They are replaced on each build.</p>
+</div>
 
 
 
