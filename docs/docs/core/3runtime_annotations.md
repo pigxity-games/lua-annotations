@@ -19,18 +19,18 @@ Server and client init files both receive shared runtime data. There is no separ
 
 ??? example "Loader Code"
     ```lua title="AnnotationInit.x.lua"
-    for _, fun in ipairs(manifest.init_hooks) do
+    for _, fun in ipairs(manifest.hooks.init) do
         fun(manifest)
     end
 
     for _, anot in ipairs(manifest.annotations) do
-        local fun = manifest.anot_hooks[anot.name]
+        local fun = manifest.hooks.annotation_handlers[anot.name]
         if fun then
             fun(anot, manifest)
         end
     end
 
-    for _, fun in ipairs(manifest.post_init_hooks) do
+    for _, fun in ipairs(manifest.hooks.post_init) do
         task.spawn(fun, manifest)
     end
     ```
@@ -38,10 +38,19 @@ Server and client init files both receive shared runtime data. There is no separ
 ## Manifest data
 The manifest is built from annotations and extension output. The core manifest contains these keys:
 
-* `anot_hooks`: a map of annotation names to runtime handler functions.
-* `init_hooks`: functions annotated with `@onInit`.
-* `post_init_hooks`: functions annotated with `@onPostInit`.
+* `hooks.annotation_handlers`: a map of annotation names to runtime handler functions.
+* `hooks.init`: functions annotated with `@onInit`.
+* `hooks.post_init`: functions annotated with `@onPostInit`.
 * `annotations`: parsed annotations whose `retention` is not `build`.
+
+The game framework extension adds these keys:
+
+* `services.entries`: service, init service, dependency, and component metadata keyed by name.
+* `services.load_order`: the runtime startup order for services and components.
+* `remotes.client`: remote metadata for client remotes.
+* `remotes.server`: remote metadata for server remotes.
+
+There is no `remotes.shared` table. Remote networking always crosses between client and server, so `@remote` annotations in shared code are invalid.
 
 Each annotation in `manifest.annotations` is converted into a lua table with:
 
@@ -49,9 +58,9 @@ Each annotation in `manifest.annotations` is converted into a lua table with:
 * `args`: parsed positional arguments.
 * `kwargs`: parsed keyword arguments.
 * `getAdornee`: a function that returns the annotated module, method, or value.
-* any extra data written to `annotation.export_data` by python build code.
+* `data`: any extra data written to `annotation.export_data` by python build code.
 
-For example, the networking extension writes `remote_name` and `remote_parent` during build, so its runtime handler can find the generated Roblox remote instance.
+For example, the networking extension writes `data.remote_name` and `data.remote_parent` during build, so its runtime handler can find the generated Roblox remote instance.
 
 ## Retention
 `AnnotationDef.retention` controls whether an annotation is placed in the runtime manifest.
@@ -95,7 +104,7 @@ class HelloWorldExtension(Extension):
 
 
 def load(ctx: ExtensionRegistry):
-    ctx.register_extension(PrintEffectExtension())
+    ctx.register_extension(HelloWorldExtension())
 ```
 
 And the lua runtime file:
@@ -143,4 +152,4 @@ class SignalExtension(Extension):
         )
 ```
 
-The lua handler can then read `anot.method_name` and `anot.module_name`.
+The lua handler can then read `anot.data.method_name` and `anot.data.module_name`.

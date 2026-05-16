@@ -20,9 +20,9 @@ A lua annotation processor written in python; it's targeted toward Roblox develo
 
 
 ## CLI usage
-To setup your project, run `lua-anot init path/to/project`. This creates a default config file. Don't forget to change the default environment paths if your project setup differs! 
+To set up your project, run `lua-anot init path/to/project`. This creates a default config file. Don't forget to change the default environment paths if your project setup differs!
 
-This is mostly a CLI tool; to build a project, run this command: `lua-anot build path/to/project`. This command assumes the project directory contains a `annotations.config.json` file. You may specify a custom filename using the `--config` or `-c` argument.
+This is mostly a CLI tool; to build a project, run this command: `lua-anot build path/to/project`. This command assumes the project directory contains an `annotations.config.json` file. You may specify a custom filename using the `--config` or `-c` argument.
 
 The program also has a watch command, which detects changes and automatically rebuilds; used via `lua-anot watch`.
 

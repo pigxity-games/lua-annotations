@@ -510,6 +510,11 @@ class FileParser:
             if module:
                 return LuaMethod(fun_name, module, param_dict, return_type, call_type)
 
+            returned_name, is_submodule = returned.get_returned_name(fun_name)
+            if strict and returned_name and not is_submodule:
+                module = LuaModule(self.file, fun_name, returned_name)
+                return LuaMethod(fun_name, module, param_dict, return_type, call_type, direct_return=True)
+
         # Allow `function foo()` to be a method annotation target when `foo`
         # is exported from a literal return table: `return { alias = foo }`.
         returned_name, is_submodule = returned.get_returned_name(fun_name)

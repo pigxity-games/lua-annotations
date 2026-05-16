@@ -4,7 +4,7 @@ Services are single-instanced modules (singletons) that represent game features 
 !!! question "Controllers?"
     Unlike other frameworks, there is no concept of "client controllers." Instead, services can be placed on both the server and client.
     
-    Nevertheless, it would still be a good idea to enforce a convention to name clientside services as "Controllers" for clarity.
+    Nevertheless, it would still be a good idea to enforce a convention to name client-side services as "Controllers" for clarity.
 
 
 ## Creating a simple service
@@ -95,7 +95,7 @@ return m
 ```
 
 ## `@dependency`
-This is a simple annotation which `@service`, `@initService`, and `@component` inherit from. Modules annotated with it **are not loaded automatically at runtime**, ie they have no `_init` method. Use this for pure data modules which still need DI or generated types.
+This is a simple annotation which `@service`, `@initService`, and `@component` inherit from. Modules annotated with it **are not loaded automatically at runtime**, i.e. they have no `_init` method. Use this for pure data modules which still need DI or generated types.
 
 ```lua title="src/server/BalanceConfig.lua"
 --@dependency

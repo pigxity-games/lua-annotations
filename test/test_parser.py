@@ -193,6 +193,27 @@ return {
     assert method_anot.adornee.get_path(require=True).to_lua(resolver) == "require(ServerScriptService.Project.LiteralReturn).test"
 
 
+def test_parser_allows_method_annotation_for_single_returned_function(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        'Middleware.lua',
+        """--@methodAnn
+local function Logger(ctx, ...)
+    return true, ...
+end
+
+return Logger
+""",
+    )
+
+    method_anot = next(a for a in parser.annotations if a.name == 'methodAnn')
+    assert isinstance(method_anot.adornee, LuaMethod)
+    assert method_anot.adornee.name == 'Logger'
+
+    resolver = make_project_resolver(tmp_path)
+    assert method_anot.adornee.get_path(require=True).to_lua(resolver) == 'require(ServerScriptService.Project.Middleware)'
+
+
 def test_parser_allows_method_annotation_for_literal_submodule_function(tmp_path: Path):
     parser = parse_text(
         tmp_path,

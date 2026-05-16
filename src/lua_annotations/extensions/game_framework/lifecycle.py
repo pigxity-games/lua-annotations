@@ -10,6 +10,7 @@ from lua_annotations.api.annotations import (
     FileBuildCtx,
 )
 from lua_annotations.api.arguments import default_list
+from lua_annotations.api.manifest import ServiceEntry
 from lua_annotations.build_process import Environment, PostProcessCtx, logger
 from lua_annotations.exceptions import BuildError
 from lua_annotations.parser_schemas import Annotation, LuaMethod, ReturnedValue
@@ -83,22 +84,25 @@ def service_todict(
     service_map: dict[str, Annotation],
     remote_map: dict[Environment, set[str]],
 ):
-    out = {
-        'depends': proc_deps(svc, service_map, remote_map),
-        'getAdornee': svc.adornee.get_path(function=True, require=True, cache=True),  # pyright: ignore[reportAttributeAccessIssue]
-        'kind': svc.name,
-    }
+    tags = None
+    data_service = None
 
     if svc.name == 'component':
-        out['tags'] = svc.args_val[0]
+        tags = svc.args_val[0]
 
         data_svc = svc.kwargs_val.get('data', None)
         if data_svc and not service_map.get(data_svc):
             logger().warn(f'Invalid data dependency for component {get_service_name(svc)}: "{data_svc}"; ommiting')
         elif data_svc:
-            out['data_service'] = data_svc
+            data_service = data_svc
 
-    return out
+    return ServiceEntry(
+        depends=proc_deps(svc, service_map, remote_map),
+        getAdornee=svc.adornee.get_path(function=True, require=True, cache=True),  # pyright: ignore[reportAttributeAccessIssue]
+        kind=svc.name,
+        tags=tags,
+        data_service=data_service,
+    )
 
 
 def get_service_name(svc: Annotation):
@@ -166,7 +170,7 @@ class LifecycleExtension(Extension):
         for env in ('server', 'client'):
             services = self.services[env] + self.services['shared']
 
-            self.manifestExt.manifest[env]['services'] = {
+            entries = {
                 get_service_name(svc): service_todict(
                     svc,
                     {get_service_name(svc): svc for svc in services},
@@ -176,7 +180,7 @@ class LifecycleExtension(Extension):
             }
 
             try:
-                self.manifestExt.manifest[env]['load_order'] = get_runtime_load_order(services)
+                self.manifestExt.set_services(env, entries, get_runtime_load_order(services))
             except CycleError as e:
                 raise BuildError(f"Cycle detected for service graph: {e.args}") from e
 

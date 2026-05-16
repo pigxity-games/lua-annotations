@@ -34,7 +34,7 @@ Don't forget to add this directory to your `.gitignore`!
 ## `workspaces`
 These represent individual lua projects which are processed in parallel. Multiple workspaces are especially useful for multi-place Roblox games.
 
-Each workspace must contain an environment map, that is a dictionary with the `client`, `server`, and `shared` keys. Each environment value should contain a map of filesystem paths (relative to the config directory) to lua expressions that represent the path at runtime. The `:` character is replaced with the environment root.
+Each workspace must contain an environment map, which is a dictionary with the `client`, `server`, and `shared` keys. Each environment value should contain a map of filesystem paths (relative to the config directory) to lua expressions that represent the path at runtime. The `:` character is replaced with the environment root.
 
 !!! tip
     Each environment can contain multiple processed paths, but the first one is the root, where the `Generated` directory is created.
@@ -67,7 +67,7 @@ Workspace-specific paths are still declared first and are used as the environmen
 ### Path tags
 Instead of a literal filesystem path and lua expression, you may use a tag to resolve paths automatically.
 
-`wally`: resolves a path based on a package name (`my-package`, in this example). The value must be the package directory at lua runtime (such as `:Packages`)
+`wally`: resolves a path based on a package name (`my-package`, in this example). The value must be the package directory at lua runtime (such as `:Packages`).
 ```json title="annotations.config.json"
 {
     "workspaces": [
@@ -99,3 +99,6 @@ The `kind` value must be either `library` or `path`.
 
 * `library`: loads the bundled game framework extension. The usual value is `lua_annotations.extensions.game_framework.main`.
 * `path`: imports a python file relative to the project directory.
+
+!!! note
+    The `library` loader currently imports the bundled game framework extension. The `expr` value is still required by the config format.

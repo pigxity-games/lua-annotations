@@ -8,10 +8,10 @@ An annotation processor for lua projects. see docs/ for documentation. The progr
 - `lua/`: lua packages for runtime extensions.
 
 ### Tooling (run these after code changes)
-- run all unit tests: `python -m pytest` **run pytest outside the sandbox**
+- run all unit tests: `pytest` **run pytest outside the sandbox**
 - syntax check: `python -m py_compile {file}`
 - type check: `pyright {file}`
-- format: `python -m black {file}`
+- format: `black {file}`
 
 ## Code conventions
 - use single quotes for strings ('')

@@ -26,19 +26,19 @@ end
 --manifest
 
 --lifecycle
-for _, fun in ipairs(manifest.init_hooks) do
+for _, fun in ipairs(manifest.hooks.init) do
     fun(manifest)
 end
 
 for _, anot in ipairs(manifest.annotations) do
-    local fun = manifest.anot_hooks[anot.name]
+    local fun = manifest.hooks.annotation_handlers[anot.name]
     if fun then
         fun(anot, manifest)
     end
 end
 
-for _, fun in ipairs(manifest.post_init_hooks) do
+for _, fun in ipairs(manifest.hooks.post_init) do
     task.spawn(fun, manifest)
 end
 
-print("(env) annotations loaded in " .. (os.clock() - t0) .. "s")
+print("[LuaAnnotations] (env) annotations loaded in " .. (os.clock() - t0) .. "s")

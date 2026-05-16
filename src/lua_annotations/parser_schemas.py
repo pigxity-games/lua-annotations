@@ -48,12 +48,16 @@ class LuaMethod:
     params: dict[str, str] = field(default_factory=dict)
     return_type: str = 'nil'
     call_type: str = '.'
+    direct_return: bool = False
 
     def __post_init__(self):
         if not self.return_type:
             self.return_type = 'nil'
 
     def get_path(self, relative: bool = False, require: bool = False, function: bool = False, cache: bool = False):
+        if self.direct_return:
+            return self.module.get_path(relative, require, [], function, cache)
+
         return self.module.get_path(relative, require, [self.name], function, cache)
 
     def generate_type(self):
@@ -141,7 +145,8 @@ class Annotation:
             'args': self.args_val,
             'kwargs': self.kwargs_val,
             'getAdornee': self.adornee.get_path(require=True, function=True, cache=True),  # pyright: ignore[reportAttributeAccessIssue]
-        } | self.export_data
+            'data': self.export_data,
+        }
 
     def get_adornee_name(self):
         if isinstance(self.adornee, LuaModule):

@@ -3,9 +3,135 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local isServer = RunService:IsServer()
-local remoteTargetEnv = isServer and "client" or "server"
-local currentEnv = isServer and "server" or "client"
+local remoteTargetEnv = if isServer then "client" else "server"
+local currentEnv = if isServer then "server" else "client"
 local componentInstances = {}
+local remoteInfoByEnv = {}
+local middlewareRegistry = {
+	inbound = {
+		global = {},
+		named = {},
+	},
+	outbound = {
+		global = {},
+		named = {},
+	},
+}
+
+
+local function unpackPacked(args)
+	return table.unpack(args, 1, args.n)
+end
+
+
+local function packTail(args)
+	return table.pack(table.unpack(args, 2, args.n))
+end
+
+
+local function splitFirst(...)
+	local args = table.pack(...)
+	return args[1], packTail(args)
+end
+
+
+local function isRemoteEvent(remote: RemoteFunction | RemoteEvent | UnreliableRemoteEvent)
+	return remote:IsA('RemoteEvent') or remote:IsA('UnreliableRemoteEvent')
+end
+
+
+local function getRemoteType(remote: RemoteFunction | RemoteEvent | UnreliableRemoteEvent)
+	if remote:IsA('RemoteFunction') then
+		return 'function'
+	elseif remote:IsA('UnreliableRemoteEvent') then
+		return 'unreliable'
+	end
+
+	return 'event'
+end
+
+
+local function getRemoteInfo(env, serviceName, methodName, fallbackType)
+	local envInfo = remoteInfoByEnv[env]
+	local serviceInfo = envInfo and envInfo[serviceName]
+	local remoteInfo = serviceInfo and serviceInfo[methodName]
+
+	if remoteInfo then
+		return remoteInfo
+	end
+
+	return {
+		service = serviceName,
+		method = methodName,
+		remoteType = fallbackType,
+		middleware = {},
+	}
+end
+
+
+local function getRemoteInfoFromAnnotation(anot)
+	return {
+		service = anot.data.remote_parent,
+		method = anot.data.remote_name,
+		remoteType = anot.args[1],
+		middleware = anot.kwargs.middleware or {},
+	}
+end
+
+
+local function makeRemoteContext(remoteInfo, direction, player)
+	return {
+		player = player,
+		direction = direction,
+		service = remoteInfo.service,
+		method = remoteInfo.method,
+		remoteType = remoteInfo.remoteType,
+	}
+end
+
+
+local function appendMiddleware(chain, added, data)
+	if not data or added[data.name] then
+		return
+	end
+
+	added[data.name] = true
+	table.insert(chain, data.callback)
+end
+
+
+local function resolveMiddlewareChain(remoteInfo, direction)
+	local registry = middlewareRegistry[direction]
+	local chain = {}
+	local added = {}
+
+	for _, data in ipairs(registry.global) do
+		appendMiddleware(chain, added, data)
+	end
+
+	for _, name in ipairs(remoteInfo.middleware or {}) do
+		appendMiddleware(chain, added, registry.named[name])
+	end
+
+	return chain
+end
+
+
+local function runMiddlewareChain(chain, ctx, ...)
+	local args = table.pack(...)
+
+	for _, callback in ipairs(chain) do
+		local result = table.pack(callback(ctx, unpackPacked(args)))
+
+		if result[1] ~= true then
+			return false, table.unpack(result, 2, result.n)
+		end
+
+		args = packTail(result)
+	end
+
+	return true, unpackPacked(args)
+end
 
 
 local function makeComponentClass<T>(class: T, dataGetter: (any) -> ())
@@ -55,7 +181,7 @@ end
 
 
 local function getMainTagForDependency(manifest, depName)
-	local depData = manifest.services[depName]
+	local depData = manifest.services.entries[depName]
 	assert(depData, ("Unknown component dependency %q"):format(depName))
 	assert(depData.tags and depData.tags[1], ("Dependency %q has no tags"):format(depName))
 	return depData.tags[1]
@@ -82,7 +208,7 @@ local function initService(manifest, data, serviceName, service, baseDeps)
 	local getComponentData
 	local dataService
 	if data.data_service then
-		dataService = manifest.services[data.data_service].getAdornee()
+		dataService = manifest.services.entries[data.data_service].getAdornee()
 
 		getComponentData = function(inst) 
 			local state = dataService[inst]
@@ -109,12 +235,15 @@ local function initService(manifest, data, serviceName, service, baseDeps)
 
 	--bind CollectionService tags
 	for _, tag in ipairs(data.tags) do
+		local componentDeps = data.depends.components
+		local hasComponentDeps = #componentDeps > 0
+
 		useCollectionTag(tag, function(inst)
-			local deps = table.clone(baseDeps)
-			local createdDepTags = {}
+			local deps = hasComponentDeps and table.clone(baseDeps) or baseDeps
+			local createdDepTags = hasComponentDeps and {} or nil
 
 			--inject component deps
-			for _, dep in ipairs(data.depends.components) do
+			for _, dep in ipairs(componentDeps) do
 				local depInstances = componentInstances[dep]
 				local depObj = depInstances and depInstances[inst]
 				
@@ -124,6 +253,7 @@ local function initService(manifest, data, serviceName, service, baseDeps)
 					if not inst:HasTag(depTag) then
 						--create dep if it doesn't exist
 						inst:AddTag(depTag)
+						assert(createdDepTags)
 						createdDepTags[dep] = depTag
 					end
 
@@ -151,9 +281,11 @@ local function initService(manifest, data, serviceName, service, baseDeps)
 				end
 
 				--destroy any dependencies as well
-				for _, depTag in pairs(createdDepTags) do
-					if inst:HasTag(depTag) then
-						inst:RemoveTag(depTag)
+				if createdDepTags then
+					for _, depTag in pairs(createdDepTags) do
+						if inst:HasTag(depTag) then
+							inst:RemoveTag(depTag)
+						end
 					end
 				end
 
@@ -167,39 +299,135 @@ local function initService(manifest, data, serviceName, service, baseDeps)
 end
 
 
-local function getRemoteMethod(remote: RemoteFunction | RemoteEvent)
-	if remote:IsA("RemoteEvent") then
-		if isServer then
-			return function(self, player, ...)
-				--handle "all" players
-				if player == "all" then
-					remote.FireAllClients(self, ...)
+local remoteRoot = ReplicatedStorage:WaitForChild('Generated'):WaitForChild('Remotes')
+local remoteCache = {}
 
-				--handle player lists
-				elseif typeof(player) == "table" then
-					for _, plr in ipairs(player) do
-						remote.FireClient(self, plr, ...)
-					end
 
-				else
-					remote.FireClient(self, player, ...)
-				end
-			end
-		else
-			return remote.FireServer
+local function fireServerRemote(remote: RemoteEvent | UnreliableRemoteEvent, ...)
+	remote:FireServer(...)
+end
+
+
+local function fireClientRemote(remote: RemoteEvent | UnreliableRemoteEvent, player, ...)
+	if player == 'all' then
+		remote:FireAllClients(...)
+	elseif typeof(player) == 'table' then
+		for _, plr in ipairs(player) do
+			remote:FireClient(plr, ...)
 		end
 	else
-		if isServer then
-			return remote.InvokeClient
-		else
-			return remote.InvokeServer
-		end
+		remote:FireClient(player, ...)
 	end
 end
 
 
-local remoteRoot = ReplicatedStorage:WaitForChild("Generated"):WaitForChild("Remotes")
-local remoteCache = {}
+local function runOutboundMiddleware(chain, remoteInfo, ...)
+	local player
+	local args
+
+	if isServer then
+		player, args = splitFirst(...)
+	else
+		args = table.pack(...)
+	end
+
+	local ctx = makeRemoteContext(remoteInfo, 'outbound', player)
+	local result = table.pack(runMiddlewareChain(chain, ctx, unpackPacked(args)))
+	return result, player
+end
+
+
+local function createEventSender(remoteInfo, remote: RemoteEvent | UnreliableRemoteEvent, remoteTable, remoteName)
+	local sender
+
+	if isServer then
+		sender = function(player, ...)
+			fireClientRemote(remote, player, ...)
+		end
+	else
+		sender = function(...)
+			fireServerRemote(remote, ...)
+		end
+	end
+
+	local wrapped
+	wrapped = function(...)
+		local chain = resolveMiddlewareChain(remoteInfo, 'outbound')
+		if #chain == 0 then
+			remoteTable[remoteName] = sender
+			return sender(...)
+		end
+
+		local middlewareSender = function(...)
+			local result, player = runOutboundMiddleware(chain, remoteInfo, ...)
+			if result[1] ~= true then
+				return
+			end
+
+			if isServer then
+				return fireClientRemote(remote, player, table.unpack(result, 2, result.n))
+			end
+
+			return fireServerRemote(remote, table.unpack(result, 2, result.n))
+		end
+
+		remoteTable[remoteName] = middlewareSender
+		return middlewareSender(...)
+	end
+
+	return wrapped
+end
+
+
+local function createFunctionSender(remoteInfo, remote: RemoteFunction, remoteTable, remoteName)
+	local sender
+
+	if isServer then
+		sender = function(player, ...)
+			return remote:InvokeClient(player, ...)
+		end
+	else
+		sender = function(...)
+			return remote:InvokeServer(...)
+		end
+	end
+
+	local wrapped
+	wrapped = function(...)
+		local chain = resolveMiddlewareChain(remoteInfo, 'outbound')
+		if #chain == 0 then
+			remoteTable[remoteName] = sender
+			return sender(...)
+		end
+
+		local middlewareSender = function(...)
+			local result, player = runOutboundMiddleware(chain, remoteInfo, ...)
+			if result[1] ~= true then
+				return table.unpack(result, 2, result.n)
+			end
+
+			if isServer then
+				return remote:InvokeClient(player, table.unpack(result, 2, result.n))
+			end
+
+			return remote:InvokeServer(table.unpack(result, 2, result.n))
+		end
+
+		remoteTable[remoteName] = middlewareSender
+		return middlewareSender(...)
+	end
+
+	return wrapped
+end
+
+
+local function createRemoteSender(remoteInfo, remote: RemoteFunction | RemoteEvent | UnreliableRemoteEvent, remoteTable, remoteName)
+	if isRemoteEvent(remote) then
+		return createEventSender(remoteInfo, remote, remoteTable, remoteName)
+	end
+
+	return createFunctionSender(remoteInfo, remote, remoteTable, remoteName)
+end
 
 
 local function getRemoteTable(folderName)
@@ -214,10 +442,8 @@ local function getRemoteTable(folderName)
 	local remotesTable = {}
 
 	for _, remote in ipairs(folder:GetChildren()) do
-		local remoteMethod = getRemoteMethod(remote)
-		remotesTable[remote.Name] = function(...)
-			return remoteMethod(remote, ...)
-		end
+		local remoteInfo = getRemoteInfo(remoteTargetEnv, folderName, remote.Name, getRemoteType(remote))
+		remotesTable[remote.Name] = createRemoteSender(remoteInfo, remote, remotesTable, remote.Name)
 	end
 
 	remoteCache[folderName] = remotesTable
@@ -235,11 +461,37 @@ function bindTag(anot)
 end
 
 
+--@annotationInit
+function middleware(anot)
+	local env = anot.args[1]
+	if env ~= currentEnv then
+		return
+	end
+
+	local direction = anot.args[2]
+	local registry = middlewareRegistry[direction]
+	assert(registry, ('Unknown middleware direction %q'):format(direction))
+
+	local data = {
+		name = anot.data.middleware_name,
+		callback = anot.getAdornee(),
+	}
+
+	registry.named[data.name] = data
+
+	if anot.kwargs.global == true then
+		table.insert(registry.global, data)
+	end
+end
+
+
 --@onPostInit
 function initServices(manifest)
-	t0 = os.clock()
-	for _, serviceName in ipairs(manifest.load_order) do
-		local data = manifest.services[serviceName]
+	remoteInfoByEnv = manifest.remotes or {}
+
+	local t0 = os.clock()
+	for _, serviceName in ipairs(manifest.services.load_order) do
+		local data = manifest.services.entries[serviceName]
 		local service = data.getAdornee()
 
 		--build deps list
@@ -247,8 +499,8 @@ function initServices(manifest)
 		injectDeps[remoteTargetEnv] = {}
 
 		--service deps
-		for _, dep in ipairs(data.depends.services) do
-			injectDeps[dep] = manifest.services[dep].getAdornee()
+	for _, dep in ipairs(data.depends.services) do
+			injectDeps[dep] = manifest.services.entries[dep].getAdornee()
 		end
 
 		--remote deps
@@ -259,29 +511,77 @@ function initServices(manifest)
 		initService(manifest, data, serviceName, service, injectDeps)
 	end
 
-	print(currentEnv .. " services started in " .. os.clock() - t0 .. "s")
+	print("[LuaAnnotations] game-framework " .. currentEnv .. " services started in " .. os.clock() - t0 .. "s")
 end
 
 
 --@annotationInit
 function remote(anot)
 	local callback = anot.getAdornee()
-	local anotType = anot.args[1] --event or function
-	local remote = remoteRoot[anot.remote_parent]:WaitForChild(anot.remote_name)
+	local remoteInfo = getRemoteInfoFromAnnotation(anot)
+	local anotType = remoteInfo.remoteType --event, unreliable, or function
+	local remote = remoteRoot[anot.data.remote_parent]:WaitForChild(anot.data.remote_name)
 
-	if anotType == "event" then
-		assert(remote:IsA("RemoteEvent"), "Expected RemoteEvent")
+	local wrappedCallback
+	wrappedCallback = function(...)
+		local chain = resolveMiddlewareChain(remoteInfo, 'inbound')
+		if #chain == 0 then
+			wrappedCallback = callback
+			return callback(...)
+		end
+
+		wrappedCallback = function(...)
+			local player
+			local args
+
+			if isServer then
+				player, args = splitFirst(...)
+			else
+				args = table.pack(...)
+			end
+
+			local ctx = makeRemoteContext(remoteInfo, 'inbound', player)
+			local result = table.pack(runMiddlewareChain(chain, ctx, unpackPacked(args)))
+
+			if result[1] ~= true then
+				if remoteInfo.remoteType == 'function' then
+					return table.unpack(result, 2, result.n)
+				end
+
+				return
+			end
+
+			if isServer then
+				return callback(player, table.unpack(result, 2, result.n))
+			end
+
+			return callback(table.unpack(result, 2, result.n))
+		end
+
+		return wrappedCallback(...)
+	end
+
+	if anotType == 'event' or anotType == 'unreliable' then
+		assert(isRemoteEvent(remote), 'Expected RemoteEvent')
 		if isServer then
-			remote.OnServerEvent:Connect(callback)
+			remote.OnServerEvent:Connect(function(...)
+				return wrappedCallback(...)
+			end)
 		else
-			remote.OnClientEvent:Connect(callback)
+			remote.OnClientEvent:Connect(function(...)
+				return wrappedCallback(...)
+			end)
 		end
 	else
-		assert(remote:IsA("RemoteFunction"), "Expected RemoteFunction")
+		assert(remote:IsA('RemoteFunction'), 'Expected RemoteFunction')
 		if isServer then
-			remote.OnServerInvoke = callback
+			remote.OnServerInvoke = function(...)
+				return wrappedCallback(...)
+			end
 		else
-			remote.OnClientInvoke = callback
+			remote.OnClientInvoke = function(...)
+				return wrappedCallback(...)
+			end
 		end
 	end
 end
@@ -290,5 +590,6 @@ end
 return {
 	initServices = initServices,
 	bindTag = bindTag,
+	middleware = middleware,
 	remote = remote,
 }

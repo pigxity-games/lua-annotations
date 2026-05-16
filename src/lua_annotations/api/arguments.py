@@ -21,6 +21,15 @@ def default_list(str: str):
         return [str]
 
 
+def bool_arg(string: str):
+    if string == 'true':
+        return True
+    if string == 'false':
+        return False
+
+    raise ParseError('boolean argument must be `true` or `false`')
+
+
 def literal_builder(options: list[str]):
     def f(s: str):
         if s not in options:

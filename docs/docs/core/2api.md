@@ -1,5 +1,5 @@
 # API Usage
-Extensions are python modules which register annotations and build hooks. The default manifest extension and the game framework extension both use this API internally, so you may see the source code `src/lua_annotations/extensions` for examples.
+Extensions are python modules which register annotations and build hooks. The default manifest extension and the game framework extension both use this API internally, so you may see the source code under `src/lua_annotations/extensions` for examples.
 
 Every extension module needs a `load(ctx)` function:
 
@@ -132,3 +132,5 @@ If you want to annotate many files with the same rule, add an `annotation-meta.j
 ```
 
 The regex rules apply to direct lua files in that directory.
+
+The annotation value may be written with or without the `--@` prefix. Both `"module"` and `"@module"` are normalized before parsing.
