@@ -638,6 +638,7 @@ return m
     assert method.call_type == '.'
     assert method.params["param1"] == "any"
 
+
 def test_parser_does_not_handle_function_return(tmp_path: Path):
     parser = parse_text(
         tmp_path,
