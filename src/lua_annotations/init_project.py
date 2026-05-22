@@ -65,7 +65,7 @@ def import_extension_from_path(workdir: Path, entry: str):
 
 def import_extension(ext: ExtensionConfig, workdir: Path):
     if ext.kind == 'library':
-        return importlib.import_module("lua_annotations.extensions.game_framework.main")
+        return importlib.import_module(ext.expr)
     return import_extension_from_path(workdir, ext.expr)
 
 
@@ -84,7 +84,9 @@ def process_tags(raw: str, raw_expr: str, env: Environment, workdir: Path):
     raise ConfigError(f'invalid path tag: {raw}')
 
 
-def _process_workspace(workdir: Path, config: Config, workspace_cfg: WorkspaceConfig, log: WorkspaceLogger):
+def _process_workspace(
+    workdir: Path, config: Config, workspace_cfg: WorkspaceConfig, selected_extensions: list[ExtensionConfig], log: WorkspaceLogger
+):
     set_logger(log)
 
     try:
@@ -101,7 +103,7 @@ def _process_workspace(workdir: Path, config: Config, workspace_cfg: WorkspaceCo
         reg = ExtensionRegistry()
         default_ext.load(reg)
 
-        for ext in config.extensions:
+        for ext in selected_extensions:
             # py_entry
             module = import_extension(ext, workdir)
             load_fn = getattr(module, 'load')
@@ -131,7 +133,7 @@ def _process_workspace(workdir: Path, config: Config, workspace_cfg: WorkspaceCo
             output_root.mkdir(parents=True, exist_ok=True)
 
             # create and use a ctx
-            ctx = BuildProcessCtx(reg, root_path, workspace, rel_paths, output_root, env)
+            ctx = BuildProcessCtx(reg, root_path, workspace, config, workspace_cfg.name, rel_paths, output_root, env)
 
             # create any pending files
             for name, content in pending_files[env]:
@@ -144,7 +146,7 @@ def _process_workspace(workdir: Path, config: Config, workspace_cfg: WorkspaceCo
 
         # run post-build hooks
         if build_contexts:
-            ctx = PostProcessCtx(reg, workdir, workspace, build_contexts)
+            ctx = PostProcessCtx(reg, workdir, workspace, config, workspace_cfg.name, build_contexts)
             for hook in reg.post_build_hooks:
                 hook(ctx)
 
@@ -156,12 +158,14 @@ def _process_workspace(workdir: Path, config: Config, workspace_cfg: WorkspaceCo
         log.exception(e)
 
 
-def build(workdir: Path, config: Config):
+def build(workdir: Path, config: Config, selected_optional_extensions: list[str] | None = None):
     init_time = datetime.now()
+    object.__setattr__(config, 'enabled_optional_extensions', tuple(selected_optional_extensions or []))
+    selected_extensions = config.selected_extensions(selected_optional_extensions)
 
     threads: list[Thread] = []
-    for i, workspace_cfg in enumerate(config.workspaces):
-        t = Thread(target=_process_workspace, args=(workdir, config, workspace_cfg, WorkspaceLogger(i)))
+    for i, workspace_cfg in enumerate(config.iter_workspaces()):
+        t = Thread(target=_process_workspace, args=(workdir, config, workspace_cfg, selected_extensions, WorkspaceLogger(i)))
         threads.append(t)
         t.start()
 
@@ -181,7 +185,7 @@ def _watch_fingerprint(workdir: Path, config_file: Path, config: Config):
     tracked: dict[str, int] = {str(config_file): config_file.stat().st_mtime_ns}
 
     # track workspaces
-    for workspace in config.workspaces:
+    for workspace in config.iter_workspaces():
         for env in ENVIRONMENTS:
             path_map = workspace.get(env)
             for env_workdir, _ in iter_rel_paths(path_map, workdir, env):
@@ -191,13 +195,21 @@ def _watch_fingerprint(workdir: Path, config_file: Path, config: Config):
                             continue
                         tracked[str(file)] = file.stat().st_mtime_ns
 
+    test_root = workdir / config.tests.root
+    if test_root.is_dir():
+        for pattern in WATCH_FILENAMES:
+            for file in test_root.rglob(pattern):
+                if config.tests.out_dir_name in file.parts:
+                    continue
+                tracked[str(file)] = file.stat().st_mtime_ns
+
     return tuple(sorted(tracked.items()))
 
 
-def watch(workdir: Path, config_file: Path, poll_interval: float = 1.0):
+def watch(workdir: Path, config_file: Path, poll_interval: float = 1.0, selected_extensions: list[str] | None = None):
     print('Running initial build...')
     config = read_config(config_file)
-    build(workdir, config)
+    build(workdir, config, selected_extensions)
 
     last_fingerprint = _watch_fingerprint(workdir, config_file, config)
     print(f'Watching for changes in {workdir} (interval: {poll_interval}s). Press Ctrl+C to stop.')
@@ -211,5 +223,5 @@ def watch(workdir: Path, config_file: Path, poll_interval: float = 1.0):
 
         if fingerprint != last_fingerprint:
             print('Change detected, rebuilding...')
-            build(workdir, config)
+            build(workdir, config, selected_extensions)
             last_fingerprint = fingerprint

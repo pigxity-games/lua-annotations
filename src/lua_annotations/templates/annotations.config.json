@@ -1,12 +1,19 @@
 {
     "outDirName": "Generated",
-    "workspaces": [
-        {
+    "workspaces": {
+        "game": {
             "client": {"src/client": ":"},
             "server": {"src/server": ":"},
             "shared": {"src/shared": ":", "wally@game-framework": ":Packages"}
         }
-    ],
+    },
+    "optional_extensions": {
+        "unit-test": ["library", "lua_annotations.extensions.unit_tests.main"]
+    },
+    "tests": {
+        "root": "test",
+        "outDirName": "Generated"
+    },
     "extensions": [
         ["library", "lua_annotations.extensions.game_framework.main"]
     ]

@@ -28,6 +28,14 @@ def main():
         default=1.0,
         help='polling interval in seconds when mode is watch',
     )
+    parser.add_argument(
+        '-e',
+        '--extension',
+        action='append',
+        default=[],
+        dest='extensions',
+        help='optional extension to enable; repeatable, or use `all`',
+    )
     args = parser.parse_args()
 
     mode: Literal['build', 'init', 'watch'] = args.mode
@@ -45,11 +53,11 @@ def main():
 
     # main mode
     if mode == 'build':
-        build(workdir, read_config(config_file))
+        build(workdir, read_config(config_file), args.extensions)
         return
 
     # watch mode
-    watch(workdir, config_file, poll_interval=args.watch_interval)
+    watch(workdir, config_file, poll_interval=args.watch_interval, selected_extensions=args.extensions)
 
     return 0
 

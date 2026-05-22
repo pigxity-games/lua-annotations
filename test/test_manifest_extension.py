@@ -5,6 +5,7 @@ from lua_annotations.api.lua_dict import LuaPath
 from lua_annotations.api.manifest import ManifestData, ManifestHooks, ManifestRemotes, RemoteEntry
 from lua_annotations.api.lua_dict import LuaPathResolver, convert_dict
 from lua_annotations.build_process import PostProcessCtx
+from lua_annotations.config import Config
 from lua_annotations.extensions.default import ManifestExtension
 
 from helpers import extract_block, make_build_ctxs, make_workspace
@@ -13,7 +14,7 @@ from helpers import extract_block, make_build_ctxs, make_workspace
 def test_manifest_extension_generates_module_paths_with_clean_lua_paths(tmp_path: Path):
     workspace = make_workspace(tmp_path, server_expr=':.', client_expr=':.', shared_expr=':.')
     build_ctxs = make_build_ctxs(tmp_path, workspace)
-    post_ctx = PostProcessCtx(SortedRegistry([], [], {}), tmp_path, workspace, build_ctxs)
+    post_ctx = PostProcessCtx(SortedRegistry([], [], {}), tmp_path, workspace, Config(out_dir_name='Generated'), 'test', build_ctxs)
 
     ext = ManifestExtension()
     ext.add_init_hook('shared', LuaPath(tmp_path / 'shared' / 'Generated' / '_Internal' / 'Lifecycle.lua', require=True, cache=True))
@@ -37,7 +38,7 @@ def test_manifest_extension_generates_module_paths_with_clean_lua_paths(tmp_path
 def test_manifest_extension_merges_shared_without_mutating_source(tmp_path: Path):
     workspace = make_workspace(tmp_path, server_expr=':.', client_expr=':.', shared_expr=':.')
     build_ctxs = make_build_ctxs(tmp_path, workspace)
-    post_ctx = PostProcessCtx(SortedRegistry([], [], {}), tmp_path, workspace, build_ctxs)
+    post_ctx = PostProcessCtx(SortedRegistry([], [], {}), tmp_path, workspace, Config(out_dir_name='Generated'), 'test', build_ctxs)
 
     ext = ManifestExtension()
     shared_path = LuaPath(tmp_path / 'shared' / 'Generated' / '_Internal' / 'Lifecycle.lua', require=True, cache=True)

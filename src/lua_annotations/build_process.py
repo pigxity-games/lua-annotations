@@ -1,8 +1,8 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 from pathlib import Path
 import threading
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 from importlib.resources import files
 
 from lua_annotations.annotation_meta_parse import META_FILE_NAME, AnnotationMeta
@@ -10,6 +10,10 @@ from lua_annotations.annotation_meta_parse import META_FILE_NAME, AnnotationMeta
 from .exceptions import BuildError
 from .api.annotations import FileBuildCtx, SortedRegistry
 from .parser_schemas import ANNOTATION_PREFIX
+
+if TYPE_CHECKING:
+    from .config import Config
+    from .parser import FileParser
 
 type Environment = Literal['server', 'client', 'shared']
 FILENAMES = ['.lua', '.luau']
@@ -78,11 +82,19 @@ def logger() -> WorkspaceLogger:
     return getattr(_local, "logger", GLOBAL_LOGGER)
 
 
+def _default_config():
+    from .config import Config
+
+    return Config(out_dir_name='Generated')
+
+
 @dataclass
 class ProcessCtx:
     reg: SortedRegistry
     root_dir: Path
     workspace: Workspace
+    config: 'Config' = field(default_factory=_default_config)
+    workspace_name: str = ''
 
     def error(self, message: str, file: Path):
         raise FileBuildError(message, file, self.root_dir)
@@ -93,7 +105,7 @@ type BuildCtxList = dict[Environment, BuildProcessCtx]
 
 @dataclass
 class PostProcessCtx(ProcessCtx):
-    build_ctxs: BuildCtxList
+    build_ctxs: BuildCtxList = field(default_factory=dict)
 
     def create_file(self, env: Environment, name: str, text: str):
         self.build_ctxs[env].create_file(name, text)
@@ -105,9 +117,10 @@ class PostProcessCtx(ProcessCtx):
 
 @dataclass
 class BuildProcessCtx(ProcessCtx):
-    workdirs: dict[Path, str]
-    output_root: Path
-    env: Environment
+    workdirs: dict[Path, str] = field(default_factory=dict)
+    output_root: Path = Path('.')
+    env: Environment = 'shared'
+    parsed_files: dict[Path, 'FileParser'] = field(default_factory=dict)
 
     def create_file(self, name: str, text: str):
         file = self.output_root / name
@@ -134,6 +147,7 @@ class BuildProcessCtx(ProcessCtx):
                 for hook in self.reg.file_build_hooks:
                     hook(FileBuildCtx(self, parser, file))
 
+                self.parsed_files[file] = parser
                 return parser
 
     def process_dir(self, dir: Path):

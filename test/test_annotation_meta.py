@@ -3,6 +3,7 @@ from pathlib import Path
 
 from lua_annotations.api.annotations import AnnotationDef, FileBuildCtx, SortedRegistry
 from lua_annotations.build_process import BuildProcessCtx, Workspace
+from lua_annotations.config import Config
 from lua_annotations.parser import FileParser
 
 
@@ -50,6 +51,8 @@ return {
         reg=reg,
         root_dir=tmp_path,
         workspace=make_workspace(src),
+        config=Config(out_dir_name='Generated'),
+        workspace_name='test',
         workdirs={src: ":"},
         output_root=tmp_path / "Generated",
         env="server",
@@ -89,6 +92,8 @@ return {
         reg=reg,
         root_dir=tmp_path,
         workspace=make_workspace(src),
+        config=Config(out_dir_name='Generated'),
+        workspace_name='test',
         workdirs={src: ":"},
         output_root=tmp_path / "Generated",
         env="server",

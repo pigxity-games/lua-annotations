@@ -5,6 +5,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 from lua_annotations.api.annotations import ENVIRONMENTS, ExtensionRegistry
 from lua_annotations.build_process import BuildProcessCtx, Environment, PostProcessCtx, Workspace
+from lua_annotations.config import Config
 from lua_annotations.exceptions import BuildError
 from lua_annotations.extensions import default as default_ext
 from lua_annotations.extensions.game_framework import main as game_framework_ext
@@ -36,6 +37,7 @@ def build_service_types(tmp_path: Path, files: dict[str, str]):
     default_ext.load(reg)
     game_framework_ext.load(reg)
     sorted_reg = reg.sort_extensions()
+    config = Config(out_dir_name='Generated')
 
     build_ctxs: dict[Environment, BuildProcessCtx] = {}
     for env in ENVIRONMENTS:
@@ -46,11 +48,11 @@ def build_service_types(tmp_path: Path, files: dict[str, str]):
         output_root = root / 'Generated'
         output_root.mkdir(parents=True, exist_ok=True)
 
-        build_ctx = BuildProcessCtx(sorted_reg, root, workspace, workspace[env], output_root, env)
+        build_ctx = BuildProcessCtx(sorted_reg, root, workspace, config, 'test', workspace[env], output_root, env)
         build_ctx.process_dir(source_root)
         build_ctxs[env] = build_ctx
 
-    post_ctx = PostProcessCtx(sorted_reg, tmp_path, workspace, build_ctxs)
+    post_ctx = PostProcessCtx(sorted_reg, tmp_path, workspace, config, 'test', build_ctxs)
     for hook in sorted_reg.post_build_hooks:
         hook(post_ctx)
 

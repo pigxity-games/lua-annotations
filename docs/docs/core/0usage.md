@@ -11,6 +11,7 @@ lua-anot {mode} {args} {workdir: default = .}
 
 ## Args
 * `-c`/`--config`: path to the config file to use, relative to `workdir` (default = `annotations.config.json`)
+* `-e`/`--extension`: optional extension name to enable. This may be repeated, for example `-e unit-test -e other-extension`, or set to `all` to enable every configured optional extension.
 * `--watch-interval`: polling interval (in seconds) for watch mode.
 
 ## Generated files

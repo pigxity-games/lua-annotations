@@ -303,7 +303,7 @@ class FileParser:
         return args_val, kwargs_val
 
     def _parse_annotation(self, text: str, ctx: SortedRegistry):
-        parts = remove_whitespace(ANNOTATION_ARG_RE.split(text.removeprefix(ANNOTATION_PREFIX)))
+        parts = split_top_level_csv(text.removeprefix(ANNOTATION_PREFIX))
         name = parts[0]
 
         adef = ctx.anot_registry.get(name)

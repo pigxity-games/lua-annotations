@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from lua_annotations.config import Config
 from lua_annotations.api.annotations import ENVIRONMENTS, SortedRegistry
 from lua_annotations.api.lua_dict import LuaPathResolver
 from lua_annotations.build_process import BuildProcessCtx, Workspace
@@ -32,13 +33,14 @@ def make_resolver(
 def make_build_ctxs(tmp_path: Path, workspace: Workspace):
     reg = SortedRegistry([], [], {})
     out = {}
+    config = Config(out_dir_name='Generated')
 
     for env in ENVIRONMENTS:
         root = tmp_path / env
         root.mkdir(parents=True, exist_ok=True)
         output_root = root / 'Generated'
         output_root.mkdir(parents=True, exist_ok=True)
-        out[env] = BuildProcessCtx(reg, root, workspace, workspace[env], output_root, env)
+        out[env] = BuildProcessCtx(reg, root, workspace, config, 'test-workspace', workspace[env], output_root, env)
 
     return out
 
