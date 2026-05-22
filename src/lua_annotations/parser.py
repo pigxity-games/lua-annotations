@@ -135,6 +135,28 @@ def _scan_balanced_parens(text: str, open_index: int):
     return None
 
 
+def _collect_multiline_function_signature(code_line: str, lines: list[str], index: int) -> str:
+    if not is_function_definition(code_line):
+        return code_line
+
+    open_paren = code_line.find('(')
+    if open_paren == -1:
+        return code_line
+
+    if _scan_balanced_parens(code_line, open_paren) is not None:
+        return code_line
+
+    text = code_line
+    for next_index in range(index + 1, len(lines)):
+        next_line = lines[next_index]
+        next_code = next_line.split('--')[0].rstrip()
+        text += '\n' + next_code
+        if _scan_balanced_parens(text, open_paren) is not None:
+            return text
+
+    return text
+
+
 def _extract_signature_parts(text: str):
     open_paren = text.find('(')
     if open_paren == -1:
@@ -564,7 +586,7 @@ class FileParser:
 
             else:
                 code_line = line.split('--')[0].rstrip()
-
+                code_line = _collect_multiline_function_signature(code_line, lines, i)
                 # Track methods defined in code regardless of annotation usage.
                 method = self._get_function(code_line, self.modules, returned, strict=False)
                 if method is not None:
@@ -584,6 +606,7 @@ class FileParser:
 
                     # methods
                     if scope == 'method':
+                        line = _collect_multiline_function_signature(line, lines, i)
                         method = self._get_function(line, self.modules, returned)
                         assert method
                         set_adornee(self.cur_annotations, method)

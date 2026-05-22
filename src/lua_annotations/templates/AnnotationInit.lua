@@ -1,6 +1,7 @@
 -- Generated using lua-anot; do not edit manually.
 local t0 = os.clock()
 local RunService = game and game:GetService("RunService")
+local isStudio = RunService and RunService:IsStudio()
 
 --modulePaths
 
@@ -47,6 +48,6 @@ for _, fun in ipairs(manifest.hooks.post_init) do
 end
 local postInitTime = os.clock() - postInitT0
 
-if RunService and RunService:IsStudio() then
+if isStudio then
     print("[LuaAnnotations] (env) annotations loaded in " .. (os.clock() - t0) .. "s (init=" .. initTime .. "s, annotations=" .. annotationTime .. "s, post_init=" .. postInitTime .. "s)")
 end

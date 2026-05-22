@@ -118,7 +118,7 @@ def test_runtime_template_includes_phase_timing(tmp_path: Path):
     assert 'local initT0 = os.clock()' in server_init
     assert 'local annotationT0 = os.clock()' in server_init
     assert 'local postInitT0 = os.clock()' in server_init
-    assert 'local isStudio = RunService:IsStudio()' in server_init
+    assert 'local isStudio = RunService and RunService:IsStudio()' in server_init
     assert 'if isStudio then' in server_init
     assert 'annotations loaded in ' in server_init
     assert 'post_init=' in server_init

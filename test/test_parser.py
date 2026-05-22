@@ -441,6 +441,41 @@ return m
     assert method2.return_type == "SomeGlobalType"
 
 
+def test_parser_handles_multi_line_function_declarations(tmp_path: Path):
+    parser = parse_text(
+        tmp_path,
+        "Test.lua",
+        """
+--@moduleAnn
+local controller = {}
+
+--@methodAnn
+function controller.updateGameInitState(
+    progressText: string?,
+    loadedPlayers: number?,
+    requiredPlayers: number?,
+    countdownSeconds: number?
+)
+end
+
+return controller
+""",
+    )
+
+    module = parser.modules["controller"]
+    assert isinstance(module, LuaModule)
+
+    method = module.methods.get("updateGameInitState")
+    assert method
+    assert method.params == {
+        "progressText": "string?",
+        "loadedPlayers": "number?",
+        "requiredPlayers": "number?",
+        "countdownSeconds": "number?",
+    }
+    assert method.return_type == "nil"
+
+
 def test_parser_method_types_inline(tmp_path: Path):
     parser = parse_text(
         tmp_path,
