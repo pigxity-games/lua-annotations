@@ -3,51 +3,59 @@ local t0 = os.clock()
 local RunService = game and game:GetService("RunService")
 local isStudio = RunService and RunService:IsStudio()
 
---modulePaths
+local Manifest = require(game:GetService("{env-service}")
+    :WaitForChild("{out-dir-name}")
+    :WaitForChild("Manifest"))
 
-local cache = {}
-local function waitForPath(path)
-    local cur = path[1]
-    for i = 2, #path do
-        cur = cur:WaitForChild(path[i])
+local data = Manifest.manifest
+
+
+local function getHookFun(hook)
+    return Manifest.getCached(hook.module)[hook.method]
+end
+
+
+--pre_init
+local preInitT0 = os.clock()
+for _, hook in ipairs(data.hooks.pre_init) do
+    local fun = getHookFun(hook)
+    fun(Manifest)
+end
+local preInitTime = os.clock() - preInitT0
+
+
+--modules
+local moduleT0 = os.clock()
+for moduleName, module in pairs(data.modules) do
+    local moduleData = module.data
+    
+    for methodName, anot in pairs(module.annotations) do
+        local anotHook = data.hooks.annotation_handlers[anot.name]
+        local fun = getHookFun(anotHook)
+       
+        if fun then
+            fun(Manifest, anot, methodName, moduleData, moduleName)
+        end
     end
-    return cur
-end
 
-local function getCached(moduleName)
-    local m = cache[moduleName]
-    if not m then
-        m = require(waitForPath(modulePaths[moduleName]))
-        cache[moduleName] = m
-    end
-    return m
-end
-
-
---manifest
-
---lifecycle
-local initT0 = os.clock()
-for _, fun in ipairs(manifest.hooks.init) do
-    fun(manifest)
-end
-local initTime = os.clock() - initT0
-
-local annotationT0 = os.clock()
-for _, anot in ipairs(manifest.annotations) do
-    local fun = manifest.hooks.annotation_handlers[anot.name]
-    if fun then
-        fun(anot, manifest)
+    local hooks = data.hooks.module_handlers
+    for _, hook in ipairs(hooks) do
+        local fun = getHookFun(hook)
+        fun(Manifest, moduleData, moduleName)
     end
 end
-local annotationTime = os.clock() - annotationT0
+local moduleTime = os.clock() - moduleT0
 
+
+--post_init
 local postInitT0 = os.clock()
-for _, fun in ipairs(manifest.hooks.post_init) do
-    task.spawn(fun, manifest)
+for _, hook in ipairs(data.hooks.post_init) do
+    local fun = getHookFun(hook)
+    task.spawn(fun, Manifest)
 end
 local postInitTime = os.clock() - postInitT0
 
+
 if isStudio then
-    print("[LuaAnnotations] (env) annotations loaded in " .. (os.clock() - t0) .. "s (init=" .. initTime .. "s, annotations=" .. annotationTime .. "s, post_init=" .. postInitTime .. "s)")
+    print("[LuaAnnotations] {env} loaded in " .. (os.clock() - t0) .. "s (pre_init=" .. preInitTime .. "s, modules=" .. moduleTime .. "s, post_init=" .. postInitTime .. "s)")
 end
