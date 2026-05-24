@@ -1,4 +1,5 @@
 from graphlib import CycleError, TopologicalSorter
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from lua_annotations.api.annotations import (
@@ -10,7 +11,8 @@ from lua_annotations.api.annotations import (
     FileBuildCtx,
 )
 from lua_annotations.api.arguments import default_list
-from lua_annotations.api.manifest import ServiceEntry
+from lua_annotations.api.lua_dict import LuaPath
+from lua_annotations.api.manifest import ManifestMethod, ServiceData
 from lua_annotations.build_process import Environment, PostProcessCtx, logger
 from lua_annotations.exceptions import BuildError
 from lua_annotations.parser_schemas import Annotation, LuaMethod, ReturnedValue
@@ -96,9 +98,8 @@ def service_todict(
         elif data_svc:
             data_service = data_svc
 
-    return ServiceEntry(
+    return ServiceData(
         depends=proc_deps(svc, service_map, remote_map),
-        getAdornee=svc.adornee.get_path(function=True, require=True, cache=True),  # pyright: ignore[reportAttributeAccessIssue]
         kind=svc.name,
         tags=tags,
         data_service=data_service,
@@ -170,19 +171,23 @@ class LifecycleExtension(Extension):
         for env in ('server', 'client'):
             services = self.services[env] + self.services['shared']
 
-            entries = {
-                get_service_name(svc): service_todict(
-                    svc,
-                    {get_service_name(svc): svc for svc in services},
-                    self.remote_services,
-                )
-                for svc in services
-            }
-
             try:
-                self.manifestExt.set_services(env, entries, get_runtime_load_order(services))
+                self.manifestExt.set_load_order(env, get_runtime_load_order(services))
             except CycleError as e:
                 raise BuildError(f"Cycle detected for service graph: {e.args}") from e
+
+            service_map = {get_service_name(svc): svc for svc in services}
+            for svc in services:
+                name = get_service_name(svc)
+                module = svc.get_module()
+                assert isinstance(module, ReturnedValue)
+                path = module.get_path(require=True, cache=True)
+                self.manifestExt.add_module_data(
+                    env,
+                    name,
+                    path,
+                    service_todict(svc, service_map, self.remote_services).asdict(),
+                )
 
     def load(self, ctx: ExtensionRegistry):
         from lua_annotations.extensions.default import ManifestExtension
@@ -216,3 +221,13 @@ class LifecycleExtension(Extension):
 
         t = files('lua_annotations') / 'extensions' / 'game_framework' / 'lua' / 'Lifecycle.lua'
         ctx.add_file('shared', 'Lifecycle.lua', t.read_text())
+
+        manifest_methods = files('lua_annotations') / 'extensions' / 'game_framework' / 'lua' / 'FrameworkManifestMethods.lua'
+        manifest_ext.add_methods('shared', manifest_methods.read_text())
+        manifest_ext.add_module_handler(
+            'shared',
+            ManifestMethod(
+                LuaPath(Path('shared') / 'Generated' / '_Internal' / 'Lifecycle.lua', require=True, cache=True),
+                'initService',
+            ),
+        )
