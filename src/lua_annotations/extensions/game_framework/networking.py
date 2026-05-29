@@ -7,6 +7,7 @@ from lua_annotations.api.annotations import (
     Extension,
 )
 from lua_annotations.api.arguments import bool_arg, default_list, literal_builder
+from lua_annotations.api.manifest import ManifestRemotes, RemoteEntry
 from lua_annotations.build_process import Environment, PostProcessCtx
 from lua_annotations.exceptions import BuildError
 from lua_annotations.parser_schemas import Annotation, LuaMethod
@@ -28,12 +29,12 @@ MIDDLEWARE_DIRECTIONS = ['inbound', 'outbound']
 class NetworkingExtension(Extension):
     def __init__(self):
         self.remotes: dict[Any, Any] = {}
+        self.remote_info: dict[Environment, dict[str, dict[str, RemoteEntry]]] = {'client': {}, 'server': {}}
         self.manifestExt: ManifestExtension | None = None
 
     def remote_on_build(self, ctx: AnnotationBuildCtx):
         if ctx.build_ctx.env == 'shared':
             raise BuildError('@remote annotations are only valid in client or server code')
-        assert self.manifestExt
 
         anot: Annotation = ctx.annotation
         adornee = anot.adornee
@@ -44,28 +45,17 @@ class NetworkingExtension(Extension):
 
         anot.export_data['remote_name'] = adornee.name
         anot.export_data['remote_parent'] = module_name
-        anot.export_data['remote_env'] = ctx.build_ctx.env
 
         self.remotes.setdefault(module_name, {'ClassName': 'Folder', 'Children': {}})
         self.remotes[module_name]['Children'][adornee.name] = {'ClassName': class_name}
-        for env in ('server', 'client'):
-            self.manifestExt.add_module_data(
-                env,
-                module_name,
-                adornee.module.get_path(require=True, cache=True),
-                {
-                    'remotes': {
-                        ctx.build_ctx.env: {
-                            adornee.name: {
-                                'service': module_name,
-                                'method': adornee.name,
-                                'remoteType': ctx.annotation.args_val[0],
-                                'middleware': ctx.annotation.kwargs_val.get('middleware', []),
-                            }
-                        }
-                    }
-                },
-            )
+
+        module_info = self.remote_info[ctx.build_ctx.env].setdefault(module_name, {})
+        module_info[adornee.name] = RemoteEntry(
+            service=module_name,
+            method=adornee.name,
+            remoteType=ctx.annotation.args_val[0],
+            middleware=ctx.annotation.kwargs_val.get('middleware', []),
+        )
 
     def middleware_on_build(self, ctx: AnnotationBuildCtx):
         anot: Annotation = ctx.annotation
@@ -74,7 +64,14 @@ class NetworkingExtension(Extension):
 
         anot.export_data['middleware_name'] = anot.kwargs_val.get('name', adornee.name)
 
+    def write_remote_info(self):
+        assert self.manifestExt
+
+        self.manifestExt.set_remotes(ManifestRemotes(client=self.remote_info['client'], server=self.remote_info['server']))
+
     def on_post_process(self, ctx: PostProcessCtx):
+        self.write_remote_info()
+
         # Convert dict to valid .model.json format
         root_children = []
 

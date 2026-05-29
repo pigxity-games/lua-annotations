@@ -3,31 +3,15 @@ local t0 = os.clock()
 local RunService = game and game:GetService("RunService")
 local isStudio = RunService and RunService:IsStudio()
 
-local Manifest = require(script.Parent:WaitForChild("Manifest"))
+local Manifest = require(game:GetService("{env-service}")
+    :WaitForChild("{out-dir-name}")
+    :WaitForChild("Manifest"))
 
 local data = Manifest.manifest
 
 
 local function getHookFun(hook)
-    if not hook then
-        return nil
-    end
-
     return Manifest.getCached(hook.module)[hook.method]
-end
-
-
-local function runModuleHandlers(moduleData, moduleName)
-    if not moduleData then
-        return
-    end
-
-    for _, hook in ipairs(data.hooks.module_handlers) do
-        local fun = getHookFun(hook)
-        if fun then
-            fun(Manifest, moduleData, moduleName)
-        end
-    end
 end
 
 
@@ -35,9 +19,7 @@ end
 local preInitT0 = os.clock()
 for _, hook in ipairs(data.hooks.pre_init) do
     local fun = getHookFun(hook)
-    if fun then
-        fun(Manifest)
-    end
+    fun(Manifest)
 end
 local preInitTime = os.clock() - preInitT0
 
@@ -55,16 +37,11 @@ for moduleName, module in pairs(data.modules) do
             fun(Manifest, anot, methodName, moduleData, moduleName)
         end
     end
-end
 
-if #data.load_order > 0 then
-    for _, moduleName in ipairs(data.load_order) do
-        local module = data.modules[moduleName]
-        runModuleHandlers(module and module.data, moduleName)
-    end
-else
-    for moduleName, module in pairs(data.modules) do
-        runModuleHandlers(module.data, moduleName)
+    local hooks = data.hooks.module_handlers
+    for _, hook in ipairs(hooks) do
+        local fun = getHookFun(hook)
+        fun(Manifest, moduleData, moduleName)
     end
 end
 local moduleTime = os.clock() - moduleT0
@@ -74,9 +51,7 @@ local moduleTime = os.clock() - moduleT0
 local postInitT0 = os.clock()
 for _, hook in ipairs(data.hooks.post_init) do
     local fun = getHookFun(hook)
-    if fun then
-        task.spawn(fun, Manifest)
-    end
+    task.spawn(fun, Manifest)
 end
 local postInitTime = os.clock() - postInitT0
 

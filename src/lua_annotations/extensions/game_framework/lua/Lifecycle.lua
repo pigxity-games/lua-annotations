@@ -209,14 +209,14 @@ end
 
 
 local function getMainTagForDependency(manifest, depName)
-	local depData = manifest.getServiceData(depName)
+	local depData = manifest.services.entries[depName]
 	assert(depData, ("[LuaAnnotations] Unknown component dependency %q"):format(depName))
 	assert(depData.tags and depData.tags[1], ("[LuaAnnotations] Dependency %q has no tags"):format(depName))
 	return depData.tags[1]
 end
 
 
-local function initServiceImpl(manifest, data, serviceName, service, baseDeps)
+local function initService(manifest, data, serviceName, service, baseDeps)
 	--services
 	if data.kind == "service" then
 		if service._init then
@@ -236,7 +236,7 @@ local function initServiceImpl(manifest, data, serviceName, service, baseDeps)
 	local getComponentData
 	local dataService
 	if data.data_service then
-		dataService = manifest.getService(data.data_service)
+		dataService = manifest.services.entries[data.data_service].getAdornee()
 
 		getComponentData = function(inst) 
 			local state = dataService[inst]
@@ -327,17 +327,8 @@ local function initServiceImpl(manifest, data, serviceName, service, baseDeps)
 end
 
 
-local remoteRoot = nil
+local remoteRoot = ReplicatedStorage:WaitForChild('Generated'):WaitForChild('Remotes')
 local remoteCache = {}
-
-
-local function getRemoteRoot()
-	if not remoteRoot then
-		remoteRoot = ReplicatedStorage:WaitForChild('Generated'):WaitForChild('Remotes')
-	end
-
-	return remoteRoot
-end
 
 
 local function fireServerRemote(remote: RemoteEvent | UnreliableRemoteEvent, ...)
@@ -462,7 +453,7 @@ local function getRemoteTable(folderName)
 		("[LuaAnnotations] Unknown remote service %q for %s"):format(folderName, remoteTargetEnv)
 	)
 
-	local folder = getRemoteRoot():WaitForChild(folderName)
+	local folder = remoteRoot:WaitForChild(folderName)
 	local remotesTable = {}
 
 	for remoteName, remoteInfo in pairs(serviceInfo) do
@@ -476,8 +467,8 @@ end
 
 
 --@annotationInit
-function bindTag(manifest, anot, methodName, moduleData, moduleName)
-	local adornee = manifest.getAnnotationAdornee(moduleName, methodName)
+function bindTag(anot)
+	local adornee = anot.getAdornee()
 
 	for _, tag in ipairs(anot.args[1]) do
 		useCollectionTag(tag, adornee)
@@ -486,9 +477,9 @@ end
 
 
 --@annotationInit
-function middleware(manifest, anot, methodName, moduleData, moduleName, options)
+function middleware(anot)
 	local env = anot.args[1]
-	if env ~= currentEnv and not (options and options.ignoreEnv) then
+	if env ~= currentEnv then
 		return
 	end
 
@@ -498,7 +489,7 @@ function middleware(manifest, anot, methodName, moduleData, moduleName, options)
 
 	local data = {
 		name = anot.data.middleware_name,
-		callback = manifest.getAnnotationAdornee(moduleName, methodName),
+		callback = anot.getAdornee(),
 	}
 
 	registry.named[data.name] = data
@@ -509,87 +500,46 @@ function middleware(manifest, anot, methodName, moduleData, moduleName, options)
 end
 
 
-function buildServiceDeps(manifest, data, options)
-	options = options or {}
-
-	if options.deps then
-		return options.deps, 0
-	end
-
-	local remoteEnv = options.remoteEnv or remoteTargetEnv
-	local serviceMocks = options.services or {}
-	local remoteMocks = options.remotes or {}
-	local injectDeps = options.baseDeps or {}
-	local remoteDepCount = 0
-	injectDeps[remoteEnv] = injectDeps[remoteEnv] or {}
-
-	for _, dep in ipairs(data.depends.services) do
-		injectDeps[dep] = serviceMocks[dep] or manifest.getService(dep)
-	end
-
-	for _, dep in ipairs(data.depends.remotes) do
-		injectDeps[remoteEnv][dep] = remoteMocks[dep] or getRemoteTable(dep)
-		remoteDepCount += 1
-	end
-
-	return injectDeps, remoteDepCount
-end
-
-
-function initService(manifest, data, serviceName, options)
-	if not data.kind then
-		return
-	end
-
-	options = options or {}
-	remoteInfoByEnv = manifest.getRemoteInfoByEnv()
+--@onPostInit
+function initServices(manifest)
+	remoteInfoByEnv = manifest.remotes or {}
 
 	local t0 = os.clock()
 	local remoteT0 = os.clock()
-	local service = options.service or manifest.getService(serviceName)
-	local injectDeps, remoteDepCount = buildServiceDeps(manifest, data, options)
+	local remoteDepCount = 0
+	for _, serviceName in ipairs(manifest.services.load_order) do
+		local data = manifest.services.entries[serviceName]
+		local service = data.getAdornee()
 
-	initServiceImpl(manifest, data, serviceName, service, injectDeps)
+		--build deps list
+		local injectDeps = {}
+		injectDeps[remoteTargetEnv] = {}
 
-	log("game-framework " .. currentEnv .. " service " .. serviceName .. " started in " .. (os.clock() - t0) .. "s (remote_deps=" .. remoteDepCount .. ", remote_setup=" .. (os.clock() - remoteT0) .. "s)")
-end
+		--service deps
+		for _, dep in ipairs(data.depends.services) do
+			injectDeps[dep] = manifest.services.entries[dep].getAdornee()
+		end
 
+		--remote deps
+		for _, dep in ipairs(data.depends.remotes) do
+			injectDeps[remoteTargetEnv][dep] = getRemoteTable(dep)
+			remoteDepCount += 1
+		end
 
-function callRemote(manifest, serviceName, methodName, options, ...)
-	options = options or {}
-	remoteInfoByEnv = manifest.getRemoteInfoByEnv()
-
-	local remoteEnv = options.remoteEnv or remoteTargetEnv
-	local remoteInfo = getRemoteInfo(remoteEnv, serviceName, methodName, options.remoteType or 'function')
-	local player = options.player
-	local target = options.target or manifest.getService(serviceName)[methodName]
-	local outbound = runRemoteMiddleware(resolveMiddlewareChain(remoteInfo, 'outbound'), remoteInfo, 'outbound', player, ...)
-
-	if outbound[1] ~= true then
-		return tailUnpack(outbound)
+		initService(manifest, data, serviceName, service, injectDeps)
 	end
 
-	local inbound = runRemoteMiddleware(resolveMiddlewareChain(remoteInfo, 'inbound'), remoteInfo, 'inbound', player, tailUnpack(outbound))
-
-	if inbound[1] ~= true then
-		return tailUnpack(inbound)
-	end
-
-	if options.includePlayer == true or (options.includePlayer == nil and remoteEnv == 'server') then
-		return target(player, tailUnpack(inbound))
-	end
-
-	return target(tailUnpack(inbound))
+	log("game-framework " .. currentEnv .. " services started in " .. (os.clock() - t0) .. "s (remote_deps=" .. remoteDepCount .. ", remote_setup=" .. (os.clock() - remoteT0) .. "s)")
 end
 
 
 --@annotationInit
-function remote(manifest, anot, methodName, moduleData, moduleName)
+function remote(anot)
 	local t0 = os.clock()
-	local callback = manifest.getAnnotationAdornee(moduleName, methodName)
+	local callback = anot.getAdornee()
 	local remoteInfo = getRemoteInfoFromAnnotation(anot)
 	local anotType = remoteInfo.remoteType --event, unreliable, or function
-	local remote = getRemoteRoot()[anot.data.remote_parent]:WaitForChild(anot.data.remote_name)
+	local remote = remoteRoot[anot.data.remote_parent]:WaitForChild(anot.data.remote_name)
 
 	local wrappedCallback
 	wrappedCallback = function(...)
@@ -658,9 +608,7 @@ end
 
 
 return {
-	buildServiceDeps = buildServiceDeps,
-	initService = initService,
-	callRemote = callRemote,
+	initServices = initServices,
 	bindTag = bindTag,
 	middleware = middleware,
 	remote = remote,

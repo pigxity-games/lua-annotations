@@ -40,7 +40,6 @@ def build_generated(tmp_path: Path, files: dict[str, str]):
     reg = ExtensionRegistry()
     default_ext.load(reg)
     game_framework_ext.load(reg)
-    pending_files = reg.pending_files
     sorted_reg = reg.sort_extensions()
 
     build_ctxs: dict[Environment, BuildProcessCtx] = {}
@@ -53,12 +52,7 @@ def build_generated(tmp_path: Path, files: dict[str, str]):
         output_root.mkdir(parents=True, exist_ok=True)
 
         build_ctx = BuildProcessCtx(sorted_reg, root, workspace, workspace[env], output_root, env)
-        for name, content in pending_files[env]:
-            build_ctx.create_file('_Internal/' + name, content)
         build_ctx.process_dir(source_root)
-        internal_root = output_root / '_Internal'
-        if internal_root.exists():
-            build_ctx.process_dir(internal_root)
         build_ctxs[env] = build_ctx
 
     post_ctx = PostProcessCtx(sorted_reg, tmp_path, workspace, build_ctxs)
@@ -96,16 +90,14 @@ def test_middleware_annotations_and_remote_metadata_are_generated(tmp_path: Path
 
     server_init = out['server']['AnnotationInit.server.lua']
     client_init = out['client']['AnnotationInit.client.lua']
-    server_manifest = out['server']['Manifest.lua']
-    client_manifest = out['client']['Manifest.lua']
     lifecycle = lifecycle_source()
 
-    assert 'name = "middleware"' in server_manifest
-    assert 'middleware_name = "Logger"' in server_manifest
-    assert 'data = {' in server_manifest
-    assert 'remotes = {' in server_manifest
+    assert 'name = "middleware"' in server_init
+    assert 'middleware_name = "Logger"' in server_init
+    assert 'data = {' in server_init
+    assert 'remotes = {' in server_init
     assert 'shared = {' not in server_init
-    assert 'runAdminCommand' in server_manifest
+    assert 'runAdminCommand' in server_init
     assert 'for remoteName, remoteInfo in pairs(serviceInfo) do' in lifecycle
     assert 'remotesTable[remoteName] = createRemoteSender(remoteInfo, remote)' in lifecycle
     assert '__index = function(t, remoteName)' not in lifecycle
@@ -114,21 +106,21 @@ def test_middleware_annotations_and_remote_metadata_are_generated(tmp_path: Path
     assert 'bound remote ' in lifecycle
     assert 'local isStudio = RunService:IsStudio()' in lifecycle
     assert 'if isStudio then' in lifecycle
-    assert 'middleware = {' in server_manifest
-    assert '"Logger"' in server_manifest
-    assert 'runAdminCommand' in client_manifest
+    assert 'middleware = {' in server_init
+    assert '"Logger"' in server_init
+    assert 'runAdminCommand' in client_init
 
 
 def test_runtime_template_includes_phase_timing(tmp_path: Path):
     out = build_generated(tmp_path, {})
     server_init = out['server']['AnnotationInit.server.lua']
 
-    assert 'local preInitT0 = os.clock()' in server_init
-    assert 'local moduleT0 = os.clock()' in server_init
+    assert 'local initT0 = os.clock()' in server_init
+    assert 'local annotationT0 = os.clock()' in server_init
     assert 'local postInitT0 = os.clock()' in server_init
     assert 'local isStudio = RunService and RunService:IsStudio()' in server_init
     assert 'if isStudio then' in server_init
-    assert 'loaded in ' in server_init
+    assert 'annotations loaded in ' in server_init
     assert 'post_init=' in server_init
 
 
@@ -137,61 +129,6 @@ def test_bind_tag_runtime_uses_no_cleanup_sentinel(tmp_path: Path):
     assert 'NO_CLEANUP' in lifecycle
     assert 'cleanups[inst] = NO_CLEANUP' in lifecycle
     assert 'bound tag ' in lifecycle
-
-
-def test_framework_manifest_methods_support_offline_mocks(tmp_path: Path):
-    out = build_generated(
-        tmp_path,
-        {
-            'server/src/AdminService.lua': '''
-                --@service, depends=[LoggerService, client:MessageController]
-                local service = {}
-
-                --@remote, function
-                function service.runAdminCommand(player: Player, command: string)
-                    return command
-                end
-
-                return service
-            ''',
-            'server/src/LoggerService.lua': '''
-                --@service
-                local service = {}
-
-                return service
-            ''',
-            'client/src/MessageController.lua': '''
-                --@service
-                local service = {}
-
-                --@remote, event
-                function service.showMessage(message: string)
-                end
-
-                return service
-            ''',
-        },
-    )
-
-    server_manifest = out['server']['Manifest.lua']
-    lifecycle = lifecycle_source()
-
-    assert 'function m.getServiceDependencies(serviceName)' in server_manifest
-    assert 'function m.buildServiceDependencies(serviceName, options)' in server_manifest
-    assert 'function m.initService(serviceName, options)' in server_manifest
-    assert 'function m.setAnnotationHandler(name, handler)' in server_manifest
-    assert server_manifest.count('function m.setAnnotationHandler(name, handler)') == 1
-    assert 'function m.runModuleAnnotations(moduleName, options)' in server_manifest
-    assert 'function m.runAllAnnotations(options)' in server_manifest
-    assert 'handler(m, anot, methodName, module.data, moduleName, options)' in server_manifest
-    assert 'function m.callRemote(serviceName, methodName, options, ...)' in server_manifest
-    assert 'options and options.ignoreEnv' in lifecycle
-    assert 'options.deps' in lifecycle
-    assert 'serviceMocks[dep] or manifest.getService(dep)' in lifecycle
-    assert 'remoteMocks[dep] or getRemoteTable(dep)' in lifecycle
-    assert 'function callRemote(manifest, serviceName, methodName, options, ...)' in lifecycle
-    assert 'local remoteRoot = nil' in lifecycle
-    assert "ReplicatedStorage:WaitForChild('Generated'):WaitForChild('Remotes')" in lifecycle
 
 
 def test_shared_remote_annotations_are_invalid(tmp_path: Path):
