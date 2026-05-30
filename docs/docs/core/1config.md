@@ -23,9 +23,6 @@ This is a rundown of the initial config file.
 ## `outDirName`
 The name of the directory where generated files are placed. It is relative to the root of each environment per workspace.
 
-!!! note
-    `out_dir` is still accepted for older config files, but `outDirName` is preferred.
-
 Don't forget to add this directory to your `.gitignore`!
 ```gitignore title=".gitignore"
 **Generated/

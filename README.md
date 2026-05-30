@@ -67,3 +67,18 @@ Add it to your project's config file:
 **Note: see the documentation for more info.**
 
 **Since the project uses this API internally for optional extensions, you may also see the source code under `src/lua_annotations/extensions` for reference!**
+
+## Testing the project
+
+The project contains two test environments:
+
+- Python unit tests using `pytest`
+- A luau fixture using [lune-test](https://github.com/pigxity-games/lune-test)
+
+Run them as follows:
+
+```sh
+python -m pytest
+lua-anot build test/luau/fixtures
+lune run lune-test -m test/luau/manifest.lua
+```

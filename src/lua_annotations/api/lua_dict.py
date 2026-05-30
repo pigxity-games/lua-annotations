@@ -194,6 +194,7 @@ class LuaPath:
     properties: list[str] = field(default_factory=list)
     function: bool = False
     cache: bool = False
+    cache_name: str | None = None
 
     def _accessor(self, name: str) -> str:
         if name.isidentifier():
@@ -231,8 +232,9 @@ class LuaPath:
                 raise BuildError('LuaPath cache requires a LuaPathResolver')
 
             assert cache_path is not None
-            resolver.register_cached_module(module_name, cache_path)
-            escaped = module_name.replace('\\', '\\\\').replace('"', '\\"')
+            cached_name = self.cache_name or module_name
+            resolver.register_cached_module(cached_name, cache_path)
+            escaped = cached_name.replace('\\', '\\\\').replace('"', '\\"')
             string = f'getCached("{escaped}")'
         elif self.require or len(self.properties) > 0:
             string = f'require({string})'

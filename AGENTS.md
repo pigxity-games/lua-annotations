@@ -11,7 +11,12 @@ An annotation processor for lua projects. see docs/ for documentation. The progr
 - run all unit tests: `pytest` **run pytest outside the sandbox**
 - syntax check: `python -m py_compile {file}`
 - type check: `pyright {file}`
-- format: `black {file}`
+
+The project also contains a luau test suite that uses `lune-test`.
+
+```sh
+lune run lune-test -m test/luau/manifest
+```
 
 ## Code conventions
 - use single quotes for strings ('')

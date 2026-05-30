@@ -89,6 +89,35 @@ class MyExtension(Extension):
 
 `on_post_process` runs after all environments in a workspace have been processed. Use this for generated files that need global information.
 
+## Manifest API
+`ManifestExtension` is the default runtime manifest builder. It now writes `Generated/Manifest.lua` as a module with a typed manifest shape and injectable API functions.
+
+Use these python methods when an extension needs to add runtime manifest data:
+
+```python
+from lua_annotations.extensions.default import ManifestExtension
+
+manifest = ctx.extensions['ManifestExtension']
+
+manifest.register_hook('shared', 'module_handlers', lua_path)
+manifest.add_annotation_handler('shared', 'remote', lua_path)
+manifest.set_module_data('client', 'MyService', module_path, data)
+manifest.update_module_data('client', 'MyService', module_path, {'customKey': 123})
+manifest.update_annotation_data(ctx.annotation, {'remote_name': 'pingRemote'})
+manifest.set_load_order('client', ['SharedService', 'MyService'])
+manifest.register_manifest_functions('shared', lua_source)
+```
+
+Guidelines:
+
+* `register_hook(env, phase, path)`: registers a general runtime hook. Valid phases are `pre_init`, `module_handlers`, and `post_init`.
+* `add_annotation_handler(env, name, path)`: registers the runtime handler for one retained annotation.
+* `set_module_data(env, module_name, module_path, data)`: stores manifest data for a module in the new `manifest.modules[module_name]` entry.
+* `update_module_data(env, module_name, module_path, data)`: merges additional data into `modules[module_name].data`, so multiple extensions can contribute keys without overwriting each other.
+* `update_annotation_data(annotation, data)`: merges additional values into `annotation.data` in the generated manifest.
+* `set_load_order(env, load_order)`: sets the explicit module load order. Leave this empty if your extension does not care about order.
+* `register_manifest_functions(env, lua_source)`: appends extra functions directly into the generated `Manifest.lua` module so extensions can expose small runtime APIs without replacing the core template.
+
 ## Registering extensions
 Inside a module-level `load(ctx)` function, register an instance of your extension:
 

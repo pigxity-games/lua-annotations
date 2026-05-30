@@ -43,8 +43,14 @@ class NetworkingExtension(Extension):
         class_name = REMOTE_INSTANCE_MAP[ctx.annotation.args_val[0]]
         module_name = adornee.module.returned_name
 
-        anot.export_data['remote_name'] = adornee.name
-        anot.export_data['remote_parent'] = module_name
+        assert self.manifestExt
+        self.manifestExt.update_annotation_data(
+            anot,
+            {
+                'remote_name': adornee.name,
+                'remote_parent': module_name,
+            },
+        )
 
         self.remotes.setdefault(module_name, {'ClassName': 'Folder', 'Children': {}})
         self.remotes[module_name]['Children'][adornee.name] = {'ClassName': class_name}
@@ -62,7 +68,13 @@ class NetworkingExtension(Extension):
         adornee = anot.adornee
         assert isinstance(adornee, LuaMethod)
 
-        anot.export_data['middleware_name'] = anot.kwargs_val.get('name', adornee.name)
+        assert self.manifestExt
+        self.manifestExt.update_annotation_data(
+            anot,
+            {
+                'middleware_name': anot.kwargs_val.get('name', adornee.name),
+            },
+        )
 
     def write_remote_info(self):
         assert self.manifestExt

@@ -15,6 +15,11 @@ def lifecycle_source():
     return path.read_text()
 
 
+def manifest_functions_source():
+    path = files('lua_annotations') / 'extensions' / 'game_framework' / 'lua' / 'ManifestFunctions.lua'
+    return path.read_text()
+
+
 def write_lua(tmp_path: Path, relative_path: str, text: str):
     file = tmp_path / relative_path
     file.parent.mkdir(parents=True, exist_ok=True)
@@ -40,6 +45,7 @@ def build_generated(tmp_path: Path, files: dict[str, str]):
     reg = ExtensionRegistry()
     default_ext.load(reg)
     game_framework_ext.load(reg)
+    pending_files = reg.pending_files
     sorted_reg = reg.sort_extensions()
 
     build_ctxs: dict[Environment, BuildProcessCtx] = {}
@@ -52,6 +58,9 @@ def build_generated(tmp_path: Path, files: dict[str, str]):
         output_root.mkdir(parents=True, exist_ok=True)
 
         build_ctx = BuildProcessCtx(sorted_reg, root, workspace, workspace[env], output_root, env)
+        for name, content in pending_files[env]:
+            created = build_ctx.create_file('_Internal/' + name, content)
+            build_ctx.process_file(created)
         build_ctx.process_dir(source_root)
         build_ctxs[env] = build_ctx
 
@@ -88,27 +97,33 @@ def test_middleware_annotations_and_remote_metadata_are_generated(tmp_path: Path
         },
     )
 
-    server_init = out['server']['AnnotationInit.server.lua']
-    client_init = out['client']['AnnotationInit.client.lua']
+    server_manifest = out['server']['Manifest.lua']
+    client_manifest = out['client']['Manifest.lua']
     lifecycle = lifecycle_source()
+    manifest_api = (tmp_path / 'shared' / 'Generated' / '_Internal' / 'ManifestAPI.lua').read_text()
 
-    assert 'name = "middleware"' in server_init
-    assert 'middleware_name = "Logger"' in server_init
-    assert 'data = {' in server_init
-    assert 'remotes = {' in server_init
-    assert 'shared = {' not in server_init
-    assert 'runAdminCommand' in server_init
+    assert 'name = "middleware"' in server_manifest
+    assert 'middleware_name = "Logger"' in server_manifest
+    assert 'data = {' in server_manifest
+    assert 'remotes = {' in server_manifest
+    assert 'shared = {' not in server_manifest
+    assert 'getAdornee' not in server_manifest
+    assert 'runAdminCommand' in server_manifest
+    assert 'ManifestAPI.new({' in server_manifest
+    assert 'require(ReplicatedStorage[\'Generated\']._Internal.ManifestAPI)' in server_manifest
     assert 'for remoteName, remoteInfo in pairs(serviceInfo) do' in lifecycle
-    assert 'remotesTable[remoteName] = createRemoteSender(remoteInfo, remote)' in lifecycle
+    assert 'remotesTable[remoteName] = createRemoteSender(manifestApi, remoteInfo, remote)' in lifecycle
     assert '__index = function(t, remoteName)' not in lifecycle
     assert 'folder:GetChildren()' not in lifecycle
-    assert 'remote_setup=' in lifecycle
     assert 'bound remote ' in lifecycle
+    assert 'manifestApi:getCached(moduleName)' in lifecycle
     assert 'local isStudio = RunService:IsStudio()' in lifecycle
     assert 'if isStudio then' in lifecycle
-    assert 'middleware = {' in server_init
-    assert '"Logger"' in server_init
-    assert 'runAdminCommand' in client_init
+    assert 'middleware = {' in server_manifest
+    assert '"Logger"' in server_manifest
+    assert 'runAdminCommand' in client_manifest
+    assert 'function ManifestAPI:getServiceDeps(' in manifest_api
+    assert 'function ManifestAPI:startService(' in manifest_api
 
 
 def test_runtime_template_includes_phase_timing(tmp_path: Path):
@@ -124,11 +139,52 @@ def test_runtime_template_includes_phase_timing(tmp_path: Path):
     assert 'post_init=' in server_init
 
 
+def test_default_manifest_does_not_include_game_framework_api(tmp_path: Path):
+    workspace: Workspace = {
+        'client': {
+            tmp_path / 'client' / 'src': ':.',
+        },
+        'server': {
+            tmp_path / 'server' / 'src': ':.',
+        },
+        'shared': {
+            tmp_path / 'shared' / 'src': ':.',
+        },
+    }
+
+    reg = ExtensionRegistry()
+    default_ext.load(reg)
+    sorted_reg = reg.sort_extensions()
+
+    build_ctxs: dict[Environment, BuildProcessCtx] = {}
+    for env in ENVIRONMENTS:
+        root = tmp_path / env
+        source_root = root / 'src'
+        source_root.mkdir(parents=True, exist_ok=True)
+
+        output_root = root / 'Generated'
+        output_root.mkdir(parents=True, exist_ok=True)
+
+        build_ctxs[env] = BuildProcessCtx(sorted_reg, root, workspace, workspace[env], output_root, env)
+
+    post_ctx = PostProcessCtx(sorted_reg, tmp_path, workspace, build_ctxs)
+    for hook in sorted_reg.post_build_hooks:
+        hook(post_ctx)
+
+    manifest = (tmp_path / 'client' / 'Generated' / 'Manifest.lua').read_text()
+    manifest_api = (tmp_path / 'shared' / 'Generated' / '_Internal' / 'ManifestAPI.lua').read_text()
+    assert 'ManifestAPI.new({' in manifest
+    assert 'function m.startService(' not in manifest
+    assert 'function m.getServiceDeps(' not in manifest
+    assert 'function ManifestAPI:startService(' not in manifest_api
+    assert 'function ManifestAPI:getServiceDeps(' not in manifest_api
+
+
 def test_bind_tag_runtime_uses_no_cleanup_sentinel(tmp_path: Path):
-    lifecycle = lifecycle_source()
-    assert 'NO_CLEANUP' in lifecycle
-    assert 'cleanups[inst] = NO_CLEANUP' in lifecycle
-    assert 'bound tag ' in lifecycle
+    manifest_functions = manifest_functions_source()
+    assert 'NO_CLEANUP' in manifest_functions
+    assert 'cleanups[inst] = NO_CLEANUP' in manifest_functions
+    assert 'bound tag ' in manifest_functions
 
 
 def test_shared_remote_annotations_are_invalid(tmp_path: Path):

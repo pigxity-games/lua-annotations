@@ -9,3 +9,4 @@ pyenv/
 .pytest_tmp
 .tmp_probe
 test_tmp_pytest
+.tmp_**

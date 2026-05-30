@@ -42,4 +42,4 @@ Important options:
 * `relative=True`: creates a `script.Parent...` path for generated files that use relative requires.
 
 !!! tip
-    Runtime manifest paths usually use `require=True`, `function=True`, and `cache=True`. That is why manifest values like `getAdornee` are functions instead of required values; the module is only required when the runtime hook needs it.
+    Runtime manifest paths usually use `require=True` and `cache=True`. The generated manifest keeps those paths outside the manifest data table and resolves modules lazily through `Manifest:getCached(...)` at runtime.

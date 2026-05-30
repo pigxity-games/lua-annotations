@@ -1,5 +1,5 @@
 # Runtime Annotations
-Some annotations only matter while the project is being built, while others need to affect the code at runtime. The core extension generates an init file, a manifest table, and a hook system.
+Some annotations only matter while the project is being built, while others need to affect the code at runtime. The core extension now generates a `Generated/Manifest.lua` module plus a small `AnnotationInit` bootstrap that calls into the manifest APIs.
 
 The game framework's `Lifecycle.lua` is the best example of this. It defines runtime behavior for annotations like `@bindTag` and `@remote`, and it starts services after other runtime annotations, using `@onPostInit`.
 
@@ -9,9 +9,10 @@ The core extension creates these files:
 * `Generated/AnnotationInit.server.lua`
 * `Generated/AnnotationInit.client.lua`
 
-Each file contains a generated lua `manifest` table containing runtime hooks/annotations. Each loader runs hooks in this order:
+Each init file requires `Generated/Manifest.lua` and runs hooks in this order:
 
 * `@onInit`: before runtime annotation code.
+* `@moduleInit`: once per manifest module after its retained annotations are processed.
 * `@annotationInit`: registers a handler function for a retained annotation.
 * `@onPostInit`: after retained annotations are handled. These hooks are run in parallel with `task.spawn`.
 
@@ -19,45 +20,38 @@ Server and client init files both receive shared runtime data. There is no separ
 
 ??? example "Loader Code"
     ```lua title="AnnotationInit.x.lua"
-    for _, fun in ipairs(manifest.hooks.init) do
-        fun(manifest)
-    end
-
-    for _, anot in ipairs(manifest.annotations) do
-        local fun = manifest.hooks.annotation_handlers[anot.name]
-        if fun then
-            fun(anot, manifest)
-        end
-    end
-
-    for _, fun in ipairs(manifest.hooks.post_init) do
-        task.spawn(fun, manifest)
-    end
+    Manifest:runPreInitHooks()
+    Manifest:loadAllModules()
+    Manifest:runPostInitHooks()
     ```
 
 ## Manifest data
 The manifest is built from annotations and extension output. The core manifest contains these keys:
 
-* `hooks.annotation_handlers`: a map of annotation names to runtime handler functions.
-* `hooks.init`: functions annotated with `@onInit`.
+* `hooks.pre_init`: functions annotated with `@onInit`.
+* `hooks.module_handlers`: functions annotated with `@moduleInit`.
 * `hooks.post_init`: functions annotated with `@onPostInit`.
-* `annotations`: parsed annotations whose `retention` is not `build`.
+* `hooks.annotation_handlers`: a map of annotation names to runtime handler functions.
+* `modules`: module entries keyed by module name.
+* `load_order`: optional explicit load order. When empty, all modules are loaded without ordering.
 
 The game framework extension adds these keys:
 
-* `services.entries`: service, init service, dependency, and component metadata keyed by name.
-* `services.load_order`: the runtime startup order for services and components.
 * `remotes.client`: remote metadata for client remotes.
 * `remotes.server`: remote metadata for server remotes.
 
 There is no `remotes.shared` table. Remote networking always crosses between client and server, so `@remote` annotations in shared code are invalid.
 
-Each annotation in `manifest.annotations` is converted into a lua table with:
+Each `manifest.modules[moduleName]` entry contains:
+
+* `annotations`: retained annotations grouped by adornee name. Module-level retained annotations use the `_module` key.
+* `data`: extension-owned module data, such as the game-framework service metadata.
+
+Each retained annotation table contains:
 
 * `name`: the annotation name.
 * `args`: parsed positional arguments.
 * `kwargs`: parsed keyword arguments.
-* `getAdornee`: a function that returns the annotated module, method, or value.
 * `data`: any extra data written to `annotation.export_data` by python build code.
 
 For example, the networking extension writes `data.remote_name` and `data.remote_parent` during build, so its runtime handler can find the generated Roblox remote instance.
@@ -109,14 +103,14 @@ def load(ctx: ExtensionRegistry):
 
 And the lua runtime file:
 
-```lua title="MyAnnotations.lua"
---@annotationInit
-local function addHelloWorld(anot, manifest)
-    local module = anot.getAdornee()
-    module.helloWorld = function()
-        print("Hello World!")
+    ```lua title="MyAnnotations.lua"
+    --@annotationInit
+    local function addHelloWorld(manifest, anot, methodName, _, moduleName)
+        local module = manifest:getCached(moduleName)
+        module.helloWorld = function()
+            print("Hello World!")
+        end
     end
-end
 
 return {
     addHelloWorld = addHelloWorld,
@@ -153,3 +147,14 @@ class SignalExtension(Extension):
 ```
 
 The lua handler can then read `anot.data.method_name` and `anot.data.module_name`.
+
+## Default Manifest.lua API
+The generated `Manifest.lua` module exposes a very small default API:
+
+* `Manifest:getModule(moduleName)`: require a module without running manifest hooks.
+* `Manifest:loadModule(moduleName)`: run retained annotation handlers and module handlers for one module, then return it.
+* `Manifest:runPreInitHooks()`: run all `pre_init` hooks.
+* `Manifest:loadAllModules()`: load every manifest module, using `load_order` first when provided.
+* `Manifest:runPostInitHooks()`: spawn all `post_init` hooks.
+
+Extensions may append more functions directly into `Manifest.lua` through the python manifest API, but the core module keeps the default surface intentionally minimal.

@@ -137,6 +137,9 @@ class BuildProcessCtx(ProcessCtx):
                 return parser
 
     def process_dir(self, dir: Path):
+        if dir == self.output_root:
+            return
+
         meta_file = dir / META_FILE_NAME
 
         meta = None

@@ -54,11 +54,18 @@ class LuaMethod:
         if not self.return_type:
             self.return_type = 'nil'
 
-    def get_path(self, relative: bool = False, require: bool = False, function: bool = False, cache: bool = False):
+    def get_path(
+        self,
+        relative: bool = False,
+        require: bool = False,
+        function: bool = False,
+        cache: bool = False,
+        cache_name: str | None = None,
+    ):
         if self.direct_return:
-            return self.module.get_path(relative, require, [], function, cache)
+            return self.module.get_path(relative, require, [], function, cache, cache_name)
 
-        return self.module.get_path(relative, require, [self.name], function, cache)
+        return self.module.get_path(relative, require, [self.name], function, cache, cache_name)
 
     def generate_type(self):
         param_string = ', '.join([self.module.returned_name] if self.call_type == ':' else [] + list(self.params.values()))
@@ -79,6 +86,7 @@ class ReturnedValue:
         properties: list[str] | None = None,
         function: bool = False,
         cache: bool = False,
+        cache_name: str | None = None,
     ):
         """Similar to the LuaPath constructor, but it takes the module's submodule status into account."""
         from .api.lua_dict import LuaPath
@@ -93,9 +101,10 @@ class ReturnedValue:
                 [self.returned_name] + props,
                 function,
                 cache,
+                cache_name,
             )
         else:
-            return LuaPath(self.file, relative, require, props, function, cache)
+            return LuaPath(self.file, relative, require, props, function, cache, cache_name)
 
     def get_expr(self, resolver: LuaPathResolver, relative: bool = False):
         path = self.get_path(relative, True)
@@ -144,7 +153,6 @@ class Annotation:
             'name': self.name,
             'args': self.args_val,
             'kwargs': self.kwargs_val,
-            'getAdornee': self.adornee.get_path(require=True, function=True, cache=True),  # pyright: ignore[reportAttributeAccessIssue]
             'data': self.export_data,
         }
 

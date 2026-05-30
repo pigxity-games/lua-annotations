@@ -1,14 +1,8 @@
-local CollectionService = game:GetService("CollectionService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
+local CollectionService = game:GetService('CollectionService')
+local ReplicatedStorage = game:GetService('ReplicatedStorage')
+local RunService = game:GetService('RunService')
 
-local isServer = RunService:IsServer()
 local isStudio = RunService:IsStudio()
-local remoteTargetEnv = if isServer then "client" else "server"
-local currentEnv = if isServer then "server" else "client"
-local componentInstances = {}
-local remoteInfoByEnv = {}
-local NO_CLEANUP = {}
 local middlewareRegistry = {
 	inbound = {
 		global = {},
@@ -20,10 +14,27 @@ local middlewareRegistry = {
 	},
 }
 
+local remoteRoot = ReplicatedStorage:WaitForChild('Generated'):WaitForChild('Remotes')
+
+
+local function getCurrentEnv(manifestApi)
+	return manifestApi.environment
+end
+
+
+local function getRemoteTargetEnv(manifestApi)
+	return if getCurrentEnv(manifestApi) == 'server' then 'client' else 'server'
+end
+
+
+local function isManifestServer(manifestApi)
+	return getCurrentEnv(manifestApi) == 'server'
+end
+
 
 local function log(message)
 	if isStudio then
-		print("[LuaAnnotations] " .. message)
+		print('[LuaAnnotations] ' .. message)
 	end
 end
 
@@ -54,19 +65,8 @@ local function isRemoteEvent(remote: RemoteFunction | RemoteEvent | UnreliableRe
 end
 
 
-local function getRemoteType(remote: RemoteFunction | RemoteEvent | UnreliableRemoteEvent)
-	if remote:IsA('RemoteFunction') then
-		return 'function'
-	elseif remote:IsA('UnreliableRemoteEvent') then
-		return 'unreliable'
-	end
-
-	return 'event'
-end
-
-
-local function getRemoteInfo(env, serviceName, methodName, fallbackType)
-	local envInfo = remoteInfoByEnv[env]
+local function getRemoteInfo(manifestApi, env, serviceName, methodName, fallbackType)
+	local envInfo = manifestApi.manifest.remotes[env]
 	local serviceInfo = envInfo and envInfo[serviceName]
 	local remoteInfo = serviceInfo and serviceInfo[methodName]
 
@@ -90,6 +90,16 @@ local function getRemoteInfoFromAnnotation(anot)
 		remoteType = anot.args[1],
 		middleware = anot.kwargs.middleware or {},
 	}
+end
+
+
+local function getAnnotationAdornee(manifestApi, moduleName, methodName)
+	local module = manifestApi:getCached(moduleName)
+	if methodName == '_module' or type(module) ~= 'table' then
+		return module
+	end
+
+	return module[methodName]
 end
 
 
@@ -154,183 +164,6 @@ local function runRemoteMiddleware(chain, remoteInfo, direction, player, ...)
 end
 
 
-local function makeComponentClass<T>(class: T, dataGetter: (any) -> ())
-	class.__index = class 
-
-	function class.new(inst, deps)
-		local self = setmetatable(dataGetter and dataGetter(inst) or {}, class)
-		if class._init then
-			class._init(self, inst, deps)
-		end
-		return self
-	end
-end
-
-
-local function useCollectionTag(tag, consumer)
-	local cleanups = setmetatable({}, { __mode = "k" })
-	local t0 = os.clock()
-
-	local function onAdd(inst)
-		--dedupe
-		if cleanups[inst] ~= nil then
-			return
-		end
-
-		--TODO: ensure component does not already exist for inst
-
-		local cleanup = consumer(inst)
-		if cleanup then
-			cleanups[inst] = cleanup
-		else
-			cleanups[inst] = NO_CLEANUP
-		end
-	end
-
-	local function onRemove(inst)
-		local cleanup = cleanups[inst]
-		if cleanup then
-			if cleanup ~= NO_CLEANUP then
-				cleanup()
-			end
-			cleanups[inst] = nil
-		end
-	end
-
-	CollectionService:GetInstanceAddedSignal(tag):Connect(onAdd)
-	CollectionService:GetInstanceRemovedSignal(tag):Connect(onRemove)
-
-	for _, inst in ipairs(CollectionService:GetTagged(tag)) do
-		onAdd(inst)
-	end
-
-	log("bound tag " .. tag .. " in " .. (os.clock() - t0) .. "s")
-end
-
-
-local function getMainTagForDependency(manifest, depName)
-	local depData = manifest.services.entries[depName]
-	assert(depData, ("[LuaAnnotations] Unknown component dependency %q"):format(depName))
-	assert(depData.tags and depData.tags[1], ("[LuaAnnotations] Dependency %q has no tags"):format(depName))
-	return depData.tags[1]
-end
-
-
-local function initService(manifest, data, serviceName, service, baseDeps)
-	--services
-	if data.kind == "service" then
-		if service._init then
-			service._init(baseDeps)
-		end
-		return
-		
-	--initService
-	elseif data.kind == "initService" then
-		service(baseDeps)
-		return
-	end
-
-	local mainTag = assert(data.tags[1], ("[LuaAnnotations] No tags for component %q"):format(serviceName))
-
-	--convert component to class; handle data_service
-	local getComponentData
-	local dataService
-	if data.data_service then
-		dataService = manifest.services.entries[data.data_service].getAdornee()
-
-		getComponentData = function(inst) 
-			local state = dataService[inst]
-			if not state then
-				state = {}
-				dataService[inst] = state
-			end
-			return state
-		end
-
-		--initialize any component declarations
-		for inst, _ in pairs(dataService) do
-			inst:AddTag(mainTag)
-		end
-	end
-
-	makeComponentClass(service, getComponentData)
-
-	local instances = componentInstances[serviceName]
-	if not instances then
-		instances = setmetatable({}, { __mode = "k" })
-		componentInstances[serviceName] = instances
-	end
-
-	--bind CollectionService tags
-	for _, tag in ipairs(data.tags) do
-		local componentDeps = data.depends.components
-		local hasComponentDeps = #componentDeps > 0
-
-		useCollectionTag(tag, function(inst)
-			local deps = hasComponentDeps and table.clone(baseDeps) or baseDeps
-			local createdDepTags = hasComponentDeps and {} or nil
-
-			--inject component deps
-			for _, dep in ipairs(componentDeps) do
-				local depInstances = componentInstances[dep]
-				local depObj = depInstances and depInstances[inst]
-				
-				if not depObj then
-					local depTag = getMainTagForDependency(manifest, dep)
-
-					if not inst:HasTag(depTag) then
-						--create dep if it doesn't exist
-						inst:AddTag(depTag)
-						assert(createdDepTags)
-						createdDepTags[dep] = depTag
-					end
-
-					--try again after creating instance
-					depInstances = componentInstances[dep]
-					depObj = depInstances and depInstances[inst]
-
-					--error if failed twice
-					assert(depObj, ("[LuaAnnotations] Failed to resolve dependency %q for %q"):format(dep, serviceName))
-				end
-				
-				deps[dep] = depObj
-			end
-
-			--create component
-			local obj = service.new(inst, deps)
-			instances[inst] = obj
-
-			return function()
-				instances[inst] = nil
-
-				--destroy component
-				if obj._destroy then
-					obj:_destroy()
-				end
-
-				--destroy any dependencies as well
-				if createdDepTags then
-					for _, depTag in pairs(createdDepTags) do
-						if inst:HasTag(depTag) then
-							inst:RemoveTag(depTag)
-						end
-					end
-				end
-
-				--remove from registry
-				if dataService then
-					dataService[inst] = nil
-				end
-			end
-		end)
-	end
-end
-
-
-local remoteRoot = ReplicatedStorage:WaitForChild('Generated'):WaitForChild('Remotes')
-local remoteCache = {}
-
-
 local function fireServerRemote(remote: RemoteEvent | UnreliableRemoteEvent, ...)
 	remote:FireServer(...)
 end
@@ -349,11 +182,11 @@ local function fireClientRemote(remote: RemoteEvent | UnreliableRemoteEvent, pla
 end
 
 
-local function runOutboundMiddleware(chain, remoteInfo, ...)
+local function runOutboundMiddleware(manifestApi, chain, remoteInfo, ...)
 	local player
 	local args
 
-	if isServer then
+	if isManifestServer(manifestApi) then
 		player, args = splitFirst(...)
 	else
 		args = table.pack(...)
@@ -365,27 +198,27 @@ local function runOutboundMiddleware(chain, remoteInfo, ...)
 end
 
 
-local function createEventSender(remote: RemoteEvent | UnreliableRemoteEvent)
-	if isServer then
+local function createEventSender(manifestApi, remote: RemoteEvent | UnreliableRemoteEvent)
+	if isManifestServer(manifestApi) then
 		return function(player, ...)
 			fireClientRemote(remote, player, ...)
 		end
-	else
-		return function(...)
-			fireServerRemote(remote, ...)
-		end
+	end
+
+	return function(...)
+		fireServerRemote(remote, ...)
 	end
 end
 
 
-local function createMiddlewareEventSender(remoteInfo, remote: RemoteEvent | UnreliableRemoteEvent, chain)
+local function createMiddlewareEventSender(manifestApi, remoteInfo, remote: RemoteEvent | UnreliableRemoteEvent, chain)
 	return function(...)
-		local result, player = runOutboundMiddleware(chain, remoteInfo, ...)
+		local result, player = runOutboundMiddleware(manifestApi, chain, remoteInfo, ...)
 		if result[1] ~= true then
 			return
 		end
 
-		if isServer then
+		if isManifestServer(manifestApi) then
 			return fireClientRemote(remote, player, tailUnpack(result))
 		end
 
@@ -394,27 +227,27 @@ local function createMiddlewareEventSender(remoteInfo, remote: RemoteEvent | Unr
 end
 
 
-local function createFunctionSender(remote: RemoteFunction)
-	if isServer then
+local function createFunctionSender(manifestApi, remote: RemoteFunction)
+	if isManifestServer(manifestApi) then
 		return function(player, ...)
 			return remote:InvokeClient(player, ...)
 		end
-	else
-		return function(...)
-			return remote:InvokeServer(...)
-		end
+	end
+
+	return function(...)
+		return remote:InvokeServer(...)
 	end
 end
 
 
-local function createMiddlewareFunctionSender(remoteInfo, remote: RemoteFunction, chain)
+local function createMiddlewareFunctionSender(manifestApi, remoteInfo, remote: RemoteFunction, chain)
 	return function(...)
-		local result, player = runOutboundMiddleware(chain, remoteInfo, ...)
+		local result, player = runOutboundMiddleware(manifestApi, chain, remoteInfo, ...)
 		if result[1] ~= true then
 			return tailUnpack(result)
 		end
 
-		if isServer then
+		if isManifestServer(manifestApi) then
 			return remote:InvokeClient(player, tailUnpack(result))
 		end
 
@@ -423,34 +256,35 @@ local function createMiddlewareFunctionSender(remoteInfo, remote: RemoteFunction
 end
 
 
-local function createRemoteSender(remoteInfo, remote: RemoteFunction | RemoteEvent | UnreliableRemoteEvent)
+local function createRemoteSender(manifestApi, remoteInfo, remote: RemoteFunction | RemoteEvent | UnreliableRemoteEvent)
 	local chain = resolveMiddlewareChain(remoteInfo, 'outbound')
 
 	if #chain == 0 then
 		if isRemoteEvent(remote) then
-			return createEventSender(remote)
+			return createEventSender(manifestApi, remote)
 		end
 
-		return createFunctionSender(remote)
+		return createFunctionSender(manifestApi, remote)
 	end
 
 	if isRemoteEvent(remote) then
-		return createMiddlewareEventSender(remoteInfo, remote, chain)
+		return createMiddlewareEventSender(manifestApi, remoteInfo, remote, chain)
 	end
 
-	return createMiddlewareFunctionSender(remoteInfo, remote, chain)
+	return createMiddlewareFunctionSender(manifestApi, remoteInfo, remote, chain)
 end
 
 
-local function getRemoteTable(folderName)
-	local cached = remoteCache[folderName]
+local function getRemoteTable(manifestApi, folderName)
+	local cached = manifestApi._remoteCache[folderName]
 	if cached then
 		return cached
 	end
 
+	local remoteTargetEnv = getRemoteTargetEnv(manifestApi)
 	local serviceInfo = assert(
-		remoteInfoByEnv[remoteTargetEnv] and remoteInfoByEnv[remoteTargetEnv][folderName],
-		("[LuaAnnotations] Unknown remote service %q for %s"):format(folderName, remoteTargetEnv)
+		manifestApi.manifest.remotes[remoteTargetEnv] and manifestApi.manifest.remotes[remoteTargetEnv][folderName],
+		('[LuaAnnotations] Unknown remote service %q for %s'):format(folderName, remoteTargetEnv)
 	)
 
 	local folder = remoteRoot:WaitForChild(folderName)
@@ -458,28 +292,38 @@ local function getRemoteTable(folderName)
 
 	for remoteName, remoteInfo in pairs(serviceInfo) do
 		local remote = folder:WaitForChild(remoteName)
-		remotesTable[remoteName] = createRemoteSender(remoteInfo, remote)
+		remotesTable[remoteName] = createRemoteSender(manifestApi, remoteInfo, remote)
 	end
 
-	remoteCache[folderName] = remotesTable
+	manifestApi._remoteCache[folderName] = remotesTable
 	return remotesTable
 end
 
 
+--@moduleInit
+function initService(manifestApi, data, serviceName)
+	if data == nil or data.kind == 'dependency' then
+		return
+	end
+
+	manifestApi:startService(serviceName)
+end
+
+
 --@annotationInit
-function bindTag(anot)
-	local adornee = anot.getAdornee()
+function bindTag(manifestApi, anot, methodName, _, moduleName)
+	local adornee = getAnnotationAdornee(manifestApi, moduleName, methodName)
 
 	for _, tag in ipairs(anot.args[1]) do
-		useCollectionTag(tag, adornee)
+		manifestApi._useCollectionTag(tag, adornee)
 	end
 end
 
 
 --@annotationInit
-function middleware(anot)
+function middleware(manifestApi, anot, methodName, _, moduleName)
 	local env = anot.args[1]
-	if env ~= currentEnv then
+	if env ~= getCurrentEnv(manifestApi) then
 		return
 	end
 
@@ -489,7 +333,7 @@ function middleware(anot)
 
 	local data = {
 		name = anot.data.middleware_name,
-		callback = anot.getAdornee(),
+		callback = getAnnotationAdornee(manifestApi, moduleName, methodName),
 	}
 
 	registry.named[data.name] = data
@@ -500,46 +344,13 @@ function middleware(anot)
 end
 
 
---@onPostInit
-function initServices(manifest)
-	remoteInfoByEnv = manifest.remotes or {}
-
-	local t0 = os.clock()
-	local remoteT0 = os.clock()
-	local remoteDepCount = 0
-	for _, serviceName in ipairs(manifest.services.load_order) do
-		local data = manifest.services.entries[serviceName]
-		local service = data.getAdornee()
-
-		--build deps list
-		local injectDeps = {}
-		injectDeps[remoteTargetEnv] = {}
-
-		--service deps
-		for _, dep in ipairs(data.depends.services) do
-			injectDeps[dep] = manifest.services.entries[dep].getAdornee()
-		end
-
-		--remote deps
-		for _, dep in ipairs(data.depends.remotes) do
-			injectDeps[remoteTargetEnv][dep] = getRemoteTable(dep)
-			remoteDepCount += 1
-		end
-
-		initService(manifest, data, serviceName, service, injectDeps)
-	end
-
-	log("game-framework " .. currentEnv .. " services started in " .. (os.clock() - t0) .. "s (remote_deps=" .. remoteDepCount .. ", remote_setup=" .. (os.clock() - remoteT0) .. "s)")
-end
-
-
 --@annotationInit
-function remote(anot)
+function remote(manifestApi, anot, methodName, _, moduleName)
 	local t0 = os.clock()
-	local callback = anot.getAdornee()
+	local callback = getAnnotationAdornee(manifestApi, moduleName, methodName)
 	local remoteInfo = getRemoteInfoFromAnnotation(anot)
-	local anotType = remoteInfo.remoteType --event, unreliable, or function
-	local remote = remoteRoot[anot.data.remote_parent]:WaitForChild(anot.data.remote_name)
+	local anotType = remoteInfo.remoteType
+	local remoteInst = remoteRoot[anot.data.remote_parent]:WaitForChild(anot.data.remote_name)
 
 	local wrappedCallback
 	wrappedCallback = function(...)
@@ -553,23 +364,30 @@ function remote(anot)
 			local player
 			local args
 
-			if isServer then
+			if isManifestServer(manifestApi) then
 				player, args = splitFirst(...)
 			else
 				args = table.pack(...)
 			end
 
-			local result = runRemoteMiddleware(chain, remoteInfo, 'inbound', player, unpackPacked(args))
+			local info = getRemoteInfo(
+				manifestApi,
+				getCurrentEnv(manifestApi),
+				remoteInfo.service,
+				remoteInfo.method,
+				remoteInfo.remoteType
+			)
+			local result = runRemoteMiddleware(chain, info, 'inbound', player, unpackPacked(args))
 
 			if result[1] ~= true then
-				if remoteInfo.remoteType == 'function' then
+				if info.remoteType == 'function' then
 					return tailUnpack(result)
 				end
 
 				return
 			end
 
-			if isServer then
+			if isManifestServer(manifestApi) then
 				return callback(player, tailUnpack(result))
 			end
 
@@ -580,36 +398,37 @@ function remote(anot)
 	end
 
 	if anotType == 'event' or anotType == 'unreliable' then
-		assert(isRemoteEvent(remote), '[LuaAnnotations] Expected RemoteEvent')
-		if isServer then
-			remote.OnServerEvent:Connect(function(...)
+		assert(isRemoteEvent(remoteInst), '[LuaAnnotations] Expected RemoteEvent')
+		if isManifestServer(manifestApi) then
+			remoteInst.OnServerEvent:Connect(function(...)
 				return wrappedCallback(...)
 			end)
 		else
-			remote.OnClientEvent:Connect(function(...)
+			remoteInst.OnClientEvent:Connect(function(...)
 				return wrappedCallback(...)
 			end)
 		end
 	else
-		assert(remote:IsA('RemoteFunction'), '[LuaAnnotations] Expected RemoteFunction')
-		if isServer then
-			remote.OnServerInvoke = function(...)
+		assert(remoteInst:IsA('RemoteFunction'), '[LuaAnnotations] Expected RemoteFunction')
+		if isManifestServer(manifestApi) then
+			remoteInst.OnServerInvoke = function(...)
 				return wrappedCallback(...)
 			end
 		else
-			remote.OnClientInvoke = function(...)
+			remoteInst.OnClientInvoke = function(...)
 				return wrappedCallback(...)
 			end
 		end
 	end
 
-	log("bound remote " .. remoteInfo.service .. "." .. remoteInfo.method .. " in " .. (os.clock() - t0) .. "s")
+	log('bound remote ' .. remoteInfo.service .. '.' .. remoteInfo.method .. ' in ' .. (os.clock() - t0) .. 's')
 end
 
 
 return {
-	initServices = initServices,
+	initService = initService,
 	bindTag = bindTag,
 	middleware = middleware,
 	remote = remote,
+	getRemoteTable = getRemoteTable,
 }

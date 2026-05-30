@@ -98,7 +98,6 @@ def service_todict(
 
     return ServiceEntry(
         depends=proc_deps(svc, service_map, remote_map),
-        getAdornee=svc.adornee.get_path(function=True, require=True, cache=True),  # pyright: ignore[reportAttributeAccessIssue]
         kind=svc.name,
         tags=tags,
         data_service=data_service,
@@ -167,22 +166,34 @@ class LifecycleExtension(Extension):
     def on_post_process(self, ctx: PostProcessCtx):
         assert self.manifestExt
 
-        for env in ('server', 'client'):
-            services = self.services[env] + self.services['shared']
+        for env_name, services in self.services.items():
+            all_services = services
+            if env_name != 'shared':
+                all_services = services + self.services['shared']
 
-            entries = {
+            entry_map = {
                 get_service_name(svc): service_todict(
                     svc,
-                    {get_service_name(svc): svc for svc in services},
+                    {get_service_name(svc): svc for svc in all_services},
                     self.remote_services,
                 )
                 for svc in services
             }
 
+            for svc in services:
+                service_name = get_service_name(svc)
+                module = svc.get_module()
+                assert isinstance(module, ReturnedValue)
+                module_path = module.get_path(require=True, cache=True, cache_name=service_name)
+                self.manifestExt.update_module_data(env_name, service_name, module_path, entry_map[service_name])
+
+        for env in ('server', 'client'):
+            services = self.services[env] + self.services['shared']
+
             try:
-                self.manifestExt.set_services(env, entries, get_runtime_load_order(services))
+                self.manifestExt.set_load_order(env, get_runtime_load_order(services))
             except CycleError as e:
-                raise BuildError(f"Cycle detected for service graph: {e.args}") from e
+                raise BuildError(f'Cycle detected for service graph: {e.args}') from e
 
     def load(self, ctx: ExtensionRegistry):
         from lua_annotations.extensions.default import ManifestExtension
@@ -191,6 +202,8 @@ class LifecycleExtension(Extension):
         assert isinstance(manifest_ext, ManifestExtension)
 
         self.manifestExt = manifest_ext
+        manifest_functions = files('lua_annotations') / 'extensions' / 'game_framework' / 'lua' / 'ManifestFunctions.lua'
+        manifest_ext.register_manifest_functions('shared', manifest_functions.read_text())
 
         dependency = AnnotationDef(
             'dependency',
