@@ -28,6 +28,15 @@ Don't forget to add this directory to your `.gitignore`!
 **Generated/
 ```
 
+This directory name also becomes part of the runtime require path for generated files. For example, with the default `outDirName` of `Generated`, local Luau tests may require:
+
+```lua
+local ServerManifest = require(game:GetService("ServerScriptService").Generated.Manifest)
+local ClientManifest = require(game:GetService("Players").LocalPlayer.PlayerScripts.Generated.Manifest)
+```
+
+If you rename `outDirName`, those require paths change too.
+
 ## `workspaces`
 These represent individual lua projects which are processed in parallel. Multiple workspaces are especially useful for multi-place Roblox games.
 

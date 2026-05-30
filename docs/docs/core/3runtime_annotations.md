@@ -157,4 +157,4 @@ The generated `Manifest.lua` module exposes a very small default API:
 * `Manifest:loadAllModules()`: load every manifest module, using `load_order` first when provided.
 * `Manifest:runPostInitHooks()`: spawn all `post_init` hooks.
 
-Extensions may append more functions directly into `Manifest.lua` through the python manifest API, but the core module keeps the default surface intentionally minimal.
+Extensions may append more functions directly into `Manifest.lua` through the python manifest API.
