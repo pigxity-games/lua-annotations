@@ -15,11 +15,12 @@ An annotation processor for lua projects. see docs/ for documentation. The progr
 The project also contains a luau test suite that uses `lune-test`.
 
 ```sh
+lua-anot build test/luau/fixtures
 lune run lune-test -m test/luau/manifest
 ```
 
 ## Code conventions
-- use single quotes for strings ('')
+- use single quotes for strings ('') in python; luau code should use double quotes ("")
 - use triple dobule quotes for docstrings ("""""")
     - only have docstrings for functions/classes accessed elsewhere (not module-private)
 - code should be fully typed and checked with pyright. Avoid explicit function return types / variable types unless required to by the typechecker. (Types should be implicit unless required)

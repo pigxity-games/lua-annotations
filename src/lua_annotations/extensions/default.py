@@ -166,26 +166,25 @@ class ManifestExtension(Extension):
             data = self.manifest[env].merged_with_shared(self.manifest['shared'])
             data.register_module_paths(resolver)
 
-            manifest_data = convert_dict(resolver, data, prefix='\tmanifest =', include_imports=False).rstrip() + ',\n'
+            manifest_payload = {
+                'environment': env,
+                'modulePaths': resolver.get_cached_module_paths(),
+                'manifest': data,
+            }
+
+            manifest_data = convert_dict(resolver, manifest_payload, prefix='return', include_imports=False)
+            manifest_data = manifest_data.removeprefix('return ').rstrip()
             import_lines = [line for line in resolver.get_import_lines() if not line.startswith('local ReplicatedStorage = ')]
             module_path_imports = '\n'.join(import_lines)
             if module_path_imports:
                 module_path_imports = module_path_imports + '\n'
-
-            module_paths = convert_dict(
-                resolver,
-                resolver.get_cached_module_paths(),
-                prefix='\tmodulePaths =',
-                include_imports=False,
-            ).rstrip() + ',\n'
             out_dir_name = ctx.build_ctxs['shared'].output_root.name
 
             manifest_out = (
                 manifest_template.replace('(env)', env)
                 .replace('(out-dir-name)', out_dir_name)
                 .replace('--{module_imports}', module_path_imports.rstrip())
-                .replace('--{module_paths}', module_paths)
-                .replace('--{manifest}', manifest_data)
+                .replace('--{manifest_payload}', manifest_data)
             )
 
             ctx.create_file(env, 'Manifest.lua', manifest_out)

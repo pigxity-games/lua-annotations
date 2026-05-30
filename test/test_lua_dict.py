@@ -60,7 +60,9 @@ def test_luapath_cache_uses_getcached_and_builds_module_paths(tmp_path: Path):
         'local ServerScriptService = game:GetService("ServerScriptService")\n'
         '\n'
         'local modulePaths = {\n'
-        '    Data = {ServerScriptService.ServerRoot, "Services", "Data"},\n'
+        '    Data = {\n'
+        '        path = {ServerScriptService.ServerRoot, "Services", "Data"},\n'
+        '    },\n'
         '}\n'
     )
 
@@ -76,6 +78,30 @@ def test_luapath_cache_works_with_function_and_properties(tmp_path: Path):
     )
 
     assert path.to_lua(resolver) == 'function() return getCached("Remote").call end'
+
+
+def test_luapath_cache_can_resolve_submodule_exports(tmp_path: Path):
+    resolver = make_resolver(tmp_path)
+    path = LuaPath(
+        tmp_path / 'server' / 'Components' / 'CounterComponent.lua',
+        require=True,
+        properties=['Counter'],
+        cache_export='Counter',
+        cache=True,
+        cache_name='Counter',
+    )
+
+    assert path.to_lua(resolver) == 'getCached("Counter")'
+    assert convert_dict(resolver, resolver.get_cached_module_paths(), prefix='local modulePaths =') == (
+        'local ServerScriptService = game:GetService("ServerScriptService")\n'
+        '\n'
+        'local modulePaths = {\n'
+        '    Counter = {\n'
+        '        path = {ServerScriptService.ServerRoot, "Components", "CounterComponent"},\n'
+        '        export = "Counter",\n'
+        '    },\n'
+        '}\n'
+    )
 
 
 def test_luapath_cache_requires_require_true(tmp_path: Path):

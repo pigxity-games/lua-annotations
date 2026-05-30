@@ -99,12 +99,13 @@ class ReturnedValue:
                 relative,
                 require,
                 [self.returned_name] + props,
+                self.returned_name,
                 function,
                 cache,
                 cache_name,
             )
         else:
-            return LuaPath(self.file, relative, require, props, function, cache, cache_name)
+            return LuaPath(self.file, relative, require, props, None, function, cache, cache_name)
 
     def get_expr(self, resolver: LuaPathResolver, relative: bool = False):
         path = self.get_path(relative, True)

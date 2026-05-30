@@ -6,7 +6,7 @@ from lua_annotations.api.manifest import ManifestData, ManifestHook, ManifestHoo
 from lua_annotations.build_process import PostProcessCtx
 from lua_annotations.extensions.default import ManifestExtension
 
-from helpers import extract_block, make_build_ctxs, make_workspace
+from helpers import make_build_ctxs, make_workspace
 
 
 def test_manifest_extension_generates_module_paths_with_clean_lua_paths(tmp_path: Path):
@@ -37,11 +37,15 @@ def test_manifest_extension_generates_module_paths_with_clean_lua_paths(tmp_path
     ext.on_post_process(post_ctx)
 
     out = (tmp_path / 'client' / 'Generated' / 'Manifest.lua').read_text()
-    module_paths_block = extract_block(out, 'modulePaths = {', 'manifest = {')
 
-    assert 'Lifecycle = {ReplicatedStorage, "Generated", "_Internal", "Lifecycle"}' in module_paths_block
-    assert 'NpcAnimation = {PlayerScripts, "Handlers", "NpcAnimation"}' in module_paths_block
-    assert '..' not in module_paths_block
+    assert 'return ManifestAPI.new({' in out
+    assert 'modulePaths = {' in out
+    assert 'Lifecycle = {' in out
+    assert 'path = {ReplicatedStorage, "Generated", "_Internal", "Lifecycle"}' in out
+    assert 'NpcAnimation = {' in out
+    assert 'path = {PlayerScripts, "Handlers", "NpcAnimation"}' in out
+    assert 'manifest = {' in out
+    assert '..' not in out
 
 
 def test_manifest_extension_merges_shared_without_mutating_source(tmp_path: Path):
@@ -67,6 +71,7 @@ def test_manifest_extension_merges_shared_without_mutating_source(tmp_path: Path
 
     out = (tmp_path / 'client' / 'Generated' / 'Manifest.lua').read_text()
     assert 'ManifestAPI.new({' in out
+    assert 'environment = "client"' in out
     assert 'manifest = {' in out
     assert 'hooks = {' in out
     assert 'annotation_handlers = {' in out

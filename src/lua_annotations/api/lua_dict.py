@@ -108,7 +108,7 @@ class LuaPathResolver:
     def __init__(self, workspace: Workspace):
         self.workspace = workspace
         self.used_imports: set[Environment] = set()
-        self.cached_module_paths: dict[str, LuaInlineList] = {}
+        self.cached_module_paths: dict[str, LuaCachedPath] = {}
 
     @staticmethod
     def _collapse_dots(expr: str):
@@ -157,7 +157,7 @@ class LuaPathResolver:
 
         return import_lines
 
-    def register_cached_module(self, module_name: str, path: LuaInlineList):
+    def register_cached_module(self, module_name: str, path: LuaCachedPath):
         current = self.cached_module_paths.get(module_name)
         if current is None:
             self.cached_module_paths[module_name] = path
@@ -185,6 +185,22 @@ class LuaInlineList:
 
 
 @dataclass
+class LuaCachedPath:
+    path: LuaInlineList
+    export: str | None = None
+
+    def asdict(self):
+        out: dict[str, LuaInlineList | str] = {
+            'path': self.path,
+        }
+
+        if self.export is not None:
+            out['export'] = self.export
+
+        return out
+
+
+@dataclass
 class LuaPath:
     """A class which allows for easy conversion of a pathlib path into a lua expression. Note that any non-relative paths require a LuaPathResolver."""
 
@@ -192,6 +208,7 @@ class LuaPath:
     relative: bool = False
     require: bool = False
     properties: list[str] = field(default_factory=list)
+    cache_export: str | None = None
     function: bool = False
     cache: bool = False
     cache_name: str | None = None
@@ -222,8 +239,10 @@ class LuaPath:
         string: str,
         module_name: str,
         resolver: LuaPathResolver | None = None,
-        cache_path: LuaInlineList | None = None,
+        cache_path: LuaCachedPath | None = None,
     ):
+        rendered_properties = self.properties
+
         if self.cache:
             if not self.require:
                 raise BuildError('LuaPath cache requires require=True')
@@ -236,15 +255,16 @@ class LuaPath:
             resolver.register_cached_module(cached_name, cache_path)
             escaped = cached_name.replace('\\', '\\\\').replace('"', '\\"')
             string = f'getCached("{escaped}")'
+            rendered_properties = self.properties[1:] if self.cache_export is not None else self.properties
         elif self.require or len(self.properties) > 0:
             string = f'require({string})'
 
-        for prop in self.properties:
+        for prop in rendered_properties:
             string += self._accessor(prop)
 
         string = self._collapse_dots(string)
 
-        if self.function or (len(self.properties) > 0 and not self.require):
+        if self.function or (len(rendered_properties) > 0 and not self.require):
             # if require is false, wrap the require path in a function
             return f'function() return {string} end'
 
@@ -257,7 +277,7 @@ class LuaPath:
         parts = self._parts_no_ext(self.path)
         expr_root = 'script.Parent'
         expr = self._append_parts(expr_root, parts)
-        cache_path = LuaInlineList([LuaExpr(expr_root), *parts])
+        cache_path = LuaCachedPath(LuaInlineList([LuaExpr(expr_root), *parts]), self.cache_export)
         module_name = self.path.with_suffix('').name
         return self._post_process(expr, module_name, resolver, cache_path)
 
@@ -272,7 +292,7 @@ class LuaPath:
 
         parts = self._parts_no_ext(rel)
         expr = self._append_parts(expr_root, parts)
-        cache_path = LuaInlineList([LuaExpr(expr_root), *parts])
+        cache_path = LuaCachedPath(LuaInlineList([LuaExpr(expr_root), *parts]), self.cache_export)
         return self._post_process(expr, rel.with_suffix('').name, resolver, cache_path)
 
 

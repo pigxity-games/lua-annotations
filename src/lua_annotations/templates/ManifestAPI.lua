@@ -10,6 +10,14 @@ local function waitForPath(path)
 	return cur
 end
 
+local function applyExport(value, exportName)
+	if not exportName then
+		return value
+	end
+
+	return value[exportName]
+end
+
 function ManifestAPI.new(data)
 	return setmetatable({
 		environment = data.environment,
@@ -67,9 +75,12 @@ end
 function ManifestAPI:getCached(moduleName)
 	local cachedModule = self._cache[moduleName]
 	if cachedModule == nil then
-		local path = self.modulePaths[moduleName]
-		assert(path ~= nil, ('[LuaAnnotations] Unknown cached module %q'):format(moduleName))
-		cachedModule = require(waitForPath(path))
+		local moduleData = self.modulePaths[moduleName]
+		assert(moduleData ~= nil, ('[LuaAnnotations] Unknown cached module %q'):format(moduleName))
+
+		local path = moduleData.path or moduleData
+		local exportName = moduleData.export
+		cachedModule = applyExport(require(waitForPath(path)), exportName)
 		self._cache[moduleName] = cachedModule
 	end
 	return cachedModule
