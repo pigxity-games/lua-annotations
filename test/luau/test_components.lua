@@ -1,43 +1,12 @@
 local ServerScriptService = game:GetService('ServerScriptService')
 
 local ServerManifest = require(ServerScriptService.Generated.Manifest)
+local Helpers = require('./helpers')
 
 local module = {}
 
-local function ensureChild(parent: Instance, className: string, childName: string)
-	local child = parent:FindFirstChild(childName)
-	if child then
-		return child
-	end
-
-	child = Instance.new(className, parent)
-	child.Name = childName
-	return child
-end
-
-local function createPart(name: string)
-	local part = Instance.new('Part')
-	part.Name = name
-	part.Parent = workspace
-	return part
-end
-
-local function setupCounterRegistryParts()
-	local part1 = createPart('Part1')
-	part1:AddTag('Counter')
-
-	local part2 = createPart('Part2')
-
-	return part1, part2
-end
-
 local function loadServerModules()
-	local generated = ensureChild(game:GetService('ReplicatedStorage'), 'Folder', 'Generated')
-	local remotes = ensureChild(generated, 'Folder', 'Remotes')
-	local serviceA = ensureChild(remotes, 'Folder', 'ServiceA')
-	ensureChild(serviceA, 'RemoteFunction', 'pingRemote')
-
-	ServerManifest:loadAllModules()
+	Helpers.loadServerModules(ServerManifest)
 end
 
 local function getCounter(inst: Instance)
@@ -51,18 +20,22 @@ local function getCounterLogger(inst: Instance)
 end
 
 function module.tagsPresentBeforeLoadCreateComponentsAndRegistryAppliesDefaultData()
-	local part1, part2 = setupCounterRegistryParts()
-	local simplePart = createPart('SimpleOriginal')
+	local part1, part2 = Helpers.setupCounterRegistryParts()
+	local simplePart = Helpers.createPart('SimpleOriginal')
 	simplePart:AddTag('SimpleComponent')
 
 	loadServerModules()
 
 	local counter1 = getCounter(part1)
 	local counter2 = getCounter(part2)
+	local counterModule = ServerManifest:getModule('Counter')
+	local counterRegistry = ServerManifest:getModule('CounterRegistry')
 
 	assert(counter1 ~= nil, 'tagged instances should create counter components when modules load')
 	assert(counter2 ~= nil, 'registry entries should create counter components when modules load')
 	assert(part2:HasTag('Counter'), 'registry-backed instances should gain the counter tag automatically')
+	assert(counterModule.increment ~= nil, 'file exports should resolve to the named Counter module')
+	assert(counterRegistry[part1].val == 123, 'file exports should resolve to the named CounterRegistry dependency')
 	assert(counter1.instance == part1)
 	assert(counter2.instance == part2)
 	assert(counter1.count == 0)
@@ -77,9 +50,9 @@ function module.tagsPresentBeforeLoadCreateComponentsAndRegistryAppliesDefaultDa
 end
 
 function module.simpleComponentCleanupRevertsThePartNameWhenTheTagIsRemoved()
-	setupCounterRegistryParts()
+	Helpers.setupCounterRegistryParts()
 
-	local simplePart = createPart('SimpleOriginal')
+	local simplePart = Helpers.createPart('SimpleOriginal')
 	simplePart:AddTag('SimpleComponent')
 
 	loadServerModules()
@@ -90,11 +63,11 @@ function module.simpleComponentCleanupRevertsThePartNameWhenTheTagIsRemoved()
 end
 
 function module.counterRegistryCanCreateANewComponentFromDocumentationStyleData()
-	setupCounterRegistryParts()
+	Helpers.setupCounterRegistryParts()
 	loadServerModules()
 
 	local registry = ServerManifest:getModule('CounterRegistry')
-	local part3 = createPart('Part3')
+	local part3 = Helpers.createPart('Part3')
 	registry[part3] = {
 		val = 456,
 	}
@@ -109,12 +82,12 @@ function module.counterRegistryCanCreateANewComponentFromDocumentationStyleData(
 end
 
 function module.counterLoggerTogglesLoggingAndAutoCreatesMissingCounterDependencies()
-	setupCounterRegistryParts()
+	Helpers.setupCounterRegistryParts()
 
-	local existingCounterPart = createPart('ExistingCounter')
+	local existingCounterPart = Helpers.createPart('ExistingCounter')
 	existingCounterPart:AddTag('Counter')
 
-	local loggerOnlyPart = createPart('LoggerOnly')
+	local loggerOnlyPart = Helpers.createPart('LoggerOnly')
 	loggerOnlyPart:AddTag('CounterLogger')
 
 	loadServerModules()
@@ -150,3 +123,4 @@ function module.counterLoggerTogglesLoggingAndAutoCreatesMissingCounterDependenc
 end
 
 return module
+

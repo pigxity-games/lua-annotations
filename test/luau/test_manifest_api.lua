@@ -6,34 +6,9 @@ local player = Players.LocalPlayer
 
 local ClientManifest = require(player.PlayerScripts.Generated.Manifest)
 local ServerManifest = require(ServerScriptService.Generated.Manifest)
+local Helpers = require('./helpers')
 
 local m = {}
-
-local function setupRemotes()
-    local Generated = ReplicatedStorage:FindFirstChild("Generated")
-    if not Generated then
-        Generated = Instance.new("Folder", ReplicatedStorage)
-        Generated.Name = "Generated"
-    end
-
-    local Remotes = Generated:FindFirstChild("Remotes")
-    if not Remotes then
-        Remotes = Instance.new("Folder", Generated)
-        Remotes.Name = "Remotes"
-    end
-
-    local ServiceA = Remotes:FindFirstChild("ServiceA")
-    if not ServiceA then
-        ServiceA = Instance.new("Folder", Remotes)
-        ServiceA.Name = "ServiceA"
-    end
-
-    local pingRemote = ServiceA:FindFirstChild("pingRemote")
-    if not pingRemote then
-        pingRemote = Instance.new("RemoteFunction", ServiceA)
-        pingRemote.Name = "pingRemote"
-    end
-end
 
 function m.sharedServiceInBothManifests()
 	local clientManifest = ClientManifest.manifest
@@ -67,7 +42,7 @@ end
 -- // GAME-FRAMEWORK API //
 
 function m.controllerAPingReturnsPong()
-    setupRemotes()
+    Helpers.setupRemotes()
     ServerManifest:startService("ServiceA")
 
     local Controller = ClientManifest:startService("ControllerA")
@@ -75,7 +50,7 @@ function m.controllerAPingReturnsPong()
 end
 
 function m.getServiceDepsControllerA()	
-	setupRemotes()
+	Helpers.setupRemotes()
 	local deps = ClientManifest:getServiceDeps("ControllerA")
 	assert(deps.server.ServiceA ~= nil)
 

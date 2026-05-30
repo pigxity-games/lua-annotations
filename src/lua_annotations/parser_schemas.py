@@ -62,10 +62,21 @@ class LuaMethod:
         cache: bool = False,
         cache_name: str | None = None,
     ):
+        from .api.lua_dict import LuaPath
+
         if self.direct_return:
             return self.module.get_path(relative, require, [], function, cache, cache_name)
 
-        return self.module.get_path(relative, require, [self.name], function, cache, cache_name)
+        return LuaPath(
+            self.module.file,
+            relative,
+            require,
+            [self.name],
+            self.name if cache else None,
+            function,
+            cache,
+            cache_name,
+        )
 
     def generate_type(self):
         param_string = ', '.join([self.module.returned_name] if self.call_type == ':' else [] + list(self.params.values()))

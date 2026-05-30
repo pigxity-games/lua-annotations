@@ -182,9 +182,15 @@ class LifecycleExtension(Extension):
 
             for svc in services:
                 service_name = get_service_name(svc)
-                module = svc.get_module()
-                assert isinstance(module, ReturnedValue)
-                module_path = module.get_path(require=True, cache=True, cache_name=service_name)
+                adornee = svc.adornee
+
+                if isinstance(adornee, LuaMethod):
+                    module_path = adornee.get_path(require=True, cache=True, cache_name=service_name)
+                else:
+                    module = svc.get_module()
+                    assert isinstance(module, ReturnedValue)
+                    module_path = module.get_path(require=True, cache=True, cache_name=service_name)
+
                 self.manifestExt.update_module_data(env_name, service_name, module_path, entry_map[service_name])
 
         for env in ('server', 'client'):

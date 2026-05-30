@@ -1,4 +1,3 @@
-local ReplicatedStorage = game:GetService('ReplicatedStorage')
 local ServerScriptService = game:GetService('ServerScriptService')
 
 local Players = game:GetService('Players')
@@ -7,6 +6,7 @@ local player = Players.LocalPlayer
 local ClientManifest = require(player.PlayerScripts.Generated.Manifest)
 local ServerManifest = require(ServerScriptService.Generated.Manifest)
 local RateLimit = require(ServerScriptService.RateLimit)
+local Helpers = require('./helpers')
 
 local module = {}
 
@@ -18,26 +18,8 @@ local function createContext(playerName: string)
 	}
 end
 
-local function ensureChild(parent: Instance, className: string, childName: string)
-	local child = parent:FindFirstChild(childName)
-	if child then
-		return child
-	end
-
-	child = Instance.new(className, parent)
-	child.Name = childName
-	return child
-end
-
-local function setupRemotes()
-	local generated = ensureChild(ReplicatedStorage, 'Folder', 'Generated')
-	local remotes = ensureChild(generated, 'Folder', 'Remotes')
-	local serviceA = ensureChild(remotes, 'Folder', 'ServiceA')
-	ensureChild(serviceA, 'RemoteFunction', 'pingRemote')
-end
-
 local function loadFixtureManifests()
-	setupRemotes()
+	Helpers.setupRemotes()
 	ServerManifest:loadAllModules()
 	ClientManifest:loadAllModules()
 	return ClientManifest:getModule('ControllerA')
