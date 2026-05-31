@@ -2,22 +2,8 @@ local ReplicatedStorage = game:GetService('ReplicatedStorage')
 
 local module = {}
 
-function module.ensureChild(parent: Instance, className: string, childName: string)
-	local child = parent:FindFirstChild(childName)
-	if child then
-		return child
-	end
-
-	child = Instance.new(className, parent)
-	child.Name = childName
-	return child
-end
-
 function module.setupRemotes()
-	local generated = module.ensureChild(ReplicatedStorage, 'Folder', 'Generated')
-	local remotes = module.ensureChild(generated, 'Folder', 'Remotes')
-	local serviceA = module.ensureChild(remotes, 'Folder', 'ServiceA')
-	module.ensureChild(serviceA, 'RemoteFunction', 'pingRemote')
+	getEnvironment():loadRojoModel("./fixtures/src/shared/Generated/Remotes.model.json")
 end
 
 function module.createPart(name: string)
