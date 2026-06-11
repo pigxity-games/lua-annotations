@@ -10,3 +10,4 @@ pyenv/
 .tmp_probe
 test_tmp_pytest
 .tmp_**
+**.d.luau

@@ -106,7 +106,7 @@ And the lua runtime file:
     ```lua title="MyAnnotations.lua"
     --@annotationInit
     local function addHelloWorld(manifest, anot, methodName, _, moduleName)
-        local module = manifest:getCached(moduleName)
+        local module = manifest:getModule(moduleName)
         module.helloWorld = function()
             print("Hello World!")
         end

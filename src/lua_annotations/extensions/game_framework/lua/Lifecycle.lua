@@ -94,7 +94,7 @@ end
 
 
 local function getAnnotationAdornee(manifestApi, moduleName, methodName)
-	local module = manifestApi:getCached(moduleName)
+	local module = manifestApi:getModule(moduleName)
 	if methodName == '_module' or type(module) ~= 'table' then
 		return module
 	end

@@ -1,40 +1,85 @@
+-- /// Game-Framework Manifest API ///
+
+-- Types --
+
 local CollectionService = game:GetService('CollectionService')
 local RunService = game:GetService('RunService')
 
+type Cleanup = () -> ()
+type CleanupSentinel = {}
+type CleanupValue = Cleanup | CleanupSentinel
+type RemoteDeps = { [string]: any }
+type ServiceDeps = {
+	[string]: any,
+	client: RemoteDeps?,
+	server: RemoteDeps?,
+}
+type ComponentState = { [string]: any }
+type ComponentInstanceMap = { [Instance]: any }
+type ComponentInstanceRegistry = { [string]: ComponentInstanceMap }
+type ServiceManifestData = {
+	kind: string,
+	tags: { string }?,
+	data_service: string?,
+	depends: {
+		services: { string }?,
+		remotes: { string }?,
+		components: { string }?,
+	},
+}
+type ServiceManifestModuleInfo = {
+	data: ServiceManifestData,
+	annotations: { [string]: { any } }?,
+}
+type ServiceManifestApi = {
+	environment: string,
+	_componentInstances: ComponentInstanceRegistry,
+	_startedServices: { [string]: any },
+	_startingServices: { [string]: boolean },
+	_getModuleInfo: (self: any, moduleName: string) -> ServiceManifestModuleInfo,
+	getModule: (self: any, moduleName: string) -> any,
+	getCached: (self: any, moduleName: string) -> any,
+	startService: (self: any, serviceName: string, deps: ServiceDeps?) -> any,
+}
+type DataService = { [Instance]: ComponentState }
+
+
 local isStudio = RunService:IsStudio()
-local NO_CLEANUP = {}
+local NO_CLEANUP: CleanupSentinel = {}
 
+-- Helpers --
 
-local function log(message)
+local function log(message: string): ()
 	if isStudio then
 		print('[LuaAnnotations] ' .. message)
 	end
 end
 
 
-local function getRemoteTargetEnv(manifestApi)
+local function getRemoteTargetEnv(manifestApi: ServiceManifestApi): 'client' | 'server'
 	return if manifestApi.environment == 'server' then 'client' else 'server'
 end
 
 
-local function makeComponentClass<T>(class: T, dataGetter: (any) -> ())
-	class.__index = class
+local function makeComponentClass<T>(class: T, dataGetter: ((Instance) -> ComponentState)?): ()
+	local classTable = class :: any
+	classTable.__index = class
 
-	function class.new(inst, deps)
-		local self = setmetatable(dataGetter and dataGetter(inst) or {}, class)
-		if class._init then
-			class._init(self, inst, deps)
+	function classTable.new(inst: Instance, deps: ServiceDeps): T
+		local self = setmetatable(dataGetter and dataGetter(inst) or {}, classTable)
+		if classTable._init then
+			classTable._init(self, inst, deps)
 		end
 		return self
 	end
 end
 
 
-local function useCollectionTag(tag, consumer)
-	local cleanups = setmetatable({}, { __mode = 'k' })
+local function useCollectionTag(tag: string, consumer: (Instance) -> Cleanup?): ()
+	local cleanups = setmetatable({} :: { [Instance]: CleanupValue }, { __mode = 'k' })
 	local t0 = os.clock()
 
-	local function onAdd(inst)
+	local function onAdd(inst: Instance): ()
 		if cleanups[inst] ~= nil then
 			return
 		end
@@ -47,11 +92,11 @@ local function useCollectionTag(tag, consumer)
 		end
 	end
 
-	local function onRemove(inst)
+	local function onRemove(inst: Instance): ()
 		local cleanup = cleanups[inst]
 		if cleanup then
 			if cleanup ~= NO_CLEANUP then
-				cleanup()
+				(cleanup :: Cleanup)()
 			end
 			cleanups[inst] = nil
 		end
@@ -68,7 +113,7 @@ local function useCollectionTag(tag, consumer)
 end
 
 
-local function getMainTagForDependency(manifestApi, depName)
+local function getMainTagForDependency(manifestApi: ServiceManifestApi, depName: string): string
 	local depData = manifestApi:_getModuleInfo(depName).data
 	assert(depData, ('[LuaAnnotations] Unknown component dependency %q'):format(depName))
 	assert(depData.tags and depData.tags[1], ('[LuaAnnotations] Dependency %q has no tags'):format(depName))
@@ -76,7 +121,13 @@ local function getMainTagForDependency(manifestApi, depName)
 end
 
 
-local function initServiceModule(manifestApi, serviceName, service, data, baseDeps)
+local function initServiceModule(
+	manifestApi: ServiceManifestApi,
+	serviceName: string,
+	service: any,
+	data: ServiceManifestData,
+	baseDeps: ServiceDeps
+): ()
 	if data.kind == 'service' then
 		if service._init then
 			service._init(baseDeps)
@@ -89,22 +140,24 @@ local function initServiceModule(manifestApi, serviceName, service, data, baseDe
 		return
 	end
 
-	local mainTag = assert(data.tags[1], ('[LuaAnnotations] No tags for component %q'):format(serviceName))
-	local getComponentData
-	local dataService
+	local tags = assert(data.tags, ('[LuaAnnotations] No tags for component %q'):format(serviceName))
+	local mainTag = assert(tags[1], ('[LuaAnnotations] No tags for component %q'):format(serviceName))
+	local getComponentData: ((Instance) -> ComponentState)?
+	local dataService: DataService?
 
 	if data.data_service then
-		dataService = manifestApi:getModule(data.data_service)
-		getComponentData = function(inst)
-			local state = dataService[inst]
+		local resolvedDataService = manifestApi:getModule(data.data_service) :: DataService
+		dataService = resolvedDataService
+		getComponentData = function(inst: Instance): ComponentState
+			local state = resolvedDataService[inst]
 			if not state then
 				state = {}
-				dataService[inst] = state
+				resolvedDataService[inst] = state
 			end
 			return state
 		end
 
-		for inst in pairs(dataService) do
+		for inst in pairs(resolvedDataService) do
 			inst:AddTag(mainTag)
 		end
 	end
@@ -117,13 +170,13 @@ local function initServiceModule(manifestApi, serviceName, service, data, baseDe
 		manifestApi._componentInstances[serviceName] = instances
 	end
 
-	for _, tag in ipairs(data.tags) do
-		local componentDeps = data.depends.components
+	for _, tag in ipairs(tags) do
+		local componentDeps = data.depends.components :: { string }
 		local hasComponentDeps = #componentDeps > 0
 
-		useCollectionTag(tag, function(inst)
-			local deps = hasComponentDeps and table.clone(baseDeps) or baseDeps
-			local createdDepTags = hasComponentDeps and {} or nil
+		useCollectionTag(tag, function(inst: Instance): Cleanup
+			local deps = (hasComponentDeps and table.clone(baseDeps) or baseDeps) :: ServiceDeps
+			local createdDepTags = (hasComponentDeps and {} or nil) :: { [string]: string }?
 
 			for _, dep in ipairs(componentDeps) do
 				local depInstances = manifestApi._componentInstances[dep]
@@ -149,7 +202,7 @@ local function initServiceModule(manifestApi, serviceName, service, data, baseDe
 			local obj = service.new(inst, deps)
 			instances[inst] = obj
 
-			return function()
+			return function(): ()
 				instances[inst] = nil
 
 				if obj._destroy then
@@ -172,8 +225,15 @@ local function initServiceModule(manifestApi, serviceName, service, data, baseDe
 	end
 end
 
+-- Methods --
 
-function ManifestAPI:getServiceDeps(serviceName, runDependencyInit)
+--[[
+    Builds and returns the dependency table for the requested service or component.
+    @param serviceName The manifest module name whose dependencies should be resolved.
+    @param runDependencyInit When true or nil, dependent services are started before being injected. When false, dependencies are required without running their startup logic.
+    @return A deps table containing resolved service dependencies and cross-environment remote wrappers keyed by their manifest names.
+]]
+function ManifestAPI:getServiceDeps(serviceName: string, runDependencyInit: boolean?): ServiceDeps
 	if runDependencyInit == nil then
 		runDependencyInit = true
 	end
@@ -181,7 +241,7 @@ function ManifestAPI:getServiceDeps(serviceName, runDependencyInit)
 	local data = self:_getModuleInfo(serviceName).data
 	assert(data ~= nil, ('[LuaAnnotations] Module %q has no manifest data'):format(serviceName))
 
-	local injectDeps = {}
+	local injectDeps: any = {}
 	local remoteTargetEnv = getRemoteTargetEnv(self)
 	injectDeps[remoteTargetEnv] = {}
 
@@ -194,14 +254,20 @@ function ManifestAPI:getServiceDeps(serviceName, runDependencyInit)
 	end
 
 	for _, dep in ipairs(data.depends.remotes or {}) do
-		injectDeps[remoteTargetEnv][dep] = self:getCached('Lifecycle').getRemoteTable(self, dep)
+		injectDeps[remoteTargetEnv][dep] = self:getModule('Lifecycle').getRemoteTable(self, dep)
 	end
 
-	return injectDeps
+	return injectDeps :: ServiceDeps
 end
 
 
-function ManifestAPI:startService(serviceName, deps)
+--[[
+    Starts and returns the requested service, component, initService, or dependency module.
+    @param serviceName The manifest module name to initialize or load.
+    @param deps An optional dependency table to inject instead of building one with getServiceDeps.
+    @return The loaded module or started service object for the requested manifest entry.
+]]
+function ManifestAPI:startService(serviceName: string, deps: ServiceDeps?): any
 	local moduleInfo = self:_getModuleInfo(serviceName)
 	local data = moduleInfo.data
 
@@ -226,6 +292,16 @@ function ManifestAPI:startService(serviceName, deps)
 	self._startedServices[serviceName] = service
 
 	return service
+end
+
+
+--[[
+	Sets a service inside of the remoteCache, allowing for creating fake remote services in tests.
+	@param name The name of the remote service.
+	@param service The service table to set; `nil` clears the cached entry.
+]]
+function ManifestAPI:setRemoteService(name: string, service: {[any]: any})
+	self._remoteCache[name] = service
 end
 
 

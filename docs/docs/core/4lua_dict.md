@@ -42,4 +42,4 @@ Important options:
 * `relative=True`: creates a `script.Parent...` path for generated files that use relative requires.
 
 !!! tip
-    Runtime manifest paths usually use `require=True` and `cache=True`. The generated manifest keeps those paths outside the manifest data table and resolves modules lazily through `Manifest:getCached(...)` at runtime.
+    Runtime manifest paths usually use `require=True` and `cache=True`. The generated manifest keeps those paths outside the manifest data table and resolves modules lazily through `Manifest:getModule(...)` at runtime.

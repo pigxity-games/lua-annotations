@@ -1,16 +1,76 @@
 -- Generated using lua-anot; do not edit manually.
+
+-- /// Core Manifest API ///
+
+-- Types
+
+type ModulePath = { [number]: Instance | string }
+type ModulePathExport = {
+	path: ModulePath,
+	export: string?,
+}
+type ModulePathEntry = ModulePath | ModulePathExport
+type ManifestAnnotation = {
+	name: string,
+	data: any,
+	args: { any }?,
+	kwargs: { [string]: any }?,
+}
+type ManifestHook = {
+	module: string,
+	method: string,
+}
+type ManifestModuleInfo = {
+	annotations: { [string]: { ManifestAnnotation } },
+	data: any,
+}
+type ManifestHooks = {
+	pre_init: { ManifestHook },
+	module_handlers: { ManifestHook },
+	post_init: { ManifestHook },
+	annotation_handlers: { [string]: ManifestHook },
+}
+type ManifestData = {
+	modules: { [string]: ManifestModuleInfo },
+	hooks: ManifestHooks,
+	load_order: { string },
+	remotes: any,
+}
+type ManifestInitData = {
+	environment: string,
+	modulePaths: { [string]: ModulePathEntry },
+	manifest: ManifestData,
+}
+type ManifestApiFields = {
+	environment: string,
+	modulePaths: { [string]: ModulePathEntry },
+	manifest: ManifestData,
+	_cache: { [string]: any },
+	_loadedAnnotations: { [string]: boolean },
+	_ranModuleHandlers: { [string]: boolean },
+	_remoteCache: { [string]: any },
+	_componentInstances: { [string]: { [Instance]: any } },
+	_startedServices: { [string]: any },
+	_startingServices: { [string]: boolean },
+}
+
 local ManifestAPI = {}
 ManifestAPI.__index = ManifestAPI
 
-local function waitForPath(path)
-	local cur = path[1]
+type ManifestApiState = typeof(setmetatable({} :: ManifestApiFields, ManifestAPI))
+
+-- Helpers --
+
+local function waitForPath(path: ModulePath): Instance
+	local cur = path[1] :: Instance
 	for i = 2, #path do
-		cur = cur:WaitForChild(path[i])
+		cur = cur:WaitForChild(path[i] :: string)
 	end
 	return cur
 end
 
-local function applyExport(value, exportName)
+
+local function applyExport(value: any, exportName: string?): any
 	if not exportName then
 		return value
 	end
@@ -18,8 +78,15 @@ local function applyExport(value, exportName)
 	return value[exportName]
 end
 
-function ManifestAPI.new(data)
-	return setmetatable({
+-- Methods --
+
+--[[
+    Creates a manifest API object backed by generated manifest data and runtime caches.
+    @param data A table containing the generated environment name, module path map, and manifest payload.
+    @return A new ManifestAPI instance for the generated manifest.
+]]
+function ManifestAPI.new(data: ManifestInitData): ManifestApiState
+	local state: ManifestApiFields = {
 		environment = data.environment,
 		modulePaths = data.modulePaths,
 		manifest = data.manifest,
@@ -30,20 +97,40 @@ function ManifestAPI.new(data)
 		_componentInstances = {},
 		_startedServices = {},
 		_startingServices = {},
-	}, ManifestAPI)
+	}
+
+	return setmetatable(state, ManifestAPI)
 end
 
-function ManifestAPI:_getModuleInfo(moduleName)
+
+--[[
+    Looks up manifest metadata for a generated module and errors when it is missing.
+    @param moduleName The manifest module name to resolve.
+    @return The manifest module info table for the requested module.
+]]
+function ManifestAPI:_getModuleInfo(moduleName: string): ManifestModuleInfo
 	local moduleInfo = self.manifest.modules[moduleName]
 	assert(moduleInfo ~= nil, ('[LuaAnnotations] Unknown manifest module %q'):format(moduleName))
 	return moduleInfo
 end
 
-function ManifestAPI:_getHookFun(hook)
-	return self:getCached(hook.module)[hook.method]
+
+--[[
+    Loads the runtime function referenced by a generated manifest hook entry.
+    @param hook A manifest hook table containing the module and method names to resolve.
+    @return The callable hook function from the cached module export.
+]]
+function ManifestAPI:_getHookFun(hook: ManifestHook): (...any) -> ...any
+	return self:getModule(hook.module)[hook.method] :: (...any) -> ...any
 end
 
-function ManifestAPI:_runAnnotationHandlers(moduleName, moduleInfo)
+
+--[[
+    Runs retained annotation handlers for a module exactly once.
+    @param moduleName The manifest module name whose retained annotations should be processed.
+    @param moduleInfo The manifest module info table containing annotation data for the module.
+]]
+function ManifestAPI:_runAnnotationHandlers(moduleName: string, moduleInfo: ManifestModuleInfo): ()
 	if self._loadedAnnotations[moduleName] then
 		return
 	end
@@ -60,7 +147,13 @@ function ManifestAPI:_runAnnotationHandlers(moduleName, moduleInfo)
 	end
 end
 
-function ManifestAPI:_runModuleHandlers(moduleName, moduleInfo)
+
+--[[
+    Runs registered module handlers for a module exactly once.
+    @param moduleName The manifest module name whose module handlers should be processed.
+    @param moduleInfo The manifest module info table passed into each module handler.
+]]
+function ManifestAPI:_runModuleHandlers(moduleName: string, moduleInfo: ManifestModuleInfo): ()
 	if self._ranModuleHandlers[moduleName] then
 		return
 	end
@@ -72,10 +165,16 @@ function ManifestAPI:_runModuleHandlers(moduleName, moduleInfo)
 	end
 end
 
-function ManifestAPI:getCached(moduleName)
+
+--[[
+    Returns a generated module without running annotation or module handlers, caching it for future calls.
+    @param moduleName The manifest module name to require from the generated module path map.
+    @return The cached module value or requested export for the module.
+]]
+function ManifestAPI:getModule(moduleName: string): any
 	local cachedModule = self._cache[moduleName]
 	if cachedModule == nil then
-		local moduleData = self.modulePaths[moduleName]
+		local moduleData: any = self.modulePaths[moduleName]
 		assert(moduleData ~= nil, ('[LuaAnnotations] Unknown cached module %q'):format(moduleName))
 
 		local path = moduleData.path or moduleData
@@ -86,13 +185,15 @@ function ManifestAPI:getCached(moduleName)
 	return cachedModule
 end
 
-function ManifestAPI:getModule(moduleName)
-	return self:getCached(moduleName)
-end
 
-function ManifestAPI:loadModule(moduleName)
+--[[
+    Loads a generated module and runs its retained annotation and module handlers.
+    @param moduleName The manifest module name to load from the generated manifest.
+    @return The loaded module value or requested export for the module.
+]]
+function ManifestAPI:loadModule(moduleName: string): any
 	local moduleInfo = self:_getModuleInfo(moduleName)
-	local module = self:getCached(moduleName)
+	local module = self:getModule(moduleName)
 
 	self:_runAnnotationHandlers(moduleName, moduleInfo)
 	self:_runModuleHandlers(moduleName, moduleInfo)
@@ -100,13 +201,21 @@ function ManifestAPI:loadModule(moduleName)
 	return module
 end
 
-function ManifestAPI:runPreInitHooks()
+
+--[[
+    Runs all generated pre-init hooks in manifest order.
+]]
+function ManifestAPI:runPreInitHooks(): ()
 	for _, hook in ipairs(self.manifest.hooks.pre_init) do
 		self:_getHookFun(hook)(self)
 	end
 end
 
-function ManifestAPI:loadAllModules()
+
+--[[
+    Loads every generated manifest module, honoring explicit load order before remaining modules.
+]]
+function ManifestAPI:loadAllModules(): ()
 	local modules = self.manifest.modules
 	local loadOrder = self.manifest.load_order
 
@@ -123,11 +232,16 @@ function ManifestAPI:loadAllModules()
 	end
 end
 
-function ManifestAPI:runPostInitHooks()
+
+--[[
+    Schedules all generated post-init hooks to run asynchronously.
+]]
+function ManifestAPI:runPostInitHooks(): ()
 	for _, hook in ipairs(self.manifest.hooks.post_init) do
 		task.spawn(self:_getHookFun(hook), self)
 	end
 end
+
 
 --{function_appends}
 

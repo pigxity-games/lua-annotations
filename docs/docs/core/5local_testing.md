@@ -24,8 +24,7 @@ local ClientManifest = require(player.PlayerScripts.Generated.Manifest)
 
 The core manifest API contains the following methods:
 
-- `Manifest:getCached(moduleName)`: get a module without running manifest hooks.
-- `Manifest:getModule(moduleName)`: alias for `getCached`
+- `Manifest:getModule(moduleName)`: get a module without running manifest hooks.
 - `Manifest:loadModule(moduleName)`: load one module and run annotation handlers and module handlers for it.
 - `Manifest:runPreInitHooks()`: run `@onInit` hooks.
 - `Manifest:loadAllModules()`: load all manifest modules, respecting load_order when present.
