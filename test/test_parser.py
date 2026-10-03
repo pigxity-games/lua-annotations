@@ -30,6 +30,7 @@ def make_registry() -> SortedRegistry:
         "typeAnn": AnnotationDef("typeAnn", scope="type"),
         "valueAnn": AnnotationDef("valueAnn", scope="returned_value"),
     }
+
     return SortedRegistry([], [], annotations)
 
 
@@ -37,6 +38,7 @@ def parse_text(tmp_path: Path, filename: str, text: str) -> FileParser:
     file = tmp_path / filename
     parser = FileParser(make_registry(), file, None)  # pyright: ignore[reportArgumentType]
     parser.parse(text)
+
     return parser
 
 
@@ -46,6 +48,7 @@ def make_project_resolver(tmp_path: Path):
         'client': {},
         'shared': {},
     }
+
     return LuaPathResolver(workspace)
 
 
@@ -69,20 +72,24 @@ return Root
     )
 
     module = parser.modules["Root"]
+
     assert isinstance(module, LuaModule)
     assert module.returned_name == "SingleReturn"
     assert module.submodule is False
 
     method_anots = [a for a in parser.annotations if a.name == "methodAnn"]
+
     assert len(method_anots) == 2
     assert all(isinstance(a.adornee, LuaMethod) for a in method_anots)
 
     run_method = next(a.adornee for a in method_anots if a.adornee.name == "run")
+
     assert isinstance(run_method, LuaMethod)
     assert run_method.params == {"count": "number", "name": "unknown"}
     assert run_method.return_type == "string"
 
     reset_method = next(a.adornee for a in method_anots if a.adornee.name == "reset")
+
     assert isinstance(reset_method, LuaMethod)
     assert reset_method.params == {}
     assert reset_method.return_type == "nil"
@@ -106,18 +113,21 @@ return {
     )
 
     module = parser.modules["Mod"]
+
     assert isinstance(module, LuaModule)
     assert module.submodule is True
     assert module.returned_name == "ExportedMod"
     assert module.get_path(require=True).properties == ["ExportedMod"]
 
     value_anot = next(a for a in parser.annotations if a.name == "valueAnn")
+
     assert isinstance(value_anot.adornee, ReturnedValue)
     assert value_anot.adornee.submodule is True
     assert value_anot.adornee.returned_name == "ExportedValue"
     assert value_anot.adornee.get_path(require=True).properties == ["ExportedValue"]
 
     resolver = make_project_resolver(tmp_path)
+
     assert module.get_expr(resolver) == "local ExportedMod = require(ServerScriptService.Project.Submodule).ExportedMod"
 
 
@@ -140,16 +150,19 @@ return Root
     )
 
     public_type = parser.types["PublicType"]
+
     assert isinstance(public_type, LuaType)
     assert public_type.exported is True
     assert public_type.data == {"id": "number", "name": "string"}
 
     internal_type = parser.types["InternalType"]
+
     assert isinstance(internal_type, LuaType)
     assert internal_type.exported is False
     assert internal_type.data == "PublicType | string"
 
     type_anots = [a for a in parser.annotations if a.name == "typeAnn"]
+
     assert len(type_anots) == 2
     assert all(isinstance(a.adornee, LuaType) for a in type_anots)
 
@@ -168,6 +181,7 @@ return Missing
         )
 
     err = exc_info.value
+
     assert err.file_name == "Broken"
     assert err.line_num == 2
     assert "cannot use method annotations for an unindexed module" in str(err)
@@ -188,10 +202,12 @@ return {
     )
 
     method_anot = next(a for a in parser.annotations if a.name == "methodAnn")
+
     assert isinstance(method_anot.adornee, LuaMethod)
     assert method_anot.adornee.name == "test"
 
     resolver = make_project_resolver(tmp_path)
+
     assert method_anot.adornee.get_path(require=True).to_lua(resolver) == "require(ServerScriptService.Project.LiteralReturn).test"
 
 
@@ -209,10 +225,12 @@ return Logger
     )
 
     method_anot = next(a for a in parser.annotations if a.name == 'methodAnn')
+
     assert isinstance(method_anot.adornee, LuaMethod)
     assert method_anot.adornee.name == 'Logger'
 
     resolver = make_project_resolver(tmp_path)
+
     assert method_anot.adornee.get_path(require=True).to_lua(resolver) == 'require(ServerScriptService.Project.Middleware)'
 
 
@@ -231,10 +249,12 @@ def test_parser_allows_method_annotation_for_literal_submodule_function(tmp_path
     )
 
     method_anot = next(a for a in parser.annotations if a.name == 'methodAnn')
+
     assert isinstance(method_anot.adornee, LuaMethod)
     assert method_anot.adornee.name == 'init'
 
     resolver = make_project_resolver(tmp_path)
+
     assert method_anot.adornee.get_path(require=True).to_lua(resolver) == 'require(ServerScriptService.Project.LiteralSubmoduleReturn).init'
 
 
@@ -250,6 +270,7 @@ return class(PropertyStorage)
     )
 
     module = parser.modules["PropertyStorage"]
+
     assert isinstance(module, LuaModule)
     assert module.returned_name == "WrappedReturn"
 
@@ -268,6 +289,7 @@ return {
     )
 
     module = parser.modules["CameraRegion"]
+
     assert isinstance(module, LuaModule)
     assert module.submodule is True
     assert module.returned_name == "CameraRegion"
@@ -292,6 +314,7 @@ return {
 
     camera_region = parser.modules["CameraRegion"]
     zone_camera_region = parser.modules["ZoneCameraRegion"]
+
     assert camera_region.returned_name == "CameraRegion"
     assert zone_camera_region.returned_name == "ZoneCameraRegion"
     assert camera_region.submodule is True
@@ -313,10 +336,12 @@ return {
 """,
     )
     method_anot = next(a for a in parser.annotations if a.name == 'methodAnn')
+
     assert isinstance(method_anot.adornee, LuaMethod)
     assert method_anot.adornee.name == 'test'
 
     resolver = make_project_resolver(tmp_path)
+
     assert method_anot.adornee.get_path(require=True).to_lua(resolver) == 'require(ServerScriptService.Project.Test).test'
 
 
@@ -335,10 +360,12 @@ return {
 """,
     )
     method_anot = next(a for a in parser.annotations if a.name == 'methodAnn')
+
     assert isinstance(method_anot.adornee, LuaMethod)
     assert method_anot.adornee.name == 'test'
 
     resolver = make_project_resolver(tmp_path)
+
     assert method_anot.adornee.get_path(require=True).to_lua(resolver) == 'require(ServerScriptService.Project.Test).test'
 
 
@@ -356,12 +383,14 @@ return {
 """,
     )
     module_anot = next(a for a in parser.annotations if a.name == 'moduleAnn')
+
     assert isinstance(module_anot.adornee, LuaModule)
     assert module_anot.adornee.name == 'test'
     assert module_anot.adornee.submodule is True
     assert module_anot.adornee.returned_name == 'test'
 
     resolver = make_project_resolver(tmp_path)
+
     assert module_anot.adornee.get_path(require=True).to_lua(resolver) == 'require(ServerScriptService.Project.Test).test'
 
 
@@ -380,10 +409,12 @@ return test
 """,
     )
     method_anot = next(a for a in parser.annotations if a.name == 'methodAnn')
+
     assert isinstance(method_anot.adornee, LuaMethod)
     assert method_anot.adornee.name == 'test'
 
     resolver = make_project_resolver(tmp_path)
+
     assert method_anot.adornee.get_path(require=True).to_lua(resolver) == 'require(ServerScriptService.Project.Test).test'
 
 
@@ -403,6 +434,7 @@ return m
     )
     module = parser.modules["m"]
     method = module.methods.get("testFun1")
+
     assert method
 
     assert method.params["param1"] == "string"
@@ -429,6 +461,7 @@ return m
     )
     module = parser.modules["m"]
     method = module.methods.get("testFun1")
+
     assert method
 
     assert method.params["param1"] == "string"
@@ -436,6 +469,7 @@ return m
     assert method.return_type == "string"
 
     method2 = module.methods.get("testFun2")
+
     assert method2
 
     assert method2.params["param1"] == "number"
@@ -465,9 +499,11 @@ return controller
     )
 
     module = parser.modules["controller"]
+
     assert isinstance(module, LuaModule)
 
     method = module.methods.get("updateGameInitState")
+
     assert method
     assert method.params == {
         "progressText": "string?",
@@ -494,6 +530,7 @@ return m
     )
     module = parser.modules["m"]
     method = module.methods.get("testFun1")
+
     assert method
 
     assert method.params["param1"] == "string"
@@ -514,6 +551,7 @@ return {
     )
     module = parser.modules[RETURN_TABLE_MODULE_NAME]
     method = module.methods["testFun1"]
+
     assert isinstance(method, LuaMethod)
 
     assert method.params["param1"] == "string"
@@ -539,6 +577,7 @@ return module
 
     module = parser.modules['module']
     camera_tween = module.methods.get('cameraTween')
+
     assert isinstance(camera_tween, LuaMethod)
     assert camera_tween.params['target'] == 'BasePart'
     assert 'assert' not in module.methods
@@ -563,6 +602,7 @@ return m
     module = parser.modules["m"]
 
     method = module.methods.get("testFun1")
+
     assert method
 
     assert method.params["param1"] == "unknown"
@@ -570,6 +610,7 @@ return m
     assert method.return_type == "string"
 
     method = module.methods.get("testFun2")
+
     assert method
 
     assert method.params["param1"] == "number"
@@ -597,6 +638,7 @@ return m
     module = parser.modules["m"]
 
     method = module.methods.get("testFun1")
+
     assert method
 
     assert method.params["param1"] == "unknown"
@@ -604,6 +646,7 @@ return m
     assert method.return_type == "string"
 
     method = module.methods.get("testFun2")
+
     assert method
 
     assert method.params["param1"] == "(number, string, any) -> (string)"
@@ -632,12 +675,15 @@ return m
     module = parser.modules["m"]
 
     method = module.methods.get("testFun1")
+
     assert method is None
 
     method = module.methods.get("testFun3")
+
     assert method is None
 
     method = module.methods.get("testFun2")
+
     assert method
 
     assert method.params["param1"] == "number"
@@ -662,6 +708,7 @@ return m
     module = parser.modules["m"]
 
     method = module.methods.get("testFun1")
+
     assert method
 
     assert method.call_type == ':'
@@ -670,6 +717,7 @@ return m
     assert method.params["param1"] == "string"
 
     method = module.methods.get("testFun2")
+
     assert method
 
     assert method.call_type == '.'
@@ -708,6 +756,7 @@ return {
     assert len(parser.modules) == 1
 
     module = parser.modules["m"]
+
     assert module
     assert module.methods.get("test")
     assert not module.methods.get("test2")
@@ -733,6 +782,7 @@ return {
     )
 
     value_anot = next(a for a in parser.annotations if a.name == "valueAnn")
+
     assert value_anot
 
     assert len(parser.modules) == 0

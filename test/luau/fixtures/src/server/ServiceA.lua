@@ -1,5 +1,5 @@
---!strict
 -- Exercises server dependency and remote dispatch so generated service contracts can be validated.
+
 local ServiceTypes = require(script.Parent.Generated.ServiceTypes)
 
 --@service, depends=[ServiceB]

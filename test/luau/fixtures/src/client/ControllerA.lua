@@ -1,5 +1,5 @@
---!strict
 -- Exercises client service dependency injection so remote proxy contracts can be validated.
+
 local ServiceTypes = require(script.Parent.Generated.ServiceTypes)
 
 --@service, depends=[server:ServiceA]

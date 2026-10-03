@@ -14,11 +14,13 @@ from lua_annotations.extensions.game_framework import main as game_framework_ext
 
 def lifecycle_source():
     path = files('lua_annotations') / 'extensions' / 'game_framework' / 'lua' / 'Lifecycle.lua'
+
     return path.read_text()
 
 
 def manifest_functions_source():
     path = files('lua_annotations') / 'extensions' / 'game_framework' / 'lua' / 'ManifestFunctions.lua'
+
     return path.read_text()
 
 
@@ -51,6 +53,7 @@ def build_generated(tmp_path: Path, files: dict[str, str]):
     sorted_reg = reg.sort_extensions()
 
     build_ctxs: dict[Environment, BuildProcessCtx] = {}
+
     for env in ENVIRONMENTS:
         root = tmp_path / env
         source_root = root / 'src'
@@ -60,13 +63,16 @@ def build_generated(tmp_path: Path, files: dict[str, str]):
         output_root.mkdir(parents=True, exist_ok=True)
 
         build_ctx = BuildProcessCtx(sorted_reg, root, workspace, workspace[env], output_root, env)
+
         for name, content in pending_files[env]:
             created = build_ctx.create_file('_Internal/' + name, content)
             build_ctx.process_file(created)
+
         build_ctx.process_dir(source_root)
         build_ctxs[env] = build_ctx
 
     post_ctx = PostProcessCtx(sorted_reg, tmp_path, workspace, build_ctxs)
+
     for hook in sorted_reg.post_build_hooks:
         hook(post_ctx)
 
@@ -128,16 +134,31 @@ def test_middleware_annotations_and_remote_metadata_are_generated(tmp_path: Path
     assert 'local function waitForPath(path: ModulePath): Instance' in manifest_api
     assert 'function ManifestAPI.getModule(self: ManifestApiState, moduleName: string): unknown' in manifest_api
     assert 'Returns a generated module without running annotation or module handlers, caching it for future calls.' in manifest_api
-    assert 'Returns a generated module without running annotation or module handlers, caching it for future calls.\n    @param moduleName' in manifest_api
+    assert (
+        'Returns a generated module without running annotation or module handlers, caching it for future calls.\n    @param moduleName'
+        in manifest_api
+    )
     assert '@param moduleName The manifest module name to require from the generated module path map.' in manifest_api
     assert '@return The cached module value or requested export for the module.' in manifest_api
     assert 'Builds and returns the dependency table for the requested service or component.' in manifest_api
     assert 'Builds and returns the dependency table for the requested service or component.\n    @param serviceName' in manifest_api
     assert 'local function useCollectionTag(tag: string, consumer: (Instance) -> Cleanup?): ()' in manifest_api
-    assert 'function ManifestAPI.getServiceDeps(self: ManifestApiState, serviceName: string, runDependencyInit: boolean?): ServiceDeps' in manifest_api
+    assert (
+        'function ManifestAPI.getServiceDeps(\n'
+        '\tself: ManifestApiState,\n'
+        '\tserviceName: string,\n'
+        '\trunDependencyInit: boolean?\n'
+        '): ServiceDeps' in manifest_api
+    )
     assert '@param serviceName The manifest module name whose dependencies should be resolved.' in manifest_api
-    assert '@param runDependencyInit When true or nil, dependent services are started before being injected. When false, dependencies are required without running their startup logic.' in manifest_api
-    assert '@return A deps table containing resolved service dependencies and cross-environment remote wrappers keyed by their manifest names.' in manifest_api
+    assert (
+        '@param runDependencyInit When true or nil, dependent services are started before being injected. When false, dependencies are required without running their startup logic.'
+        in manifest_api
+    )
+    assert (
+        '@return A deps table containing resolved service dependencies and cross-environment remote wrappers keyed by their manifest names.'
+        in manifest_api
+    )
     assert 'function ManifestAPI.getServiceDeps(' in manifest_api
     assert 'Starts and returns the requested service, component, initService, or dependency module.' in manifest_api
     assert '@param deps An optional dependency table to inject instead of building one with getServiceDeps.' in manifest_api
@@ -176,6 +197,7 @@ def test_default_manifest_does_not_include_game_framework_api(tmp_path: Path):
     sorted_reg = reg.sort_extensions()
 
     build_ctxs: dict[Environment, BuildProcessCtx] = {}
+
     for env in ENVIRONMENTS:
         root = tmp_path / env
         source_root = root / 'src'
@@ -187,11 +209,13 @@ def test_default_manifest_does_not_include_game_framework_api(tmp_path: Path):
         build_ctxs[env] = BuildProcessCtx(sorted_reg, root, workspace, workspace[env], output_root, env)
 
     post_ctx = PostProcessCtx(sorted_reg, tmp_path, workspace, build_ctxs)
+
     for hook in sorted_reg.post_build_hooks:
         hook(post_ctx)
 
     manifest = (tmp_path / 'client' / 'Generated' / 'Manifest.lua').read_text()
     manifest_api = (tmp_path / 'shared' / 'Generated' / '_Internal' / 'ManifestAPI.lua').read_text()
+
     assert 'ManifestAPI.new({' in manifest
     assert 'function m.startService(' not in manifest
     assert 'function m.getServiceDeps(' not in manifest
@@ -201,6 +225,7 @@ def test_default_manifest_does_not_include_game_framework_api(tmp_path: Path):
 
 def test_bind_tag_runtime_uses_no_cleanup_sentinel(tmp_path: Path):
     manifest_functions = manifest_functions_source()
+
     assert 'NO_CLEANUP' in manifest_functions
     assert 'cleanups[inst] = NO_CLEANUP' in manifest_functions
     assert 'bound tag ' in manifest_functions

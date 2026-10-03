@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 import re
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Never, TypeVar
 
 from lua_annotations.build_process import logger
 
@@ -44,12 +44,14 @@ def split_top_level_csv(text: str):
     for char in text:
         if in_string:
             current.append(char)
+
             if escaped:
                 escaped = False
             elif char == '\\':
                 escaped = True
             elif char == in_string:
                 in_string = None
+
             continue
 
         if char in ('"', "'"):
@@ -72,14 +74,17 @@ def split_top_level_csv(text: str):
 
         if char == ',' and paren_depth == 0 and brace_depth == 0 and bracket_depth == 0:
             part = ''.join(current).strip()
+
             if part:
                 parts.append(part)
+
             current = []
             continue
 
         current.append(char)
 
     tail = ''.join(current).strip()
+
     if tail:
         parts.append(tail)
 
@@ -87,22 +92,18 @@ def split_top_level_csv(text: str):
 
 
 def map_param_list(params: list[str]):
-    out: dict[str, str] = {}
-    for param in params:
-        parts = remove_whitespace(param.split(':', 1))
-        if len(parts) > 1:
-            out[parts[0]] = parts[1]
-        else:
-            out[parts[0]] = 'unknown'
+    parts = [remove_whitespace(param.split(':', 1)) for param in params]
 
-    return out
+    return {part[0]: part[1] if len(part) > 1 else 'unknown' for part in parts}
 
 
 def split_qualified_name(name: str):
     for separator in ('.', ':'):
         if separator in name:
             module_name, function_name = name.split(separator, 1)
+
             return module_name, function_name, separator
+
     return None, name, ''
 
 
@@ -121,6 +122,7 @@ def _scan_balanced_parens(text: str, open_index: int):
                 escaped = True
             elif char == in_string:
                 in_string = None
+
             continue
 
         if char in ('"', "'"):
@@ -131,6 +133,7 @@ def _scan_balanced_parens(text: str, open_index: int):
             depth += 1
         elif char == ')':
             depth -= 1
+
             if depth == 0:
                 return i
 
@@ -142,6 +145,7 @@ def _collect_multiline_function_signature(code_line: str, lines: list[str], inde
         return code_line
 
     open_paren = code_line.find('(')
+
     if open_paren == -1:
         return code_line
 
@@ -149,10 +153,12 @@ def _collect_multiline_function_signature(code_line: str, lines: list[str], inde
         return code_line
 
     text = code_line
+
     for next_index in range(index + 1, len(lines)):
         next_line = lines[next_index]
         next_code = next_line.split('--')[0].rstrip()
         text += '\n' + next_code
+
         if _scan_balanced_parens(text, open_paren) is not None:
             return text
 
@@ -161,31 +167,37 @@ def _collect_multiline_function_signature(code_line: str, lines: list[str], inde
 
 def _extract_signature_parts(text: str):
     open_paren = text.find('(')
+
     if open_paren == -1:
         return None
 
     close_paren = _scan_balanced_parens(text, open_paren)
+
     if close_paren is None:
         return None
 
     name_part = text[:open_paren].strip()
     raw_params = text[open_paren + 1 : close_paren]
     suffix = text[close_paren + 1 :].strip()
+
     return name_part, raw_params, suffix
 
 
 def _parse_assignment_signature(text: str):
     assignment = re.match(r'^(.*?)=\s*function\b(.*)$', text)
+
     if not assignment:
         return None
 
     left = assignment.group(1).strip()
     right = assignment.group(2).lstrip()
     parts = _extract_signature_parts(right)
+
     if not parts:
         return None
 
     _, raw_params, suffix = parts
+
     return left, raw_params, suffix
 
 
@@ -193,30 +205,37 @@ def _parse_declaration_signature(text: str):
     for prefix in ('local function ', 'function '):
         if text.startswith(prefix):
             header = text.removeprefix(prefix).lstrip()
+
             return _extract_signature_parts(header)
+
     return None
 
 
 def parse_function_signature(text: str):
     stripped = text.strip()
+
     if 'function' not in stripped:
         return None
 
     parsed = _parse_declaration_signature(stripped)
+
     if parsed:
         name_part, raw_params, suffix = parsed
     else:
         parsed = _parse_assignment_signature(stripped)
+
         if not parsed:
             return None
 
         name_part, raw_params, suffix = parsed
 
     module_name, function_name, call_type = split_qualified_name(name_part)
+
     if function_name == '':
         return None
 
     return_type = 'nil'
+
     if suffix.startswith(':'):
         return_type = suffix.removeprefix(':').strip() or 'nil'
 
@@ -225,12 +244,15 @@ def parse_function_signature(text: str):
 
 def unwrap_return_module(expr: str) -> str | None:
     cur = expr.strip()
+
     while True:
         direct = re.fullmatch(r'(\w+)', cur)
+
         if direct:
             return direct.group(1)
 
         wrapper = re.fullmatch(r'\w+\(\s*(.+)\s*\)', cur)
+
         if not wrapper:
             return None
 
@@ -243,8 +265,10 @@ def is_literal_function(expr: str):
 
 def is_function_definition(text: str):
     stripped = text.strip()
+
     if stripped.startswith('function '):
         return True
+
     return bool(re.match(r'^\s*[\w.]+\s*[:=]\s*function\s*\(', stripped))
 
 
@@ -268,6 +292,7 @@ class FileParser:
     # assertion functions
     def _check_anot_scopes(self, line: str, anots: list[AnnotationDef]):
         scope = anots[0].scope
+
         for anot in anots:
             if not anot.scope == scope:
                 self.error(line, f'all annotations must have scope: `{scope}`')
@@ -309,32 +334,33 @@ class FileParser:
         name = parts[0]
 
         adef = ctx.anot_registry.get(name)
+
         if adef:
             args, kwargs = self._parse_anot_args(adef, parts[1:])
+
             return Annotation(adef, name, args, kwargs)
         else:
             self.error(text, 'Annotation does not exist')
 
     def _get_dict_data(self, text: str):
         text = text.strip()
+
         if text.startswith('{') and text.endswith('}'):
             text = text[1:-1]
 
-        clean_lines: list[str] = []
-        for raw_line in text.splitlines():
-            stripped = raw_line.strip()
-            if stripped.startswith('--'):
-                continue
-            clean_lines.append(raw_line.split('--')[0])
+        clean_lines = [raw_line.split('--')[0] for raw_line in text.splitlines() if not raw_line.strip().startswith('--')]
         text = '\n'.join(clean_lines)
 
         entries = split_top_level_csv(text)
+
         if len(entries) == 0:
             self.error(text, 'line is not a dict')
 
         out: dict[str, str] = {}
+
         for entry in entries:
             match = RETURN_TABLE_ENTRY_REGEX.search(entry)
+
             if not match:
                 self.error(entry, 'line is not a dict')
 
@@ -346,6 +372,7 @@ class FileParser:
 
     def _map_dict_return(self, k: str, v: Any) -> str:
         module_name = unwrap_return_module(v)
+
         if module_name:
             return module_name
 
@@ -356,10 +383,12 @@ class FileParser:
 
     def _get_returned(self, text: str, default_name: str):
         return_starts = list(re.finditer(r'^return\b', text, re.MULTILINE))
+
         if len(return_starts) == 0:
             return
 
         match = RETURN_REGEX.search(text[return_starts[-1].start() :])
+
         if not match:
             return
 
@@ -367,11 +396,14 @@ class FileParser:
 
         if single_expr:
             single_module = unwrap_return_module(single_expr)
+
             if not single_module:
                 self.error(text, 'single module export is incorrectly defined')
+
             return ReturnDefinition(default_name, 'single', single_module=single_module)
         else:
             tablestr: str = match.group(1)
+
             if not tablestr:
                 self.error(text, 'module export is incorrectly defined')
 
@@ -397,6 +429,7 @@ class FileParser:
             return ReturnedValue(self.file, self.file_name, self.file_name)
 
         match = VARIABLE_REGEX.search(text)
+
         if not match:
             self.error(text, 'code block is not a variable declaration')
 
@@ -411,6 +444,7 @@ class FileParser:
     def _build_param_dict(self, raw_params: str):
         if raw_params.strip() == '':
             return {}
+
         return map_param_list(split_top_level_csv(raw_params))
 
     def _get_dict_return_alias_method(self, text: str, modules: dict[str, LuaModule], returned: ReturnDefinition):
@@ -418,26 +452,33 @@ class FileParser:
             return None
 
         entry = RETURN_TABLE_ENTRY_REGEX.search(text)
+
         if not entry:
             return None
 
         module_name = unwrap_return_module(entry.group(2).strip())
+
         if not module_name:
             return None
 
         returned_name, is_submodule = returned.get_returned_name(module_name)
+
         if not (returned_name and is_submodule):
             return None
 
         module = self._get_return_table_module(modules)
+
         return LuaMethod(returned_name, module, {})
 
     def _next_method_name(self, method_name: str):
         match = re.match(r'^(.*?)(\d+)$', method_name)
+
         if match:
             base = match.group(1)
             index = int(match.group(2)) + 1
+
             return f'{base}{index}'
+
         return f'{method_name}2'
 
     def _resolve_method_name_collision(self, method: LuaMethod):
@@ -448,12 +489,15 @@ class FileParser:
             return name
 
         existing = module_methods[name]
+
         if existing.call_type == method.call_type:
             return name
 
         candidate = self._next_method_name(name)
+
         while candidate in module_methods:
             candidate = self._next_method_name(candidate)
+
         return candidate
 
     def _track_method(self, method: LuaMethod):
@@ -463,6 +507,7 @@ class FileParser:
         if not is_implicit:
             self.explicit_method_modules.add(module_name)
             implicit_names = self.implicit_method_names.pop(module_name, set())
+
             for name in implicit_names:
                 method.module.methods.pop(name, None)
 
@@ -486,13 +531,16 @@ class FileParser:
             return None
 
         parsed = parse_function_signature(text)
+
         if not parsed:
             alias_method = self._get_dict_return_alias_method(text, modules, returned)
+
             if alias_method:
                 return alias_method
 
             if strict:
                 self.error(text, 'function is incorrectly defined')
+
             return None
 
         module_name, fun_name, call_type, raw_params, return_type = parsed
@@ -506,52 +554,69 @@ class FileParser:
             if module_name not in modules:
                 if strict:
                     self.error(module_name, 'cannot use method annotations for an unindexed module.')
+
                 return None
+
             return LuaMethod(fun_name, modules[module_name], param_dict, return_type, call_type)
 
         if returned.type == 'single':
             entry = RETURN_TABLE_ENTRY_REGEX.search(text)
+
             if entry and entry.group(2).strip().startswith('function'):
                 module = modules.get(returned.single_module or '') or self._get_return_table_module(modules)
+
                 return LuaMethod(fun_name, module, param_dict, return_type, call_type)
 
             module = modules.get(returned.single_module or '')
+
             if module:
                 return LuaMethod(fun_name, module, param_dict, return_type, call_type)
 
             returned_name, is_submodule = returned.get_returned_name(fun_name)
+
             if strict and returned_name and not is_submodule:
                 module = LuaModule(self.file, fun_name, returned_name)
+
                 return LuaMethod(fun_name, module, param_dict, return_type, call_type, direct_return=True)
 
         # Allow `function foo()` to be a method annotation target when `foo`
         # is exported from a literal return table: `return { alias = foo }`.
         returned_name, is_submodule = returned.get_returned_name(fun_name)
+
         if returned.type != 'dict' or not (returned_name and is_submodule):
             if strict:
                 self.error(fun_name, 'cannot use method annotations for an unindexed module.')
+
             return None
+
         assert returned_name is not None
 
         module = self._get_return_table_module(modules)
+
         return LuaMethod(returned_name, module, param_dict, return_type, call_type)
 
     def _get_return_table_module(self, modules: dict[str, LuaModule]):
         module = modules.get(RETURN_TABLE_MODULE_NAME)
+
         if module is None:
             module = LuaModule(self.file, RETURN_TABLE_MODULE_NAME, self.file_name, False)
             modules[module.name] = module
+
         return module
 
     # main functions
-    def error(self, text: str, message: str):
+    # Parsing stops here; the return contract lets the type checker narrow validated values.
+    def error(self, text: str, message: str) -> Never:
         raise LuaParserError(message, text, self.cur_line, self.file_name)
 
     def parse(self, text: str):
         returned = self._get_returned(text, self.file_name)
+
         if not returned:
             logger().warn(f'Skipping file {self.file_name}; doesn\'t return a value')
+
             return
+
         lines = [l.rstrip() for l in text.splitlines()]
 
         for i, line in enumerate(lines):
@@ -566,6 +631,7 @@ class FileParser:
                 # annotation
                 if lstrip.startswith(ANNOTATION_PREFIX):
                     anot = self._parse_annotation(lstrip, self.reg)
+
                     if anot:
                         self.cur_annotations.append(anot)
                     else:
@@ -576,6 +642,7 @@ class FileParser:
                 code_line = _collect_multiline_function_signature(code_line, lines, i)
                 # Track methods defined in code regardless of annotation usage.
                 method = self._get_function(code_line, self.modules, returned, strict=False)
+
                 if method is not None:
                     self._track_method(method)
 
@@ -591,81 +658,87 @@ class FileParser:
                     # strip comments
                     line = code_line
 
-                    # methods
-                    if scope == 'method':
-                        line = _collect_multiline_function_signature(line, lines, i)
-                        method = self._get_function(line, self.modules, returned)
-                        assert method
-                        set_adornee(self.cur_annotations, method)
+                    match scope:
+                        case 'method':
+                            line = _collect_multiline_function_signature(line, lines, i)
+                            method = self._get_function(line, self.modules, returned)
 
-                    # module
-                    elif scope == 'module':
-                        match = MODULE_REGEX.search(line)
-                        if match:
-                            name: str = match.group(1)
-                            returned_name, is_submodule = returned.get_returned_name(name)
-                        else:
-                            entry = RETURN_TABLE_ENTRY_REGEX.search(line)
-                            if not entry:
-                                self.error(line, 'code block is not a module')
-                            name = unwrap_return_module(entry.group(2).strip()) or ''
-                            returned_name, is_submodule = returned.get_returned_name(name)
+                            assert method
+                            set_adornee(self.cur_annotations, method)
 
-                        if not (name and returned_name):
-                            self.error(line, 'invalid module definition or it is not returned.')
+                        case 'module':
+                            match = MODULE_REGEX.search(line)
 
-                        module = LuaModule(self.file, name, returned_name, is_submodule)
-                        set_adornee(self.cur_annotations, module)
-                        self.modules[module.name] = module
+                            if match:
+                                name: str = match.group(1)
+                                returned_name, is_submodule = returned.get_returned_name(name)
+                            else:
+                                entry = RETURN_TABLE_ENTRY_REGEX.search(line)
 
-                    # returned value
-                    elif scope == 'returned_value':
-                        returned_value = self._get_returned_value(line, returned)
-                        set_adornee(self.cur_annotations, returned_value)
+                                if not entry:
+                                    self.error(line, 'code block is not a module')
 
-                    # type
-                    elif scope == 'type':
-                        # get entire code block
-                        block = ''
-                        for line2 in lines[i:]:
-                            block += line2 + '\n'
-                            if '}' in line2:
-                                break
+                                name = unwrap_return_module(entry.group(2).strip()) or ''
+                                returned_name, is_submodule = returned.get_returned_name(name)
 
-                        # use type regex
-                        match = TYPE_REGEX.search(block)
-                        if not match:
-                            self.error(line, 'code block is not a type definition')
+                            if not (name and returned_name):
+                                self.error(line, 'invalid module definition or it is not returned.')
 
-                        exported = bool(match.group(1))
-                        name: str = match.group(2)
-                        contents: str = match.group(3)
+                            module = LuaModule(self.file, name, returned_name, is_submodule)
+                            set_adornee(self.cur_annotations, module)
+                            self.modules[module.name] = module
 
-                        if not (name and contents):
-                            self.error(line, 'type definition is missing name or contents')
+                        case 'returned_value':
+                            returned_value = self._get_returned_value(line, returned)
+                            set_adornee(self.cur_annotations, returned_value)
 
-                        if contents.startswith('{'):
-                            data = self._get_dict_data(contents)
-                        else:
-                            data = contents
+                        case 'type':
+                            # get entire code block
+                            block = ''
 
-                        if not data:
-                            self.error(line, 'type definition is missing type data')
+                            for line2 in lines[i:]:
+                                block += line2 + '\n'
 
-                        lua_type = LuaType(name, data, exported)
+                                if '}' in line2:
+                                    break
 
-                        set_adornee(self.cur_annotations, lua_type)
-                        self.types[name] = lua_type
+                            # use type regex
+                            match = TYPE_REGEX.search(block)
+
+                            if not match:
+                                self.error(line, 'code block is not a type definition')
+
+                            exported = bool(match.group(1))
+                            name: str = match.group(2)
+                            contents: str = match.group(3)
+
+                            if not (name and contents):
+                                self.error(line, 'type definition is missing name or contents')
+
+                            if contents.startswith('{'):
+                                data = self._get_dict_data(contents)
+                            else:
+                                data = contents
+
+                            if not data:
+                                self.error(line, 'type definition is missing type data')
+
+                            lua_type = LuaType(name, data, exported)
+
+                            set_adornee(self.cur_annotations, lua_type)
+                            self.types[name] = lua_type
 
                     # now run anot on_build
                     for anot in self.cur_annotations:
                         adef = anot.adef
+
                         for on_build in (
                             adef.on_build,
                             adef.extends.on_build if adef.extends else None,
                         ):
                             if not on_build:
                                 continue
+
                             on_build(AnnotationBuildCtx(anot, self, self.build_ctx))
 
                     self.annotations += self.cur_annotations

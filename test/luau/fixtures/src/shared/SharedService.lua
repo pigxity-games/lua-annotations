@@ -1,6 +1,6 @@
---!strict
 -- Exercises shared service loading and arithmetic so generated method contracts can be validated.
 --@service
+
 local m = {
 	initialized = false,
 }

@@ -1,4 +1,3 @@
---!strict
 -- Generated using lua-anot; do not edit manually.
 -- Loads annotated modules and invokes configured hooks so generated manifests share one runtime implementation.
 
@@ -68,9 +67,9 @@ local function waitForPath(path: ModulePath): Instance
 	for i = 2, #path do
 		cur = cur:WaitForChild(path[i] :: string)
 	end
+
 	return cur
 end
-
 
 -- Module exports and hook functions have differing fields; this adapter alone indexes their dynamic shape.
 local function applyExport(value: any, exportName: string?): unknown
@@ -105,7 +104,6 @@ function ManifestAPI.new(data: ManifestInitData): ManifestApiState
 	return setmetatable(state, ManifestAPI)
 end
 
-
 --[[
     Looks up manifest metadata for a generated module and errors when it is missing.
     @param moduleName The manifest module name to resolve.
@@ -113,10 +111,10 @@ end
 ]]
 function ManifestAPI._getModuleInfo(self: ManifestApiState, moduleName: string): ManifestModuleInfo
 	local moduleInfo = self.manifest.modules[moduleName]
-	assert(moduleInfo ~= nil, ('[LuaAnnotations] Unknown manifest module %q'):format(moduleName))
+
+	assert(moduleInfo ~= nil, ("[LuaAnnotations] Unknown manifest module %q"):format(moduleName))
 	return moduleInfo
 end
-
 
 --[[
     Loads the runtime function referenced by a generated manifest hook entry.
@@ -127,13 +125,16 @@ function ManifestAPI._getHookFun(self: ManifestApiState, hook: ManifestHook): (.
 	return applyExport(self:getModule(hook.module), hook.method) :: (...any) -> ...unknown
 end
 
-
 --[[
     Runs retained annotation handlers for a module exactly once.
     @param moduleName The manifest module name whose retained annotations should be processed.
     @param moduleInfo The manifest module info table containing annotation data for the module.
 ]]
-function ManifestAPI._runAnnotationHandlers(self: ManifestApiState, moduleName: string, moduleInfo: ManifestModuleInfo): ()
+function ManifestAPI._runAnnotationHandlers(
+	self: ManifestApiState,
+	moduleName: string,
+	moduleInfo: ManifestModuleInfo
+): ()
 	if self._loadedAnnotations[moduleName] then
 		return
 	end
@@ -149,7 +150,6 @@ function ManifestAPI._runAnnotationHandlers(self: ManifestApiState, moduleName: 
 		end
 	end
 end
-
 
 --[[
     Runs registered module handlers for a module exactly once.
@@ -168,7 +168,6 @@ function ManifestAPI._runModuleHandlers(self: ManifestApiState, moduleName: stri
 	end
 end
 
-
 --[[
     Returns a generated module without running annotation or module handlers, caching it for future calls.
     @param moduleName The manifest module name to require from the generated module path map.
@@ -178,7 +177,8 @@ function ManifestAPI.getModule(self: ManifestApiState, moduleName: string): unkn
 	local cachedModule = self._cache[moduleName]
 	if cachedModule == nil then
 		local moduleData = self.modulePaths[moduleName]
-		assert(moduleData ~= nil, ('[LuaAnnotations] Unknown cached module %q'):format(moduleName))
+
+		assert(moduleData ~= nil, ("[LuaAnnotations] Unknown cached module %q"):format(moduleName))
 
 		-- Generated paths are either ordinal paths or exported paths; the optional field distinguishes them.
 		local exportedPath = moduleData :: ModulePathExport
@@ -189,9 +189,9 @@ function ManifestAPI.getModule(self: ManifestApiState, moduleName: string): unkn
 		cachedModule = applyExport(requireModule(waitForPath(path)), exportName)
 		self._cache[moduleName] = cachedModule
 	end
+
 	return cachedModule
 end
-
 
 --[[
     Loads a generated module and runs its retained annotation and module handlers.
@@ -208,7 +208,6 @@ function ManifestAPI.loadModule(self: ManifestApiState, moduleName: string): unk
 	return module
 end
 
-
 --[[
     Runs all generated pre-init hooks in manifest order.
 ]]
@@ -217,7 +216,6 @@ function ManifestAPI:runPreInitHooks(): ()
 		self:_getHookFun(hook)(self)
 	end
 end
-
 
 --[[
     Loads every generated manifest module, honoring explicit load order before remaining modules.
@@ -239,7 +237,6 @@ function ManifestAPI:loadAllModules(): ()
 	end
 end
 
-
 --[[
     Schedules all generated post-init hooks to run asynchronously.
 ]]
@@ -248,7 +245,6 @@ function ManifestAPI:runPostInitHooks(): ()
 		task.spawn(self:_getHookFun(hook), self)
 	end
 end
-
 
 --{function_appends}
 

@@ -82,6 +82,7 @@ class LuaMethod:
 
     def generate_type(self):
         param_string = ', '.join(([self.module.returned_name] if self.call_type == ':' else []) + list(self.params.values()))
+
         return f'({param_string}) -> ({self.return_type if self.return_type != 'nil' else ''})'
 
 
@@ -122,6 +123,7 @@ class ReturnedValue:
 
     def get_expr(self, resolver: LuaPathResolver, relative: bool = False):
         path = self.get_path(relative, True)
+
         return f'local {self.returned_name} = {path.to_lua(resolver)}'
 
 
@@ -132,12 +134,11 @@ class LuaModule(ReturnedValue):
     methods: dict[str, LuaMethod] = field(default_factory=dict)
 
     def generate_type(self, exclude: list[str] = []):
-        string = '\n'
-        for name, method in self.methods.items():
-            if not name in exclude and not name.startswith('_'):
-                string += f'    {name}: {method.generate_type()},\n'
+        methods = [
+            f'    {name}: {method.generate_type()},\n' for name, method in self.methods.items() if name not in exclude and not name.startswith('_')
+        ]
 
-        return '{' + string + '}'
+        return '{\n' + ''.join(methods) + '}'
 
 
 @dataclass
@@ -171,10 +172,11 @@ class Annotation:
         }
 
     def get_adornee_name(self):
-        if isinstance(self.adornee, LuaModule):
-            return self.adornee.returned_name
-        elif isinstance(self.adornee, LuaMethod):
-            return self.adornee.name
+        match self.adornee:
+            case LuaModule(returned_name=name):
+                return name
+            case LuaMethod(name=name):
+                return name
 
 
 @dataclass

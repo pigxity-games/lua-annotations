@@ -40,6 +40,7 @@ def build_service_types(tmp_path: Path, files: dict[str, str]):
     sorted_reg = reg.sort_extensions()
 
     build_ctxs: dict[Environment, BuildProcessCtx] = {}
+
     for env in ENVIRONMENTS:
         root = tmp_path / env
         source_root = root / 'src'
@@ -53,6 +54,7 @@ def build_service_types(tmp_path: Path, files: dict[str, str]):
         build_ctxs[env] = build_ctx
 
     post_ctx = PostProcessCtx(sorted_reg, tmp_path, workspace, build_ctxs)
+
     for hook in sorted_reg.post_build_hooks:
         hook(post_ctx)
 

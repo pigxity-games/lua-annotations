@@ -1,5 +1,5 @@
---!strict
 -- Supplies a dependency result so fixture services can exercise initialization order.
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Utility = require(ReplicatedStorage.Utility)
 

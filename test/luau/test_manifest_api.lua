@@ -1,6 +1,6 @@
---!strict
 -- Exercises manifest loading and injection through generated service contracts.
 -- Literal service names identify the generated contract of each opaque registry result.
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
@@ -26,6 +26,7 @@ end
 
 function m.sharedGeneratedStructure()
 	local generated = ReplicatedStorage.Generated
+
 	assert(generated:FindFirstChild("Manifest") == nil, "shared tree should not duplicate Manifest")
 	assert(generated["_Internal"].Lifecycle ~= nil, "shared runtime should include Lifecycle")
 end
@@ -34,12 +35,14 @@ end
 
 function m.coreGetModule()
 	local SharedService = ServerManifest:getModule("SharedService") :: SharedServiceTypes.SharedService
+
 	assert(SharedService.initialized == false, "getModule should not initialize service")
 	assert(SharedService.add(1, 2) == 3, "shared add should return numeric sum")
 end
 
 function m.coreLoadModule()
 	local module = ClientManifest:loadModule("SharedService") :: SharedServiceTypes.SharedService --runs all annotation handlers or module handlers; here, it should start the service.
+
 	assert(module.initialized == true, "loadModule should initialize service")
 end
 
@@ -50,20 +53,24 @@ function m.controllerAPingReturnsPong()
 	ServerManifest:startService("ServiceA")
 
 	local Controller = ClientManifest:startService("ControllerA") :: ClientServiceTypes.ControllerA
+
 	assert(Controller.ping() == "pong", "controller should call remote service")
 end
 
 function m.getServiceDepsControllerA()
 	Helpers.setupRemotes()
 	local deps = ClientManifest:getServiceDeps("ControllerA") :: ClientServiceTypes.ControllerADeps
+
 	assert(deps.server.ServiceA ~= nil, "controller dependency should include ServiceA")
 
 	ServerManifest:startService("ServiceA")
+
 	assert(deps.server.ServiceA.pingRemote() == "pong", "remote dependency should return pong")
 end
 
 function m.getServiceDepsWithoutInitializing()
 	local deps = ServerManifest:getServiceDeps("ServiceA", false) :: ServerServiceTypes.ServiceADeps
+
 	assert(deps.ServiceB.initialized == false, "dependency lookup should preserve uninitialized service")
 end
 
