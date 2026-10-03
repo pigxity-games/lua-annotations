@@ -8,12 +8,45 @@ from lua_annotations.build_process import Environment
 from lua_annotations.parser import split_top_level_csv
 from lua_annotations.parser_schemas import LuaMethod, LuaModule
 
+# Matches a local assignment; group 1 is its name and the match ends at the expression start.
+LOCAL_BINDING_REGEX = re.compile(r'^local\s+(\w+)\s*(?::[^=\n]+)?=\s*', re.MULTILINE)
+
+# Matches a type declaration; group 1 is its name and the match ends at the type body start.
+TYPE_DECLARATION_REGEX = re.compile(r'^(?:export\s+)?type\s+(\w+)\s*=\s*', re.MULTILINE)
+
+# Matches a colon method-call prefix to distinguish calls from type labels; no capture groups.
+METHOD_CALL_REGEX = re.compile(r':\w+\s*\(')
+
+# Matches a require-call prefix within a binding expression; no capture groups.
+REQUIRE_CALL_REGEX = re.compile(r'\brequire\s*\(')
+
+# Matches an entire signed integer or decimal literal; no capture groups.
+NUMBER_LITERAL_REGEX = re.compile(r'-?\d+(?:\.\d+)?')
+
+# Matches a local module assignment; group 1 is its name and the match ends at its initializer.
+MODULE_INITIALIZER_REGEX = re.compile(r'^local\s+(\w+)\s*=\s*', re.MULTILINE)
+
+# Matches an entire initializer entry; group 1 is the field name and group 2 is its expression.
+FIELD_ENTRY_REGEX = re.compile(r'(\w+)\s*=\s*(.*)', re.DOTALL)
+
+# Matches a module field assignment; group 1 is the module name and group 2 is the field name.
+MODULE_FIELD_REGEX = re.compile(r'^(\w+)\.(\w+)\s*=\s*', re.MULTILINE)
+
+# Matches quoted strings or comments; group 0 identifies the token so only comments are removed.
+COMMENT_TOKEN_REGEX = re.compile(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|--\[\[[\s\S]*?\]\]|--[^\n]*')
+
+# Matches quoted strings, cast operators, or delimiters; group 0 supplies each nesting token.
+CAST_TOKEN_REGEX = re.compile(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|::|[(){}\[\]]')
+
+# Matches quoted strings or unqualified identifiers; group 0 supplies the token to preserve or rebase.
+IDENTIFIER_TOKEN_REGEX = re.compile(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|(?<![\w.:])\b[A-Za-z_]\w*\b')
+
+# Matches strings or qualified type references; groups 1 and 2 are the binding and type names, absent for strings.
+SERVICE_TYPE_REFERENCE_REGEX = re.compile(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|\b(\w+)\.(\w+)')
+
 
 def _strip_comments(text: str):
-    pattern = r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|--\[\[[\s\S]*?\]\]|--[^\n]*'
-
-    return re.sub(
-        pattern,
+    return COMMENT_TOKEN_REGEX.sub(
         lambda match: '' if match.group(0).startswith('--') else match.group(0),
         text,
     )
@@ -51,9 +84,8 @@ def _expression(text: str, start: int):
 
 def _outer_cast(value: str):
     depth = 0
-    pattern = r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|::|[(){}\[\]]'
 
-    for match in re.finditer(pattern, value):
+    for match in CAST_TOKEN_REGEX.finditer(value):
         token = match.group(0)
 
         match token:
@@ -76,22 +108,8 @@ class SourceTypes:
         self.resolver = resolver
         self.text = _strip_comments(module.file.read_text())
 
-        self.bindings = {
-            match.group(1): _expression(self.text, match.end())
-            for match in re.finditer(
-                r'^local\s+(\w+)\s*(?::[^=\n]+)?=\s*',
-                self.text,
-                re.MULTILINE,
-            )
-        }
-        self.types = {
-            match.group(1): _expression(self.text, match.end())
-            for match in re.finditer(
-                r'^(?:export\s+)?type\s+(\w+)\s*=\s*',
-                self.text,
-                re.MULTILINE,
-            )
-        }
+        self.bindings = {match.group(1): _expression(self.text, match.end()) for match in LOCAL_BINDING_REGEX.finditer(self.text)}
+        self.types = {match.group(1): _expression(self.text, match.end()) for match in TYPE_DECLARATION_REGEX.finditer(self.text)}
 
         self.imports: dict[str, str] = {}
         self.aliases: dict[str, str] = {}
@@ -121,19 +139,17 @@ class SourceTypes:
     @staticmethod
     def _identifiers(text: str, replace):
         # Strings and property names are data, not source-local identifiers.
-        pattern = r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|(?<![\w.:])\b[A-Za-z_]\w*\b'
-
         def token(match: re.Match[str]):
             value = match.group(0)
             suffix = text[match.end() :].lstrip()
-            label = suffix.startswith(':') and not suffix.startswith('::') and not re.match(r':\w+\s*\(', suffix)
+            label = suffix.startswith(':') and not suffix.startswith('::') and not METHOD_CALL_REGEX.match(suffix)
 
             if value[0] in ('"', "'") or label or (suffix.startswith('=') and not suffix.startswith('==')):
                 return value
 
             return replace(match)
 
-        return re.sub(pattern, token, text)
+        return IDENTIFIER_TOKEN_REGEX.sub(token, text)
 
     def resolve(self, text: str, expression: bool = False):
         """Rebase a type or typeof expression into the generated module's scope."""
@@ -146,7 +162,7 @@ class SourceTypes:
 
             binding = self.bindings.get(name, '')
 
-            if re.search(r'\brequire\s*\(', binding):
+            if REQUIRE_CALL_REGEX.search(binding):
                 if 'Generated.ServiceTypes' in binding:
                     return ''
 
@@ -174,10 +190,9 @@ class SourceTypes:
 
         for name, binding in self.bindings.items():
             if 'Generated.ServiceTypes' in binding:
-                pattern = rf'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|\b{re.escape(name)}\.(\w+)'
-                text = re.sub(
-                    pattern,
-                    lambda match: match.group(1) or match.group(0),
+                # Only this generated-types binding is removed; strings and other qualifiers stay intact.
+                text = SERVICE_TYPE_REFERENCE_REGEX.sub(
+                    lambda match: match.group(2) if match.group(1) == name else match.group(0),
                     text,
                 )
 
@@ -193,7 +208,7 @@ class SourceTypes:
             case 'true' | 'false':
                 return 'boolean'
 
-            case _ if re.fullmatch(r'-?\d+(?:\.\d+)?', value):
+            case _ if NUMBER_LITERAL_REGEX.fullmatch(value):
                 return 'number'
 
             case _ if value.startswith(('"', "'")):
@@ -208,10 +223,9 @@ class SourceTypes:
     def fields(self):
         """Read initializer entries and explicitly declared public module fields."""
         fields: dict[str, str] = {}
-        start = re.search(
-            rf'^local\s+{re.escape(self.module.name)}\s*=\s*',
-            self.text,
-            re.MULTILINE,
+        start = next(
+            (match for match in MODULE_INITIALIZER_REGEX.finditer(self.text) if match.group(1) == self.module.name),
+            None,
         )
 
         if start:
@@ -219,17 +233,14 @@ class SourceTypes:
 
             if value.startswith('{') and value.endswith('}'):
                 for entry in split_top_level_csv(value[1:-1]):
-                    match = re.fullmatch(r'(\w+)\s*=\s*(.*)', entry, re.DOTALL)
+                    match = FIELD_ENTRY_REGEX.fullmatch(entry)
 
                     if match:
                         fields[match.group(1)] = match.group(2)
 
-        for match in re.finditer(
-            rf'^{re.escape(self.module.name)}\.(\w+)\s*=\s*',
-            self.text,
-            re.MULTILINE,
-        ):
-            fields[match.group(1)] = _expression(self.text, match.end())
+        for match in MODULE_FIELD_REGEX.finditer(self.text):
+            if match.group(1) == self.module.name:
+                fields[match.group(2)] = _expression(self.text, match.end())
 
         return {name: self._field_type(value) for name, value in fields.items() if not name.startswith('_') and name not in self.module.methods}
 
