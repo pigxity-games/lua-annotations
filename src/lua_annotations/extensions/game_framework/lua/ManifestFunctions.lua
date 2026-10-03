@@ -1,4 +1,5 @@
--- /// Game-Framework Manifest API ///
+-- Implements manifest service dependencies, component lifecycle, and remotes.
+-- Generated manifests append these methods to bind annotation metadata to the runtime.
 
 -- Types --
 
@@ -8,14 +9,14 @@ local RunService = game:GetService('RunService')
 type Cleanup = () -> ()
 type CleanupSentinel = {}
 type CleanupValue = Cleanup | CleanupSentinel
-type RemoteDeps = { [string]: any }
+type RemoteDeps = { [string]: unknown }
 type ServiceDeps = {
-	[string]: any,
+	[string]: unknown,
 	client: RemoteDeps?,
 	server: RemoteDeps?,
 }
-type ComponentState = { [string]: any }
-type ComponentInstanceMap = { [Instance]: any }
+type ComponentState = { [string]: unknown }
+type ComponentInstanceMap = { [Instance]: unknown }
 type ComponentInstanceRegistry = { [string]: ComponentInstanceMap }
 type ServiceManifestData = {
 	kind: string,
@@ -26,20 +27,6 @@ type ServiceManifestData = {
 		remotes: { string }?,
 		components: { string }?,
 	},
-}
-type ServiceManifestModuleInfo = {
-	data: ServiceManifestData,
-	annotations: { [string]: { any } }?,
-}
-type ServiceManifestApi = {
-	environment: string,
-	_componentInstances: ComponentInstanceRegistry,
-	_startedServices: { [string]: any },
-	_startingServices: { [string]: boolean },
-	_getModuleInfo: (self: any, moduleName: string) -> ServiceManifestModuleInfo,
-	getModule: (self: any, moduleName: string) -> any,
-	getCached: (self: any, moduleName: string) -> any,
-	startService: (self: any, serviceName: string, deps: ServiceDeps?) -> any,
 }
 type DataService = { [Instance]: ComponentState }
 
@@ -56,19 +43,23 @@ local function log(message: string): ()
 end
 
 
-local function getRemoteTargetEnv(manifestApi: ServiceManifestApi): 'client' | 'server'
+local function getRemoteTargetEnv(manifestApi: { read environment: string }): 'client' | 'server'
 	return if manifestApi.environment == 'server' then 'client' else 'server'
 end
 
 
-local function makeComponentClass<T>(class: T, dataGetter: ((Instance) -> ComponentState)?): ()
-	local classTable = class :: any
-	classTable.__index = class
+-- Annotation modules provide their own fields and initializer signatures; augmentation dispatches those methods dynamically.
+-- Constructed values are component state with class lookup, rather than the class module itself.
+local function makeComponentClass(class: any, dataGetter: ((Instance) -> ComponentState)?): ()
+	class.__index = class
 
-	function classTable.new(inst: Instance, deps: ServiceDeps): T
-		local self = setmetatable(dataGetter and dataGetter(inst) or {}, classTable)
-		if classTable._init then
-			classTable._init(self, inst, deps)
+	function class.new(inst: Instance, deps: ServiceDeps): ComponentState
+		local state: ComponentState = dataGetter and dataGetter(inst) or {}
+		local self = setmetatable(state, class)
+		-- Component constructors invoke the lifecycle signature selected by their annotation kind.
+		local initialize = class._init :: ((ComponentState, Instance, ServiceDeps) -> ())?
+		if initialize then
+			initialize(self, inst, deps)
 		end
 		return self
 	end
@@ -113,8 +104,8 @@ local function useCollectionTag(tag: string, consumer: (Instance) -> Cleanup?): 
 end
 
 
-local function getMainTagForDependency(manifestApi: ServiceManifestApi, depName: string): string
-	local depData = manifestApi:_getModuleInfo(depName).data
+local function getMainTagForDependency(manifestApi: ManifestApiState, depName: string): string
+	local depData = manifestApi:_getModuleInfo(depName).data :: ServiceManifestData?
 	assert(depData, ('[LuaAnnotations] Unknown component dependency %q'):format(depName))
 	assert(depData.tags and depData.tags[1], ('[LuaAnnotations] Dependency %q has no tags'):format(depName))
 	return depData.tags[1]
@@ -122,15 +113,17 @@ end
 
 
 local function initServiceModule(
-	manifestApi: ServiceManifestApi,
+	manifestApi: ManifestApiState,
 	serviceName: string,
 	service: any,
 	data: ServiceManifestData,
 	baseDeps: ServiceDeps
 ): ()
 	if data.kind == 'service' then
-		if service._init then
-			service._init(baseDeps)
+		-- Service annotations select the dependency-only initializer contract.
+		local initialize = service._init :: ((ServiceDeps) -> ())?
+		if initialize then
+			initialize(baseDeps)
 		end
 		return
 	end
@@ -187,7 +180,7 @@ local function initServiceModule(
 
 					if not inst:HasTag(depTag) then
 						inst:AddTag(depTag)
-						assert(createdDepTags)
+						assert(createdDepTags, 'Component dependencies require a created-tag lookup')
 						createdDepTags[dep] = depTag
 					end
 
@@ -205,8 +198,10 @@ local function initServiceModule(
 			return function(): ()
 				instances[inst] = nil
 
-				if obj._destroy then
-					obj:_destroy()
+				-- Component cleanup is an optional method on its constructed state.
+				local destroy = obj._destroy :: ((ComponentState) -> ())?
+				if destroy then
+					destroy(obj)
 				end
 
 				if createdDepTags then
@@ -233,17 +228,19 @@ end
     @param runDependencyInit When true or nil, dependent services are started before being injected. When false, dependencies are required without running their startup logic.
     @return A deps table containing resolved service dependencies and cross-environment remote wrappers keyed by their manifest names.
 ]]
-function ManifestAPI:getServiceDeps(serviceName: string, runDependencyInit: boolean?): ServiceDeps
+-- An explicit self contract keeps callers from inheriting recursive method inference from the manifest implementation.
+function ManifestAPI.getServiceDeps(self: ManifestApiState, serviceName: string, runDependencyInit: boolean?): ServiceDeps
 	if runDependencyInit == nil then
 		runDependencyInit = true
 	end
 
-	local data = self:_getModuleInfo(serviceName).data
+	local data = self:_getModuleInfo(serviceName).data :: ServiceManifestData?
 	assert(data ~= nil, ('[LuaAnnotations] Module %q has no manifest data'):format(serviceName))
 
-	local injectDeps: any = {}
+	local injectDeps: ServiceDeps = {}
 	local remoteTargetEnv = getRemoteTargetEnv(self)
-	injectDeps[remoteTargetEnv] = {}
+	local remoteDeps: RemoteDeps = {}
+	injectDeps[remoteTargetEnv] = remoteDeps
 
 	for _, dep in ipairs(data.depends.services or {}) do
 		if runDependencyInit then
@@ -254,10 +251,10 @@ function ManifestAPI:getServiceDeps(serviceName: string, runDependencyInit: bool
 	end
 
 	for _, dep in ipairs(data.depends.remotes or {}) do
-		injectDeps[remoteTargetEnv][dep] = self:getModule('Lifecycle').getRemoteTable(self, dep)
+		remoteDeps[dep] = self:_getHookFun({ module = 'Lifecycle', method = 'getRemoteTable' })(self, dep)
 	end
 
-	return injectDeps :: ServiceDeps
+	return injectDeps
 end
 
 
@@ -267,9 +264,9 @@ end
     @param deps An optional dependency table to inject instead of building one with getServiceDeps.
     @return The loaded module or started service object for the requested manifest entry.
 ]]
-function ManifestAPI:startService(serviceName: string, deps: ServiceDeps?): any
+function ManifestAPI.startService(self: ManifestApiState, serviceName: string, deps: ServiceDeps?): unknown
 	local moduleInfo = self:_getModuleInfo(serviceName)
-	local data = moduleInfo.data
+	local data = moduleInfo.data :: ServiceManifestData?
 
 	if data == nil or data.kind == 'dependency' then
 		return self:loadModule(serviceName)
@@ -300,7 +297,7 @@ end
 	@param name The name of the remote service.
 	@param service The service table to set; `nil` clears the cached entry.
 ]]
-function ManifestAPI:setRemoteService(name: string, service: {[any]: any})
+function ManifestAPI:setRemoteService(name: string, service: {}?)
 	self._remoteCache[name] = service
 end
 

@@ -1,3 +1,5 @@
+# Describes parsed Luau modules, methods, types, and annotation targets.
+# Extensions share these records so signature semantics remain consistent across outputs.
 from dataclasses import dataclass, field
 from pathlib import Path
 import re
@@ -79,7 +81,7 @@ class LuaMethod:
         )
 
     def generate_type(self):
-        param_string = ', '.join([self.module.returned_name] if self.call_type == ':' else [] + list(self.params.values()))
+        param_string = ', '.join(([self.module.returned_name] if self.call_type == ':' else []) + list(self.params.values()))
         return f'({param_string}) -> ({self.return_type if self.return_type != 'nil' else ''})'
 
 

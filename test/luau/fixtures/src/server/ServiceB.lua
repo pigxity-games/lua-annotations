@@ -1,9 +1,11 @@
+--!strict
+-- Supplies a dependency result so fixture services can exercise initialization order.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Utility = require(ReplicatedStorage.Utility)
 
 --@service
 local m = {
-	initialized = false
+	initialized = false,
 }
 
 function m._init(deps)
@@ -11,7 +13,7 @@ function m._init(deps)
 	m.initialized = true
 end
 
-function m.getPingMessage()
+function m.getPingMessage(): string
 	return Utility.pingMessage
 end
 

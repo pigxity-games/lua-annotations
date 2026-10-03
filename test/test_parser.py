@@ -1,3 +1,5 @@
+# Exercises annotation parsing and method signatures.
+# Explicit source types must survive parsing so generated contracts match callers.
 from pathlib import Path
 
 import pytest  # pyright: ignore[reportMissingImports]
@@ -77,7 +79,7 @@ return Root
 
     run_method = next(a.adornee for a in method_anots if a.adornee.name == "run")
     assert isinstance(run_method, LuaMethod)
-    assert run_method.params == {"count": "number", "name": "any"}
+    assert run_method.params == {"count": "number", "name": "unknown"}
     assert run_method.return_type == "string"
 
     reset_method = next(a.adornee for a in method_anots if a.adornee.name == "reset")
@@ -404,7 +406,7 @@ return m
     assert method
 
     assert method.params["param1"] == "string"
-    assert method.params["param2"] == "string"
+    assert method.params["param2"] == "number"
     assert method.return_type == "string"
 
 
@@ -430,7 +432,7 @@ return m
     assert method
 
     assert method.params["param1"] == "string"
-    assert method.params["param2"] == "string"
+    assert method.params["param2"] == "number"
     assert method.return_type == "string"
 
     method2 = module.methods.get("testFun2")
@@ -495,7 +497,7 @@ return m
     assert method
 
     assert method.params["param1"] == "string"
-    assert method.params["param2"] == "string"
+    assert method.params["param2"] == "number"
     assert method.return_type == "string"
 
 
@@ -515,7 +517,7 @@ return {
     assert isinstance(method, LuaMethod)
 
     assert method.params["param1"] == "string"
-    assert method.params["param2"] == "string"
+    assert method.params["param2"] == "number"
     assert method.return_type == "string"
 
 
@@ -542,7 +544,7 @@ return module
     assert 'assert' not in module.methods
 
 
-def test_parser_method_types_use_any_if_ommited(tmp_path: Path):
+def test_parser_method_types_use_unknown_if_omitted(tmp_path: Path):
     parser = parse_text(
         tmp_path,
         "Test.lua",
@@ -563,15 +565,15 @@ return m
     method = module.methods.get("testFun1")
     assert method
 
-    assert method.params["param1"] == "any"
-    assert method.params["param2"] == "any"
+    assert method.params["param1"] == "unknown"
+    assert method.params["param2"] == "unknown"
     assert method.return_type == "string"
 
     method = module.methods.get("testFun2")
     assert method
 
     assert method.params["param1"] == "number"
-    assert method.params["param2"] == "any"
+    assert method.params["param2"] == "unknown"
     assert method.params["param3"] == "string"
     assert method.return_type == "nil"
 
@@ -597,7 +599,7 @@ return m
     method = module.methods.get("testFun1")
     assert method
 
-    assert method.params["param1"] == "any"
+    assert method.params["param1"] == "unknown"
     assert method.params["callback"] == "() -> ()"
     assert method.return_type == "string"
 
@@ -671,7 +673,7 @@ return m
     assert method
 
     assert method.call_type == '.'
-    assert method.params["param1"] == "any"
+    assert method.params["param1"] == "unknown"
 
 
 def test_parser_does_not_handle_function_return(tmp_path: Path):

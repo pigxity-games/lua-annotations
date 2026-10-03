@@ -1,3 +1,5 @@
+# Exercises generated service types through the real parser and build hooks.
+# These regressions keep static declarations aligned with dependency injection and remote senders.
 from pathlib import Path
 from textwrap import dedent
 
@@ -66,7 +68,8 @@ def test_service_types_include_remote_dependency_alias_and_remote_only_methods(t
                 local controller = {}
 
                 --@remote, event
-                function controller.sendInfo(notification: Notification)
+                function controller.sendInfo(notification: Notification): number
+                    return 1
                 end
 
                 --@remote, function
@@ -95,14 +98,14 @@ def test_service_types_include_remote_dependency_alias_and_remote_only_methods(t
         },
     )['server']
 
-    assert 'export type NotificationController = {' in out
-    assert '    sendInfo: (Notification) -> (),' in out
-    assert '    requestCount: (number) -> (number),' in out
+    assert 'export type ClientNotificationController = {' in out
+    assert '    sendInfo: (Player | {Player} | "all", Notification) -> (),' in out
+    assert '    requestCount: (Player, number) -> (number),' in out
     assert 'localOnly' not in out
-    assert 'export type PartyServiceDeps = {LoggerService: LoggerService, NotificationController: NotificationController}' in out
+    assert 'export type PartyServiceDeps = {LoggerService: LoggerService, client: {NotificationController: ClientNotificationController}}' in out
 
 
-def test_remote_dependency_type_overrides_same_named_local_type_in_output(tmp_path: Path):
+def test_remote_dependency_type_preserves_same_named_local_type_in_output(tmp_path: Path):
     out = build_service_types(
         tmp_path,
         {
@@ -141,10 +144,12 @@ def test_remote_dependency_type_overrides_same_named_local_type_in_output(tmp_pa
         },
     )['server']
 
-    assert 'export type NotificationController = {' in out
-    assert '    sendInfo: (Notification) -> (),' in out
+    assert 'export type ClientNotificationController = {' in out
+    assert '    sendInfo: (Player | {Player} | "all", Notification) -> (),' in out
     assert 'sendClickable' not in out
-    assert 'serverLocalOnly' not in out
+    assert 'serverLocalOnly' in out
+    assert 'export type NotificationController = {' in out
+    assert 'export type ClientNotificationController = {' in out
 
 
 def test_service_types_mirror_server_remote_function_types_into_client_output(tmp_path: Path):
@@ -156,7 +161,7 @@ def test_service_types_mirror_server_remote_function_types_into_client_output(tm
                 local service = {}
 
                 --@remote, function
-                function service.getProfile(user_id: number): PlayerProfile
+                function service.getProfile(player: Player, user_id: number): PlayerProfile
                 end
 
                 function service.localOnly(user_id: number)
@@ -174,10 +179,10 @@ def test_service_types_mirror_server_remote_function_types_into_client_output(tm
         },
     )['client']
 
-    assert 'export type DataService = {' in out
+    assert 'export type ServerDataService = {' in out
     assert '    getProfile: (number) -> (PlayerProfile),' in out
     assert 'localOnly' not in out
-    assert 'export type ProfileControllerDeps = {DataService: DataService}' in out
+    assert 'export type ProfileControllerDeps = {server: {DataService: ServerDataService}}' in out
 
 
 def test_remote_dependency_errors_when_target_remote_module_does_not_exist(tmp_path: Path):
@@ -193,3 +198,116 @@ def test_remote_dependency_errors_when_target_remote_module_does_not_exist(tmp_p
                 ''',
             },
         )
+
+
+def test_service_types_include_imported_types_declared_fields_and_colon_parameters(tmp_path: Path):
+    out = build_service_types(
+        tmp_path,
+        {
+            'server/src/State.lua': 'export type State = {ready: boolean}\nreturn {}',
+            'server/src/Store.lua': 'local m = {}\nfunction m.new() return {} end\nreturn m',
+            'server/src/MineService.lua': '''
+                local State = require(script.Parent.State)
+                local Store = require(script.Parent.Store)
+                type Progress = {depth: number}
+                --@service
+                local MineService = {
+                    data = Store.new(),
+                    running = false,
+                    depth = 1,
+                    current = nil :: State.State?,
+                }
+                MineService.root = nil :: BasePart?
+                function MineService.getState(): State.State
+                end
+                function MineService.enter(player: Player, depth: number)
+                end
+                function MineService:report(progress: Progress, depth: number): number
+                    return depth
+                end
+                function MineService.identity(peer: MineService): MineService
+                    return peer
+                end
+                return MineService
+            ''',
+        },
+    )['server']
+
+    assert 'local _ServerMineService_State = require(' in out
+    assert '.MineService.Parent.State)' in out
+    assert 'local _ServerMineService_Store = require(' in out
+    assert 'type _ServerMineService_Progress = {depth: number}' in out
+    assert 'data: typeof(_ServerMineService_Store.new())' in out
+    assert 'running: boolean' in out
+    assert 'depth: number' in out
+    assert 'current: _ServerMineService_State.State?' in out
+    assert 'root: BasePart?' in out
+    assert 'getState: () -> (_ServerMineService_State.State)' in out
+    assert 'enter: (Player, number) -> ()' in out
+    assert 'report: (MineService, _ServerMineService_Progress, number) -> (number)' in out
+    assert 'identity: (MineService) -> (MineService)' in out
+    assert 'require(ServerScriptService.src.MineService)' not in out
+
+
+def test_service_types_rebase_colliding_imports_without_importing_themselves(tmp_path: Path):
+    out = build_service_types(
+        tmp_path,
+        {
+            'client/src/NotificationController.lua': '''
+                local Types = require(script.Parent.Types)
+                --@service
+                local controller = {}
+                --@remote, unreliable
+                function controller.send(info: Types.ClientInfo)
+                end
+                return controller
+            ''',
+            'server/src/NotificationController.lua': '''
+                local Types = require(script.Parent.Types)
+                local ST = require(game:GetService("ServerScriptService").Generated.ServiceTypes)
+                local Unused = require(script.Parent.Unused)
+                type Result = {Types: string, other: ST.NotificationController?}
+                --@service, depends=[client:NotificationController]
+                local controller = {
+                    -- This comment must not swallow the following field.
+                    running = false,
+                }
+                function controller.send(info: Types.ServerInfo): Result
+                end
+                return controller
+            ''',
+        },
+    )['server']
+
+    assert 'local _ClientNotificationController_Types = require(' in out
+    assert 'local _ServerNotificationController_Types = require(' in out
+    assert 'send: (Player | {Player} | "all", _ClientNotificationController_Types.ClientInfo)' in out
+    assert 'send: (_ServerNotificationController_Types.ServerInfo)' in out
+    assert 'running: boolean' in out
+    assert '{Types: string, other: NotificationController?}' in out
+    assert 'Generated.ServiceTypes)' not in out
+    assert 'Unused' not in out
+
+
+def test_service_types_preserve_literal_tokens_and_nested_casts(tmp_path: Path):
+    out = build_service_types(
+        tmp_path,
+        {
+            'server/src/TokenService.lua': '''
+                local Store = require(script:WaitForChild("Store"))
+                local ST = require(game:GetService("ServerScriptService").Generated.ServiceTypes)
+                --@service
+                local service = {
+                    options = {Store = "ST.Ready", limit = nil :: number?},
+                    data = Store.new(),
+                }
+                function service.status(): "ST.Ready" | ST.TokenService
+                end
+                return service
+            ''',
+        },
+    )['server']
+
+    assert 'options: typeof({Store = "ST.Ready", limit = nil :: number?})' in out
+    assert 'status: () -> ("ST.Ready" | TokenService)' in out
+    assert '.TokenService:WaitForChild("Store"))' in out

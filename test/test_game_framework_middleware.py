@@ -1,3 +1,5 @@
+# Checks generated middleware metadata and the runtime contracts it drives.
+# Existing integration fixtures keep generated lifecycle wiring aligned with runtime behavior.
 from pathlib import Path
 from textwrap import dedent
 
@@ -124,23 +126,23 @@ def test_middleware_annotations_and_remote_metadata_are_generated(tmp_path: Path
     assert 'runAdminCommand' in client_manifest
     assert '--[[' in manifest_api
     assert 'local function waitForPath(path: ModulePath): Instance' in manifest_api
-    assert 'function ManifestAPI:getModule(moduleName: string): any' in manifest_api
-    assert 'Requires a generated module and caches its resolved export for future calls.' in manifest_api
-    assert 'Requires a generated module and caches its resolved export for future calls.\n    @param moduleName' in manifest_api
+    assert 'function ManifestAPI.getModule(self: ManifestApiState, moduleName: string): unknown' in manifest_api
+    assert 'Returns a generated module without running annotation or module handlers, caching it for future calls.' in manifest_api
+    assert 'Returns a generated module without running annotation or module handlers, caching it for future calls.\n    @param moduleName' in manifest_api
     assert '@param moduleName The manifest module name to require from the generated module path map.' in manifest_api
     assert '@return The cached module value or requested export for the module.' in manifest_api
     assert 'Builds and returns the dependency table for the requested service or component.' in manifest_api
     assert 'Builds and returns the dependency table for the requested service or component.\n    @param serviceName' in manifest_api
     assert 'local function useCollectionTag(tag: string, consumer: (Instance) -> Cleanup?): ()' in manifest_api
-    assert 'function ManifestAPI:getServiceDeps(serviceName: string, runDependencyInit: boolean?): ServiceDeps' in manifest_api
+    assert 'function ManifestAPI.getServiceDeps(self: ManifestApiState, serviceName: string, runDependencyInit: boolean?): ServiceDeps' in manifest_api
     assert '@param serviceName The manifest module name whose dependencies should be resolved.' in manifest_api
     assert '@param runDependencyInit When true or nil, dependent services are started before being injected. When false, dependencies are required without running their startup logic.' in manifest_api
     assert '@return A deps table containing resolved service dependencies and cross-environment remote wrappers keyed by their manifest names.' in manifest_api
-    assert 'function ManifestAPI:getServiceDeps(' in manifest_api
+    assert 'function ManifestAPI.getServiceDeps(' in manifest_api
     assert 'Starts and returns the requested service, component, initService, or dependency module.' in manifest_api
     assert '@param deps An optional dependency table to inject instead of building one with getServiceDeps.' in manifest_api
-    assert 'function ManifestAPI:startService(serviceName: string, deps: ServiceDeps?): any' in manifest_api
-    assert 'function ManifestAPI:startService(' in manifest_api
+    assert 'function ManifestAPI.startService(self: ManifestApiState, serviceName: string, deps: ServiceDeps?): unknown' in manifest_api
+    assert 'function ManifestAPI.startService(' in manifest_api
 
 
 def test_runtime_template_includes_phase_timing(tmp_path: Path):

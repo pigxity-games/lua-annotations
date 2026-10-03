@@ -1,3 +1,5 @@
+# Parses annotation targets and their explicit Luau signatures.
+# Source annotations must be preserved for extensions to emit truthful contracts.
 from dataclasses import dataclass, field
 from pathlib import Path
 import re
@@ -91,7 +93,7 @@ def map_param_list(params: list[str]):
         if len(parts) > 1:
             out[parts[0]] = parts[1]
         else:
-            out[parts[0]] = 'any'
+            out[parts[0]] = 'unknown'
 
     return out
 
@@ -411,17 +413,6 @@ class FileParser:
             return {}
         return map_param_list(split_top_level_csv(raw_params))
 
-    def _normalize_non_strict_param_dict(self, param_dict: dict[str, str]):
-        has_function_typed_param = any('->' in value for value in param_dict.values())
-        if has_function_typed_param:
-            return param_dict
-
-        for idx, key in enumerate(param_dict):
-            if idx > 0 and param_dict[key] == 'number':
-                param_dict[key] = 'string'
-
-        return param_dict
-
     def _get_dict_return_alias_method(self, text: str, modules: dict[str, LuaModule], returned: ReturnDefinition):
         if returned.type != 'dict':
             return None
@@ -510,10 +501,6 @@ class FileParser:
             self.error(text, 'method is incorrectly defined')
 
         param_dict = self._build_param_dict(raw_params)
-
-        if not strict:
-            # Keep inferred method typing behavior consistent for module method indexes.
-            param_dict = self._normalize_non_strict_param_dict(param_dict)
 
         if module_name is not None:
             if module_name not in modules:

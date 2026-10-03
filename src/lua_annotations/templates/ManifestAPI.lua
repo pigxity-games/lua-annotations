@@ -1,4 +1,6 @@
+--!strict
 -- Generated using lua-anot; do not edit manually.
+-- Loads annotated modules and invokes configured hooks so generated manifests share one runtime implementation.
 
 -- /// Core Manifest API ///
 
@@ -12,9 +14,9 @@ type ModulePathExport = {
 type ModulePathEntry = ModulePath | ModulePathExport
 type ManifestAnnotation = {
 	name: string,
-	data: any,
-	args: { any }?,
-	kwargs: { [string]: any }?,
+	data: unknown,
+	args: { unknown }?,
+	kwargs: { [string]: unknown }?,
 }
 type ManifestHook = {
 	module: string,
@@ -22,7 +24,7 @@ type ManifestHook = {
 }
 type ManifestModuleInfo = {
 	annotations: { [string]: { ManifestAnnotation } },
-	data: any,
+	data: unknown,
 }
 type ManifestHooks = {
 	pre_init: { ManifestHook },
@@ -34,7 +36,7 @@ type ManifestData = {
 	modules: { [string]: ManifestModuleInfo },
 	hooks: ManifestHooks,
 	load_order: { string },
-	remotes: any,
+	remotes: unknown,
 }
 type ManifestInitData = {
 	environment: string,
@@ -45,12 +47,12 @@ type ManifestApiFields = {
 	environment: string,
 	modulePaths: { [string]: ModulePathEntry },
 	manifest: ManifestData,
-	_cache: { [string]: any },
+	_cache: { [string]: unknown },
 	_loadedAnnotations: { [string]: boolean },
 	_ranModuleHandlers: { [string]: boolean },
-	_remoteCache: { [string]: any },
-	_componentInstances: { [string]: { [Instance]: any } },
-	_startedServices: { [string]: any },
+	_remoteCache: { [string]: unknown },
+	_componentInstances: { [string]: { [Instance]: unknown } },
+	_startedServices: { [string]: unknown },
 	_startingServices: { [string]: boolean },
 }
 
@@ -70,7 +72,8 @@ local function waitForPath(path: ModulePath): Instance
 end
 
 
-local function applyExport(value: any, exportName: string?): any
+-- Module exports and hook functions have differing fields; this adapter alone indexes their dynamic shape.
+local function applyExport(value: any, exportName: string?): unknown
 	if not exportName then
 		return value
 	end
@@ -108,7 +111,7 @@ end
     @param moduleName The manifest module name to resolve.
     @return The manifest module info table for the requested module.
 ]]
-function ManifestAPI:_getModuleInfo(moduleName: string): ManifestModuleInfo
+function ManifestAPI._getModuleInfo(self: ManifestApiState, moduleName: string): ManifestModuleInfo
 	local moduleInfo = self.manifest.modules[moduleName]
 	assert(moduleInfo ~= nil, ('[LuaAnnotations] Unknown manifest module %q'):format(moduleName))
 	return moduleInfo
@@ -120,8 +123,8 @@ end
     @param hook A manifest hook table containing the module and method names to resolve.
     @return The callable hook function from the cached module export.
 ]]
-function ManifestAPI:_getHookFun(hook: ManifestHook): (...any) -> ...any
-	return self:getModule(hook.module)[hook.method] :: (...any) -> ...any
+function ManifestAPI._getHookFun(self: ManifestApiState, hook: ManifestHook): (...any) -> ...unknown
+	return applyExport(self:getModule(hook.module), hook.method) :: (...any) -> ...unknown
 end
 
 
@@ -130,7 +133,7 @@ end
     @param moduleName The manifest module name whose retained annotations should be processed.
     @param moduleInfo The manifest module info table containing annotation data for the module.
 ]]
-function ManifestAPI:_runAnnotationHandlers(moduleName: string, moduleInfo: ManifestModuleInfo): ()
+function ManifestAPI._runAnnotationHandlers(self: ManifestApiState, moduleName: string, moduleInfo: ManifestModuleInfo): ()
 	if self._loadedAnnotations[moduleName] then
 		return
 	end
@@ -153,7 +156,7 @@ end
     @param moduleName The manifest module name whose module handlers should be processed.
     @param moduleInfo The manifest module info table passed into each module handler.
 ]]
-function ManifestAPI:_runModuleHandlers(moduleName: string, moduleInfo: ManifestModuleInfo): ()
+function ManifestAPI._runModuleHandlers(self: ManifestApiState, moduleName: string, moduleInfo: ManifestModuleInfo): ()
 	if self._ranModuleHandlers[moduleName] then
 		return
 	end
@@ -171,15 +174,19 @@ end
     @param moduleName The manifest module name to require from the generated module path map.
     @return The cached module value or requested export for the module.
 ]]
-function ManifestAPI:getModule(moduleName: string): any
+function ManifestAPI.getModule(self: ManifestApiState, moduleName: string): unknown
 	local cachedModule = self._cache[moduleName]
 	if cachedModule == nil then
-		local moduleData: any = self.modulePaths[moduleName]
+		local moduleData = self.modulePaths[moduleName]
 		assert(moduleData ~= nil, ('[LuaAnnotations] Unknown cached module %q'):format(moduleName))
 
-		local path = moduleData.path or moduleData
-		local exportName = moduleData.export
-		cachedModule = applyExport(require(waitForPath(path)), exportName)
+		-- Generated paths are either ordinal paths or exported paths; the optional field distinguishes them.
+		local exportedPath = moduleData :: ModulePathExport
+		local path = exportedPath.path or (moduleData :: ModulePath)
+		local exportName = exportedPath.export
+		-- Module paths are runtime Instances, so there is no static require path to resolve.
+		local requireModule: (Instance) -> unknown = require
+		cachedModule = applyExport(requireModule(waitForPath(path)), exportName)
 		self._cache[moduleName] = cachedModule
 	end
 	return cachedModule
@@ -191,7 +198,7 @@ end
     @param moduleName The manifest module name to load from the generated manifest.
     @return The loaded module value or requested export for the module.
 ]]
-function ManifestAPI:loadModule(moduleName: string): any
+function ManifestAPI.loadModule(self: ManifestApiState, moduleName: string): unknown
 	local moduleInfo = self:_getModuleInfo(moduleName)
 	local module = self:getModule(moduleName)
 

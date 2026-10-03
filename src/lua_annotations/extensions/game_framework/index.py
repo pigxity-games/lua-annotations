@@ -1,3 +1,5 @@
+# Generates annotation indexes and static service contracts.
+# Dependency shapes and remote sender signatures must match the framework runtime.
 from lua_annotations.api.annotations import (
     ENVIRONMENTS,
     AnnotationBuildCtx,
@@ -9,10 +11,12 @@ from lua_annotations.api.annotations import (
 from lua_annotations.api.lua_dict import (
     HEADER,
     LuaPath,
+    LuaPathResolver,
     convert_dict_module,
 )
 from lua_annotations.build_process import Environment, PostProcessCtx
 from lua_annotations.parser_schemas import LuaMethod, LuaModule, ReturnedValue
+from .typegen import SourceTypes
 
 
 def _env(ctx: AnnotationBuildCtx) -> Environment:
@@ -26,13 +30,6 @@ def _name(ctx: AnnotationBuildCtx) -> str | None:
 TYPEGEN_ANOTS = ('service', 'component', 'dependency')
 
 
-def _dep_type_name(dep: str):
-    if ':' not in dep:
-        return dep
-
-    return dep.split(':', 1)[1]
-
-
 def _remote_dep(dep: str) -> tuple[Environment, str] | None:
     if ':' not in dep:
         return None
@@ -44,43 +41,85 @@ def _remote_dep(dep: str) -> tuple[Environment, str] | None:
     return remote_env, remote_name
 
 
-def _render_remote_type(methods: dict[str, LuaMethod]):
-    if not methods:
-        return '{}'
+def _remote_type_name(env: Environment, name: str):
+    return env.capitalize() + name
 
-    out = '\n'
-    for name, method in methods.items():
-        out += f'    {name}: {method.generate_type()},\n'
 
-    return '{' + out + '}'
+def _dependency_type(deps: list[str]):
+    local = []
+    remote: dict[Environment, list[str]] = {}
+    for dep in deps:
+        target = _remote_dep(dep)
+        if target is None:
+            local.append(f'{dep}: {dep}')
+        else:
+            env, name = target
+            remote.setdefault(env, []).append(f'{name}: {_remote_type_name(env, name)}')
+    local.extend(f'{env}: ' + '{' + ', '.join(entries) + '}' for env, entries in remote.items())
+    return '{' + ', '.join(local) + '}'
+
+
+def _render_remote_type(source: SourceTypes, methods: dict[str, tuple[LuaMethod, str]], env: Environment):
+    out = []
+    for name, (method, kind) in methods.items():
+        params = list(method.params.values())
+        if env == 'server':
+            # Roblox supplies Player to server receivers; client senders omit it.
+            params = params[1:]
+        else:
+            # Only event senders support broadcast and player lists.
+            target = 'Player' if kind == 'function' else 'Player | {Player} | "all"'
+            params = [target] + params
+        # Event transport discards receiver returns; only RemoteFunction returns a result.
+        result = None if kind == 'function' else 'nil'
+        out.append(f'    {name}: {source.method(method, params, result)},')
+    return '{\n' + '\n'.join(out) + '\n}'
 
 
 class IndexExtension(Extension):
     def __init__(self) -> None:
         self.indexes: dict[Environment, dict[str, LuaPath] | LuaPath] = {env: {} for env in ENVIRONMENTS}
-        self.module_types: dict[Environment, dict[str, str]] = {env: {} for env in ENVIRONMENTS}
+        self.module_types: dict[Environment, dict[str, LuaModule | str]] = {env: {} for env in ENVIRONMENTS}
         self.dep_types: dict[Environment, dict[str, str]] = {env: {} for env in ENVIRONMENTS}
-        self.remote_methods: dict[Environment, dict[str, dict[str, LuaMethod]]] = {env: {} for env in ENVIRONMENTS}
+        self.remote_methods: dict[Environment, dict[str, dict[str, tuple[LuaMethod, str]]]] = {env: {} for env in ENVIRONMENTS}
         self.remote_type_refs: dict[Environment, dict[str, Environment]] = {env: {} for env in ENVIRONMENTS}
 
     def on_post_process(self, ctx: PostProcessCtx):
         for env in ENVIRONMENTS:
             # module index
             ctx.create_file(env, 'Index.lua', convert_dict_module(ctx, self.indexes[env]))
-            out: list[str] = []
-            type_defs = dict(self.module_types[env])
+            out = []
+            sources = []
+            resolver = LuaPathResolver(ctx.workspace)
+            for name, module in self.module_types[env].items():
+                if isinstance(module, LuaModule):
+                    source = SourceTypes(module, resolver, env)
+                    sources.append(source)
+                    data = source.declaration()
+                else:
+                    data = module
+                out.append(f'export type {name} = {data}')
 
             for name, remote_env in self.remote_type_refs[env].items():
                 methods = self.remote_methods[remote_env].get(name, {})
-                type_defs[name] = _render_remote_type(methods)
-
-            for name, data in type_defs.items():
-                out.append(f'export type {name} = {data}')
+                if methods:
+                    method = next(iter(methods.values()))[0]
+                    source = SourceTypes(method.module, resolver, remote_env)
+                    sources.append(source)
+                    data = _render_remote_type(source, methods, remote_env)
+                else:
+                    data = '{}'
+                out.append(f'export type {_remote_type_name(remote_env, name)} = {data}')
 
             for name, data in self.dep_types[env].items():
                 out.append(f'export type {name} = {data}')
 
-            ctx.create_file(env, 'ServiceTypes.lua', '\n'.join([HEADER, ''] + out + ['', 'return nil\n']))
+            prelude = list(dict.fromkeys(line for source in sources for line in source.prelude()))
+            ctx.create_file(env, 'ServiceTypes.lua', '\n'.join([
+                '--!strict', HEADER,
+                '-- Declares service state, local methods, and remote senders for typed dependency injection.',
+                '', *prelude, '', *out, '', 'return nil\n',
+            ]))
 
     def on_file_process(self, ctx: FileBuildCtx):
         env = ctx.build_ctx.env
@@ -91,7 +130,7 @@ class IndexExtension(Extension):
 
                 module_name = method.module.returned_name
                 self.remote_methods[env].setdefault(module_name, {})
-                self.remote_methods[env][module_name][method.name] = method
+                self.remote_methods[env][module_name][method.name] = (method, anot.args_val[0])
 
             if anot.name in TYPEGEN_ANOTS:
                 # service typegen
@@ -103,18 +142,17 @@ class IndexExtension(Extension):
 
                 if typegen == 'registry':
                     load_after = anot.kwargs_val.get('load_after')
-                    load_after_type = load_after[0] if load_after else 'any'
+                    load_after_type = load_after[0] if load_after else 'unknown'
                     out_type = '{' + f'[Instance]: {load_after_type}' + '}'
                 else:
-                    out_type = module.generate_type()
+                    out_type = module
 
                 self.module_types[env][module.returned_name] = out_type
 
             if anot.name in TYPEGEN_ANOTS or anot.name == 'initService':
                 # deps types
                 deps = anot.kwargs_val.get('depends', [])
-                dep_names = [_dep_type_name(dep) for dep in deps]
-                dep_string = '{' + ', '.join([f'{dep}: {dep}' for dep in dep_names]) + '}'
+                dep_string = _dependency_type(deps)
 
                 for dep in deps:
                     remote_dep = _remote_dep(dep)
